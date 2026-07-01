@@ -21,10 +21,10 @@ def cargar_credenciales():
     
 
 def cargar_ajustes():
-    """NUEVA FUNCIÓN: Lee el archivo settings.json para saber tu nombre y la voz de David"""
+    """NUEVA FUNCIÓN: Lee el archivo settings.json para saber tu nombre y la voz creada en eleven labs"""
     ruta_actual = os.path.dirname(os.path.abspath(__file__))
     ruta_json = os.path.abspath(os.path.join(ruta_actual, "../../config/settings.json"))
-
+    #aqui verifica el json que se creo en la carpeta de config 
     try:
         with open(ruta_json, "r", encoding="utf-8") as archivo:
             ajustes = json.load(archivo)

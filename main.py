@@ -9,7 +9,7 @@ if __name__ == "__main__":
     revan_voz = ElevenLabsClient()
     
     # El saludo épico
-    mensaje = f"Sistemas en línea, {titulo}. Todos los módulos de control táctico están listos para sus directivas."
+    mensaje = f"Sistemas en línea, {titulo}. Todos los módulos de control de su ordenador están listos para sus ordenes"
     print(f"Texto a decir: '{mensaje}'")
     
     revan_voz.hablar(mensaje)
