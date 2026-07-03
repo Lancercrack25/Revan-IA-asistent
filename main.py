@@ -1,4 +1,9 @@
 import os
+import sys
+
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+sys.dont_write_bytecode = True
+
 from src.Core.Gemini_client import GeminiClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient  # NUEVO
@@ -34,11 +39,12 @@ def main():
                 continue
                 
             # Comandos de apagado por voz
-            if any(palabra in orden.lower() for palabra in ["salir", "apagar sistema", "desconectar"]):
-                voz_ia.hablar(f"Entendido, {titulo}. Desconectando sistemas tácticos. Que la Fuerza lo acompañe.")
+            if any(palabra in orden.lower() for palabra in ["salir", "apagar sistema", "desconectar","adios", "apagate"]):
+                voz_ia.hablar(f"Entendido, {titulo}. Desconectando sistemas tácticos, espero volver a activarme para seguir sus instrucciones.")
                 break
                 
             print(f"🧠 Revan pensando respuesta...")
+            #aqui se genera la respuesta de la ia y se te la da con voz
             respuesta_texto = cerebro_ia.generar_respuesta(orden)
             
             print(f"🤖 [REVAN]: {respuesta_texto}")
