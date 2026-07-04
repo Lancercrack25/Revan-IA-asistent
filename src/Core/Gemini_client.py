@@ -1,21 +1,23 @@
-import google.generativeai as genai 
-from src.Core.Config_loader import cargar_credenciales, cargar_ajustes
+import os
+from google import genai
+from google.genai import types
+from src.Core.Config_loader import cargar_credentials, cargar_ajustes
 
 class GeminiClient:
     def __init__(self):
         # 1. Cargar credenciales y ajustes
-        credenciales = cargar_credenciales()
+        credenciales = cargar_credentials()
         ajustes = cargar_ajustes()
+        # Soportamos tanto tu cargador como las variables de entorno normales
+        api_key = credenciales.get("GEMINI_API_KEY") if credenciales else os.environ.get("GEMINI_API_KEY")
         
-        if not credenciales or "GEMINI_API_KEY" not in credenciales:
-            raise ValueError("❌ No se encontró la GEMINI_API_KEY.")
-            
-        genai.configure(api_key=credenciales["GEMINI_API_KEY"])
-        
+        if not api_key:
+            raise ValueError("❌ No se encontró la GEMINI_API_KEY en las credenciales.")
+        # Inicializamos el nuevo cliente oficial de Google
+        self.client = genai.Client(api_key=api_key)
         # 2. Obtener y guardar el título del usuario
         self.titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
-        
-        # 3. Darle la personalidad y el contexto conversacional
+        # 3. Personalidad y contexto de REVAN
         instruccion_sistema = (
             f"Eres REVAN, un asistente avanzado como Jarvis de las películas de Iron Man, pero con más personalidad. "
             f"Te estás dirigiendo a tu usuario, a quien reconoces y respetas profundamente como tu {self.titulo}. "
@@ -24,20 +26,22 @@ class GeminiClient:
             f"no suenes aburrido ni satures el audio. Sé directo, estratégico y leal."
         )
         
-        # 4. Inicializar el modelo con la versión flash más reciente y compatible
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+        # 4. Configurar el chat con la instrucción de sistema integrada en el SDK moderno
+        config = types.GenerateContentConfig(
             system_instruction=instruccion_sistema
         )
         
-        # 5. Iniciamos el chat con memoria
-        print("🧠 [REVAN]: Memoria e historial de conversación activados.")
-        self.chat = self.model.start_chat(history=[])
+        # 5. Iniciamos el chat con memoria usando el modelo nativo rápido
+        print("🧠 [REVAN]: Memoria e historial de conversación activados (SDK Moderno).")
+        self.chat = self.client.chats.create(
+            model="gemini-2.5-flash",
+            config=config
+        )
 
     def generar_respuesta(self, orden: str) -> str:
         """Envía el mensaje al chat con memoria y devuelve la respuesta continua."""
         try:
-            # Enviamos el mensaje dentro de la sesión de chat
+            # Nueva sintaxis para enviar mensajes manteniendo el historial
             respuesta = self.chat.send_message(orden)
             return respuesta.text
         except Exception as e:

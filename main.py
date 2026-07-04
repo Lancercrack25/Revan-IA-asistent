@@ -26,15 +26,17 @@ sistema_activo = False
 def esperar_aplauso():
     global oidos_ia, gui, sistema_activo
     try:
-        captura = oidos_ia.escuchar()
+        # Le indicamos al cliente que use el modo rápido para cazar el ruido seco
+        captura = oidos_ia.escuchar(modo_pasivo=True)
+        # Si devuelve texto o nuestro comodín "GOLPE_ACUSTICO", encendemos los sistemas
         if captura.strip():
+            print(f"💥 ¡Señal acústica validada! Inicializando REVAN...")
             encender_sistemas()
             return
     except Exception as e:
-        print(f"Buscando señal... {e}")
-
+        pass
     if not sistema_activo:
-        gui.app.after(100, esperar_aplauso)
+        gui.app.after(50, esperar_aplauso)
 
 def encender_sistemas():
     """Ejecuta la modularización táctica al recibir el aplauso."""
@@ -101,12 +103,12 @@ def main():
     print("🌌 Inicializando cargador base de REVAN...")
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
-    
+    # 1. Iniciamos la GUI de REVAN visible desde el principio para ver el estado
     gui = RevanGUI(titulo_usuario=titulo)
+    gui.mostrar_panel() 
+    gui.actualizar_estado("💤 MODO PASIVO (APLAUDA)", "#ffb703") # Amarillo de espera
+    # 2. Encendemos los oídos de la IA
     oidos_ia = MicrophoneClient()
-    
-    gui.app.after(100, esperar_aplauso)
+    # 3. Lanzamos el bucle de escaneo de impacto
+    gui.app.after(500, esperar_aplauso)
     gui.app.mainloop()
-
-if __name__ == "__main__":
-    main()
