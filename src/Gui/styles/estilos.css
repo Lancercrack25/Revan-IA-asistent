@@ -69,7 +69,6 @@ body, html {
     text-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
     transition: color 0.4s ease;
 }
-
 /* Subtexto Informativo Inferior */
 #sub-text {
     color: #8888aa;

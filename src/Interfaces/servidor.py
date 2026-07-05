@@ -1,46 +1,40 @@
-import asyncio
-import json
 import os
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 
 app = FastAPI()
-conexion_interfaz = None
 
-# Apuntamos dinámicamente a la carpeta 'web' que está al mismo nivel de este archivo
-DIRECTORIO_WEB = os.path.join(os.path.dirname(__file__), "web")
-app.mount("/static", StaticFiles(directory=DIRECTORIO_WEB), name="static")
+# 🛠️ CORRECCIÓN DE RUTAS TÁCTICAS:
+# os.path.abspath(__file__) -> src/Interfaces/servidor.py
+# os.path.dirname(...)       -> src/Interfaces/
+CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
+
+# Bajamos directo a la carpeta 'web' que está ahí al lado
+CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
+
+# Subimos dos niveles para llegar a 'src' y luego entramos a 'Gui/styles'
+BASE_DIR = os.path.dirname(os.path.dirname(CARPETA_INTERFACES))
+CARPETA_STYLES = os.path.join(BASE_DIR, "src", "Gui", "styles")
+
+# Montamos los recursos estáticos con las rutas corregidas
+app.mount("/static", StaticFiles(directory=CARPETA_WEB), name="static")
+app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
+
+@app.get("/")
+async def obtener_index():
+    ruta_index = os.path.join(CARPETA_WEB, "index.html")
+    if os.path.exists(ruta_index):
+        with open(ruta_index, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content=f"<h1>⚠️ Error: index.html no encontrado en: {CARPETA_WEB}</h1>", status_code=404)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    global conexion_interfaz
     await websocket.accept()
-    conexion_interfaz = websocket
-    print("🛸 REVAN_CORE: Esfera neuronal 3D vinculada exitosamente.")
     try:
         while True:
-            # Mantiene el pulso del WebSocket activo
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        print("❌ REVAN_CORE: Esfera neuronal 3D desconectada.")
-        conexion_interfaz = None
-
-async def cambiar_estado_esfera(estado: str, color_hex: str):
-    """Envía de forma inmediata la instrucción de animación y color a la esfera web."""
-    global conexion_interfaz
-    if conexion_interfaz:
-        payload = {
-            "estado": estado.upper(),
-            "color": color_hex
-        }
-        try:
-            await conexion_interfaz.send_text(json.dumps(payload))
-        except Exception as e:
-            print(f"⚠️ Error al transmitir datos a la esfera: {e}")
-
-def iniciar_servidor_ui():
-    """Inicializa la configuración de Uvicorn para embeber el servidor en un hilo secundario."""
-    import uvicorn
-    # Levantamos el servidor en localhost puerto 8000
-    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="warning")
-    return uvicorn.Server(config)
+            data = await websocket.receive_text()
+            await websocket.send_text(data)
+    except Exception:
+        pass
