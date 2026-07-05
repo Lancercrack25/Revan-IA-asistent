@@ -7,25 +7,16 @@ from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
-# 🎯 CONFIGURACIÓN AJUSTADA A TU ÁRBOL REAL EN PANTALLA:
-# 1. Nos paramos en src/Interfaces/
+# Mapeo Absoluto Adaptado al Árbol de Trabajo Real
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
-
-# 2. Entramos directo a la carpeta 'web' que es hermana de servidor.py
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
-
-# 3. Subimos UN SOLO NIVEL para llegar a la raíz de 'src/'
 RAIZ_SRC = os.path.dirname(CARPETA_INTERFACES)
-
-# 4. Bajamos de forma limpia hacia 'src/Gui/styles'
 CARPETA_STYLES = os.path.join(RAIZ_SRC, "Gui", "styles")
 
-
-# Montamos los recursos con los mapeos virtuales corregidos
+# Montura de Alias Virtuales de Red
 app.mount("/static", StaticFiles(directory=CARPETA_WEB), name="static")
 app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
 
-# Control de Navegadores Activos (Brave)
 conexiones_activas = []
 
 @app.get("/")
@@ -34,7 +25,7 @@ async def obtener_index():
     if os.path.exists(ruta_index):
         with open(ruta_index, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content=f"<h1>⚠️ Error: index.html no encontrado en: {CARPETA_WEB}</h1>", status_code=404)
+    return HTMLResponse(content=f"<h1>⚠️ Error: index.html no encontrado</h1>", status_code=404)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -50,6 +41,7 @@ async def websocket_endpoint(websocket: WebSocket):
             conexiones_activas.remove(websocket)
 
 async def cambiar_estado_esfera(estado: str, color_hex: str):
+    """Enruta y distribuye los estados hacia el cliente JavaScript en tiempo real."""
     if not conexiones_activas:
         return
         

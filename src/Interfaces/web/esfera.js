@@ -1,10 +1,10 @@
 /* ==========================================================================
-   REVAN NEURAL CORE - ENGINE GRAPHICS (THREE.JS & WEBSOCKETS)
+   REVAN NEURAL CORE - SHADER ENGINE & CHROMATIC REALTIME MUTATION
    ========================================================================== */
 
 let escena, camara, render, redNeuronal, nodosSinapticos, brilloNucleo;
 let estadoActual = "ESPERA";
-let colorObjetivo = new THREE.Color("#0077ff");
+let colorObjetivo = new THREE.Color("#0077ff"); // Variable maestra de control de color
 let velocidadGiro = 0.005;
 let deltaTiempo = 0;
 let amplitudOnda = 0.03;
@@ -23,16 +23,14 @@ function inicializarEsfera() {
     render.setPixelRatio(window.devicePixelRatio);
     contenedor.appendChild(render.domElement);
 
-    // Malla de alta densidad para deformaciones fluidas
     const geometriaEsfera = new THREE.IcosahedronGeometry(2.1, 3);
-    
-    // Clonamos la geometría de fábrica para usarla como base de cálculo
     geometriaEsfera.userData = {
         posOriginales: geometriaEsfera.attributes.position.clone()
     };
 
+    // 🎯 MEJORADO: Vinculamos el color inicial directamente a la referencia dinámica
     const matLineas = new THREE.MeshBasicMaterial({
-        color: 0x0077ff,
+        color: colorObjetivo, 
         wireframe: true,
         transparent: true,
         opacity: 0.4
@@ -41,7 +39,7 @@ function inicializarEsfera() {
     escena.add(redNeuronal);
 
     const matPuntos = new THREE.PointsMaterial({
-        color: 0x00ffcc,
+        color: colorObjetivo, 
         size: 0.07,
         transparent: true,
         opacity: 0.9
@@ -49,10 +47,9 @@ function inicializarEsfera() {
     nodosSinapticos = new THREE.Points(geometriaEsfera, matPuntos);
     escena.add(nodosSinapticos);
 
-    // Núcleo de energía interno
     const geoBrillo = new THREE.SphereGeometry(0.8, 16, 16);
     const matBrillo = new THREE.MeshBasicMaterial({
-        color: 0x0077ff,
+        color: colorObjetivo, 
         transparent: true,
         opacity: 0.15,
         blending: THREE.AdditiveBlending
@@ -97,27 +94,31 @@ function conectarServidorCore() {
     socket.onmessage = function(evento) {
         const comando = JSON.parse(evento.data);
         estadoActual = comando.estado;
-        colorObjetivo.set(comando.color);
         
-        hudTexto.innerText = `REVAN V1.0 | ${comando.estado}`;
-        hudTexto.style.color = comando.color;
-        hudContenedor.style.borderColor = comando.color;
-        hudContenedor.style.boxShadow = `0 0 30px ${comando.color}44, inset 0 0 15px ${comando.color}11`;
-
-        // Modificadores de físicas según comportamiento en tiempo real
+        // Asignación de mutaciones cromáticas y comportamiento físico
         if (estadoActual === "ESCUCHANDO") {
+            colorObjetivo.set("#00ffcc"); // Cian Eléctrico
             velocidadGiro = 0.015;
             amplitudOnda = 0.15;
         } else if (estadoActual === "PENSANDO") {
+            colorObjetivo.set("#ffaa00"); // Ámbar / Dorado cuántico
             velocidadGiro = 0.06;
             amplitudOnda = 0.05;
         } else if (estadoActual === "HABLANDO") {
+            colorObjetivo.set("#ff0055"); // Fucsia de alta frecuencia
             velocidadGiro = 0.008;
             amplitudOnda = 0.35;
         } else {
+            colorObjetivo.set("#0077ff"); // Azul estándar
             velocidadGiro = 0.004;
             amplitudOnda = 0.03;
         }
+
+        // Modificación del entorno CSS HUD en tiempo de ejecución
+        hudTexto.innerText = `REVAN V1.0 | ${comando.estado}`;
+        hudTexto.style.color = colorObjetivo.getStyle();
+        hudContenedor.style.borderColor = colorObjetivo.getStyle();
+        hudContenedor.style.boxShadow = `0 0 30px ${colorObjetivo.getStyle()}44, inset 0 0 15px ${colorObjetivo.getStyle()}11`;
     };
 
     socket.onclose = function() {
@@ -129,16 +130,21 @@ function bucleAnimacion() {
     requestAnimationFrame(bucleAnimacion);
     deltaTiempo += (estadoActual === "PENSANDO") ? 0.25 : 0.05;
 
-    redNeuronal.material.color.lerp(colorObjetivo, 0.06);
-    nodosSinapticos.material.color.lerp(colorObjetivo, 0.06);
-    brilloNucleo.material.color.lerp(colorObjetivo, 0.06);
+    // 🎯 MEJORADO: Interpolación lineal explícita por cuadro en la GPU para transiciones líquidas
+    redNeuronal.material.color.lerp(colorObjetivo, 0.08);
+    nodosSinapticos.material.color.lerp(colorObjetivo, 0.08);
+    brilloNucleo.material.color.lerp(colorObjetivo, 0.08);
+
+    // Forzado de banderas internas de actualización para Three.js
+    redNeuronal.material.needsUpdate = true;
+    nodosSinapticos.material.needsUpdate = true;
+    brilloNucleo.material.needsUpdate = true;
 
     redNeuronal.rotation.y += velocidadGiro;
     redNeuronal.rotation.x += velocidadGiro * 0.3;
     nodosSinapticos.rotation.y = redNeuronal.rotation.y;
     nodosSinapticos.rotation.x = redNeuronal.rotation.x;
 
-    // Distorsión paramétrica de vértices basada en ruido matemático
     const posAttr = redNeuronal.geometry.attributes.position;
     const posOrig = redNeuronal.geometry.userData.posOriginales;
     
