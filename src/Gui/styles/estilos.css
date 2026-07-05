@@ -1,39 +1,83 @@
-        body, html {
-            margin: 0;
-            overflow: hidden;
-            background-color: transparent !important;
-        }
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            background: transparent !important;
-        }
+       /* ==========================================================================
+   REVAN NEURAL CORE - HUD STYLESHEET
+   ========================================================================== */
+
+/* Configuración Base del Contenedor de la Ventana */
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #04040a; /* Fondo oscuro profundo para mitigar el destello blanco de Brave */
+    font-family: 'Segoe UI', 'Consolas', 'Courier New', monospace;
+    user-select: none;
+}
+
+/* Lienzo de Renderizado 3D (Three.js) */
+#canvas-container {
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+/* Banner de Estado Estilo HUD Militar / Inteligencia Artificial */
+#hud-banner {
+    position: absolute;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
     
-        #hud-banner {
-            position: absolute;
-            bottom: 8%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 1px solid #00ffcc;
-            background: rgba(4, 4, 12, 0.9);
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
-            border-radius: 8px;
-            padding: 18px 45px;
-            text-align: center;
-            pointer-events: none;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        #status-text {
-            color: #00ffcc;
-            font-size: 16px;
-            font-weight: bold;
-            letter-spacing: 3px;
-            margin: 0;
-            text-transform: uppercase;
-        }
-        #sub-text {
-            color: #666688;
-            font-size: 11px;
-            margin-top: 6px;
-            letter-spacing: 1px;
-        }
+    /* Dimensiones y Espaciado */
+    min-width: 280px;
+    padding: 15px 40px;
+    text-align: center;
+    border-radius: 12px;
+    
+    /* Bordes y Fondos Avanzados (Vidrio Esmerilado Cyberpunk) */
+    border: 1px solid #00ffcc;
+    background: rgba(6, 6, 20, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    
+    /* Efectos de Iluminación Neon */
+    box-shadow: 0 0 30px rgba(0, 255, 204, 0.2), 
+                inset 0 0 15px rgba(0, 255, 204, 0.1);
+    
+    /* Seguridad de Interacción */
+    pointer-events: none;
+    
+    /* Transición Suave para Cambios de Color y Estado */
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Texto de Estado Principal (Ej: EN ESPERA, ESCUCHANDO, PENSANDO) */
+#status-text {
+    color: #00ffcc;
+    font-size: 15px;
+    font-weight: 900;
+    margin: 0;
+    padding: 0;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    
+    /* Brillo Neón en el Texto */
+    text-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
+    transition: color 0.4s ease;
+}
+
+/* Subtexto Informativo Inferior */
+#sub-text {
+    color: #8888aa;
+    font-size: 10px;
+    font-weight: 600;
+    margin: 5px 0 0 0;
+    padding: 0;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.8;
+}

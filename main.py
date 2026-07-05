@@ -44,46 +44,56 @@ def encender_sistemas():
 
     print("⚡ Inicializando secuencia de despliegue...")
     
+    # 1. Se abren las ventanas nativas de Windows (Administrador de tareas, Monitor, etc.)
     try:
         desplegar_monitores_windows()
     except Exception as e:
         print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
 
-    # 🔥 DESPLIEGUE DEL WIDGET FLOTANTE:
+    # 2. DESPLIEGUE DEL WIDGET FLOTANTE EN BRAVE (Optimizado para tu navegador por defecto)
     try:
-        # Abre la esfera en una mini-ventana limpia e independiente de 450x450 píxeles
-        subprocess.Popen([
-            "chrome", 
-            "--app=http://127.0.0.1:8000/static/index.html", 
-            "--window-size=450,450"
-        ])
+        # Estrategia 1: Intentar arrancar Brave directamente usando el CMD
+        subprocess.Popen(
+            'start brave --app=http://127.0.0.1:8000/static/index.html --window-size=450,450',
+            shell=True
+        )
     except Exception:
         try:
-            # Respaldo por si usas Edge por defecto
-            subprocess.Popen([
-                "msedge", 
-                "--app=http://127.0.0.1:8000/static/index.html", 
-                "--window-size=450,450"
-            ])
+            # Estrategia 2: Si falla el comando directo, buscamos la ruta típica de Brave en Windows
+            ruta_brave = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
+            if os.path.exists(ruta_brave):
+                subprocess.Popen([
+                    ruta_brave, 
+                    "--app=http://127.0.0.1:8000/static/index.html", 
+                    "--window-size=450,450"
+                ])
+            else:
+                # Estrategia 3: Respaldo de emergencia en el navegador predeterminado del sistema
+                import webbrowser
+                webbrowser.open("http://127.0.0.1:8000/static/index.html")
         except Exception as e:
             print(f"⚠️ No se pudo inicializar la interfaz flotante: {e}")
 
-    # Conectamos los motores cognitivos
+    # 3. Conectamos los motores cognitivos e inteligencias sin romper el ciclo gráfico
     gui.actualizar_estado("⚙️ CONECTANDO COGNICIÓN...", "#7ef1ff")
     
     try:
         cerebro_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
 
+        # 4. Activación completa en ambas interfaces simultáneamente
         gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
         gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas. Estoy listo, {titulo}.")
         
+        # El asistente habla para confirmar la carga
         voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas, {titulo}.")
+        
+        # Lanzamos el bucle continuo de escucha de voz
         gui.app.after(100, procesar_ciclo_voz)
         
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
-        print(f"❌ Error crítico al inicializar las APIs: {e}")
+        print(f"❌ Error crítico al inicializar las APIs (Gemini/ElevenLabs): {e}")
 
 def procesar_ciclo_voz():
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo
@@ -110,11 +120,11 @@ def procesar_ciclo_voz():
                 gui.app.quit()
                 return
 
-            gui.actualizar_estado("🧠 PENSANDO...", "#ffaa00") # Cambia a dorado en consola y esfera web
+            gui.actualizar_estado("🧠 PENSANDO...", "#ffaa00") # Cambia a dorado en consola y esfera web de Brave
             respuesta_texto = cerebro_ia.generar_respuesta(orden)
             
             gui.agregar_mensaje("revan", respuesta_texto)
-            gui.actualizar_estado("🔊 REVAN HABLANDO...", "#ff0055") # Cambia a fucsia/rojo latido en ambas interfaces
+            gui.actualizar_estado("🔊 REVAN HABLANDO...", "#ff0055") # Cambia a fucsia/rojo latido en ambas pantallas
             voz_ia.hablar(respuesta_texto)
             gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
 
@@ -131,11 +141,11 @@ def main():
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
     
-    # 1. Creamos y configuramos el bucle de eventos asíncronos para FastAPI antes de iniciar hilos
+    # 1. Inicializamos el bucle asíncrono para FastAPI antes de disparar hilos gráficos
     loop_asincrono_global = asyncio.new_event_loop()
     asyncio.set_event_loop(loop_asincrono_global)
 
-    # 2. Lanzamos el servidor de la Esfera Web 3D en un hilo independiente (Dejado en segundo plano)
+    # 2. Lanzamos el servidor de la Esfera Web 3D en segundo plano
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
 
@@ -157,26 +167,26 @@ def main():
             
         time.sleep(0.1)
 
-    # 5. EL DESPERTAR: Se ejecuta tras validar el impacto acústico
+    # 5. EL DESPERTAR: Se ejecuta tras validar el impacto acústico del aplauso
     print("⚡ Desplegando interfaces tácticas...")
     
     # Instanciamos la ventana principal de CustomTkinter
     gui = RevanGUI(titulo_usuario=titulo)
     
-    # Vinculamos el bucle asíncrono que creamos al inicio para que el Dashboard pueda mandar comandos de red
+    # Inyectamos el bucle asíncrono que creamos para que el Dashboard pueda transmitir comandos de red a Brave
     gui.loop_ui = loop_asincrono_global
 
-    # Forzar la visibilidad del panel resolviendo fallas de nombres
+    # Forzar la visibilidad del panel resolviendo fallas de nombres nativos de Tkinter
     try:
         gui.mostrar_panel()
     except AttributeError:
         if hasattr(gui, 'app'):
-            gui.app.deiconify() # Método nativo de Tkinter para restaurar ventanas ocultas
+            gui.app.deiconify()
             
-    # Guardamos 250 milisegundos para que Windows pinte la GUI antes de correr los subprocesos pesados
+    # Concedemos 250 milisegundos para que Windows termine de pintar la interfaz antes del subproceso pesado
     gui.app.after(250, encender_sistemas)
     
-    # Encendemos el motor visual de Tkinter (mantiene la app viva en pantalla en el hilo principal)
+    # Encendemos el motor visual en el hilo principal (mantiene la app viva en pantalla)
     gui.app.mainloop()
 
 if __name__ == "__main__":
