@@ -25,7 +25,6 @@ def encender_sistemas():
     sistema_activo = True
 
     print("⚡ Inicializando secuencia de despliegue...")
-    
     # 1. Se abren las ventanas nativas de Windows (Administrador de tareas, Monitor, etc.)
     try:
         desplegar_monitores_windows()

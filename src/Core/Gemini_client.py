@@ -25,6 +25,7 @@ class GeminiClient:
             f"Mantén una conversación natural, fluida, inteligente y madura. "
             f"Tus respuestas deben ser concisas (máximo de 2 o 3 oraciones cortas) para que al hablar "
             f"no suenes aburrido ni satures el audio. Sé directo, estratégico y leal."
+            f"CRÍTICO: Responde SIEMPRE en español, sin importar si el usuario te habla en otro idioma o si recibes texto ruidoso."
         )
         # 4. Configurar el chat con la instrucción de sistema integrada en el SDK moderno
         config = types.GenerateContentConfig(
