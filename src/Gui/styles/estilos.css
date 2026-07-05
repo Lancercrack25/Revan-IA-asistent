@@ -1,13 +1,14 @@
-body {
+        body, html {
             margin: 0;
             overflow: hidden;
-            background-color: #030308;
-            font-family: 'Segoe UI', 'Consolas', monospace;
+            background-color: transparent !important;
         }
         #canvas-container {
             width: 100vw;
             height: 100vh;
+            background: transparent !important;
         }
+    
         #hud-banner {
             position: absolute;
             bottom: 8%;

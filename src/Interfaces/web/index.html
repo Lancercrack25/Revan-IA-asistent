@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REVAN - Neural Core</title>
-    <link rel="stylesheet" href="Gui/styles/estilos.css">
+    <link rel="stylesheet" href="/src/Gui/styles/estilos.css">
 </head>
 <body>
 
@@ -31,12 +31,13 @@
             camara = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camara.position.z = 7.5;
 
-            render = new THREE.WebGLRenderer({ antialias: true });
+            render = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             render.setSize(window.innerWidth, window.innerHeight);
             render.setPixelRatio(window.devicePixelRatio);
+            render.setClearColor(0x000000, 0); 
             contenedor.appendChild(render.domElement);
 
-            const geometriaEsfera = new THREE.IcosahedronGeometry(2, 2);
+            const geometryEsfera = new THREE.IcosahedronGeometry(2, 2);
             
             const matLineas = new THREE.MeshBasicMaterial({
                 color: 0x0077ff,
@@ -44,7 +45,7 @@
                 transparent: true,
                 opacity: 0.35
             });
-            redNeuronal = new THREE.Mesh(geometriaEsfera, matLineas);
+            redNeuronal = new THREE.Mesh(geometryEsfera, matLineas);
             escena.add(redNeuronal);
 
             const matPuntos = new THREE.PointsMaterial({
@@ -53,7 +54,7 @@
                 transparent: true,
                 opacity: 0.85
             });
-            nodosSinapticos = new THREE.Points(geometriaEsfera, matPuntos);
+            nodosSinapticos = new THREE.Points(geometryEsfera, matPuntos);
             escena.add(nodosSinapticos);
 
             generarPolvoCosmico();
@@ -143,7 +144,7 @@
             camara.updateProjectionMatrix();
             render.setSize(window.innerWidth, window.innerHeight);
         }
-
+    
         window.onload = inicializarEsfera;
     </script>
 </body>
