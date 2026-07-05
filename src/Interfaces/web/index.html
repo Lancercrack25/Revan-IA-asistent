@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REVAN - Neural Core</title>
+    <link rel="stylesheet" href="Gui/styles/estilos.css">
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    
+    <div id="hud-banner">
+        <p id="status-text">REVAN V1.0 | EN ESPERA</p>
+        <p id="sub-text">NÚCLEO COGNITIVO SINÁPTICO ACTIVO</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        let escena, camara, render, redNeuronal, nodosSinapticos;
+        let estadoActual = "ESPERA";
+        let colorObjetivo = new THREE.Color("#0077ff");
+        let velocidadGiro = 0.005;
+        let deltaTiempo = 0;
+
+        function inicializarEsfera() {
+            const contenedor = document.getElementById('canvas-container');
+            
+            escena = new THREE.Scene();
+            camara = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camara.position.z = 7.5;
+
+            render = new THREE.WebGLRenderer({ antialias: true });
+            render.setSize(window.innerWidth, window.innerHeight);
+            render.setPixelRatio(window.devicePixelRatio);
+            contenedor.appendChild(render.domElement);
+
+            const geometriaEsfera = new THREE.IcosahedronGeometry(2, 2);
+            
+            const matLineas = new THREE.MeshBasicMaterial({
+                color: 0x0077ff,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.35
+            });
+            redNeuronal = new THREE.Mesh(geometriaEsfera, matLineas);
+            escena.add(redNeuronal);
+
+            const matPuntos = new THREE.PointsMaterial({
+                color: 0x00ffcc,
+                size: 0.09,
+                transparent: true,
+                opacity: 0.85
+            });
+            nodosSinapticos = new THREE.Points(geometriaEsfera, matPuntos);
+            escena.add(nodosSinapticos);
+
+            generarPolvoCosmico();
+            window.addEventListener('resize', enRedimension, false);
+            
+            bucleAnimacion();
+            conectarServidorCore();
+        }
+
+        function generarPolvoCosmico() {
+            const geoFondo = new THREE.BufferGeometry();
+            const cantidad = 150;
+            const posiciones = new Float32Array(cantidad * 3);
+
+            for(let i=0; i < cantidad*3; i+=3) {
+                posiciones[i] = (Math.random() - 0.5) * 14;
+                posiciones[i+1] = (Math.random() - 0.5) * 14;
+                posiciones[i+2] = (Math.random() - 0.5) * 14;
+            }
+            geoFondo.setAttribute('position', new THREE.BufferAttribute(posiciones, 3));
+            const matFondo = new THREE.PointsMaterial({ color: 0xffffff, size: 0.02, transparent: true, opacity: 0.25 });
+            const nubeFondo = new THREE.Points(geoFondo, matFondo);
+            escena.add(nubeFondo);
+        }
+
+        function conectarServidorCore() {
+            const socket = new WebSocket("ws://127.0.0.1:8000/ws");
+            const hudTexto = document.getElementById("status-text");
+            const hudContenedor = document.getElementById("hud-banner");
+
+            socket.onmessage = function(evento) {
+                const comando = JSON.parse(evento.data);
+                estadoActual = comando.estado;
+                colorObjetivo.set(comando.color);
+                
+                hudTexto.innerText = `REVAN V1.0 | ${comando.estado}`;
+                hudTexto.style.color = comando.color;
+                hudContenedor.style.borderColor = comando.color;
+                hudContenedor.style.boxShadow = `0 0 25px ${comando.color}33`;
+
+                if (estadoActual === "ESCUCHANDO") {
+                    velocidadGiro = 0.025;
+                } else if (estadoActual === "PENSANDO") {
+                    velocidadGiro = 0.08;
+                } else if (estadoActual === "HABLANDO") {
+                    velocidadGiro = 0.012;
+                } else {
+                    velocidadGiro = 0.005;
+                }
+            };
+
+            socket.onclose = function() {
+                setTimeout(conectarServidorCore, 2000);
+            };
+        }
+
+        function bucleAnimacion() {
+            requestAnimationFrame(bucleAnimacion);
+            deltaTiempo += 0.04;
+
+            redNeuronal.material.color.lerp(colorObjetivo, 0.08);
+            nodosSinapticos.material.color.lerp(colorObjetivo, 0.08);
+
+            redNeuronal.rotation.y += velocidadGiro;
+            redNeuronal.rotation.x += velocidadGiro * 0.4;
+            nodosSinapticos.rotation.y = redNeuronal.rotation.y;
+            nodosSinapticos.rotation.x = redNeuronal.rotation.x;
+
+            let escala = 1.0;
+            if (estadoActual === "ESCUCHANDO") {
+                escala = 1.0 + Math.sin(deltaTiempo * 2.5) * 0.07;
+            } else if (estadoActual === "HABLANDO") {
+                escala = 1.0 + Math.abs(Math.sin(deltaTiempo * 3.5)) * 0.18;
+            } else if (estadoActual === "PENSANDO") {
+                escala = 1.0 + Math.sin(deltaTiempo * 6.0) * 0.03;
+            } else {
+                escala = 1.0 + Math.sin(deltaTiempo * 0.6) * 0.02;
+            }
+            redNeuronal.scale.set(escala, escala, escala);
+            nodosSinapticos.scale.set(escala, escala, escala);
+
+            render.render(escena, camara);
+        }
+
+        function enRedimension() {
+            camara.aspect = window.innerWidth / window.innerHeight;
+            camara.updateProjectionMatrix();
+            render.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = inicializarEsfera;
+    </script>
+</body>
+</html>

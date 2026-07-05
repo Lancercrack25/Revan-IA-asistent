@@ -1,0 +1,38 @@
+body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #030308;
+            font-family: 'Segoe UI', 'Consolas', monospace;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #hud-banner {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 1px solid #00ffcc;
+            background: rgba(4, 4, 12, 0.9);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+            border-radius: 8px;
+            padding: 18px 45px;
+            text-align: center;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #status-text {
+            color: #00ffcc;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        #sub-text {
+            color: #666688;
+            font-size: 11px;
+            margin-top: 6px;
+            letter-spacing: 1px;
+        }
