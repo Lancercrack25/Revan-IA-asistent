@@ -1,21 +1,17 @@
 import os
 import sys
-
-# 🛡️ 1. ESCUDO ABSOLUTO: Bloqueamos pycache
+import time
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
-# 📦 2. IMPORTACIONES DE TU ARQUITECTURA MODULAR
 from src.Core.Gemini_client import GeminiClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes
 from src.Gui.Dashboard import RevanGUI
-
-# 🚀 NUEVA IMPORTACIÓN DE AUTOMATIZACIÓN
 from src.Automation.System_commands import desplegar_monitores_windows
 
-# Inicialización de componentes globales
+# componentes globales
 cerebro_ia = None
 voz_ia = None
 oidos_ia = None
@@ -71,7 +67,7 @@ def procesar_ciclo_voz():
         return
 
     try:
-        gui.actualizar_estado("🎤 ESCUCHANDO...", "#58a6ff")
+        gui.actualizar_estado("ESCUCHANDO...", "#58a6ff")
         orden = oidos_ia.escuchar()
         
         if orden.strip():
@@ -93,22 +89,44 @@ def procesar_ciclo_voz():
 
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN SISTEMA", "#f85149")
-        print(f"❌ Ocurrió un error en el ciclo de voz: {e}")
+        print(f"Ocurrió un error en el ciclo de voz: {e}")
 
     gui.app.after(100, procesar_ciclo_voz)
 
 def main():
-    global oidos_ia, gui, titulo
+    global oidos_ia, gui, sistema_activo
     
     print("🌌 Inicializando cargador base de REVAN...")
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
-    # 1. Iniciamos la GUI de REVAN visible desde el principio para ver el estado
-    gui = RevanGUI(titulo_usuario=titulo)
-    gui.mostrar_panel() 
-    gui.actualizar_estado("💤 MODO PASIVO (APLAUDA)", "#ffb703") # Amarillo de espera
-    # 2. Encendemos los oídos de la IA
+    
+    # 1. Inicializamos los oídos de la IA
     oidos_ia = MicrophoneClient()
-    # 3. Lanzamos el bucle de escaneo de impacto
-    gui.app.after(500, esperar_aplauso)
+    
+    # 2. BUCLE DE RETENCIÓN: Obliga a Python a quedarse aquí escuchando
+    print("🎙️ REVAN en modo pasivo. Esperando señal acústica (aplauso)...")
+    
+    while True:
+        try:
+            # Escucha usando el modo rápido que configuramos antes
+            captura = oidos_ia.escuchar(modo_pasivo=True)
+            
+            if captura.strip():
+                print(f"¡Señal acústica validada! Inicializando REVAN...")
+                break # Rompemos el bucle infinito para continuar con el encendido
+                
+        except Exception as e:
+            print(f"Aviso en escaneo: {e}")
+            
+        # Pequeño respiro de 100ms para que tu procesador no trabaje al 100% de forma innecesaria
+        time.sleep(0.1)
+
+    # 3. EL DESPERTAR: Una vez que rompe el bucle por el aplauso, ejecuta lo demás
+    print("Desplegando interfaces tácticas...")
+    # 1. Instanciamos el objeto de la interfaz base
+    gui = RevanGUI(titulo_usuario=titulo)
+    encender_sistemas()
     gui.app.mainloop()
+
+if __name__ == "__main__":
+    main()
