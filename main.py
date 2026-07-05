@@ -2,31 +2,32 @@ import os
 import sys
 import time
 import threading
-import asyncio
 import subprocess
 
+# Prevenir la generación de archivos de caché compilados (.pyc)
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
+# Importaciones del Sistema REVAN
 from src.Core.Gemini_client import GeminiClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes
 from src.Gui.Dashboard import RevanGUI
 from src.Automation.System_commands import desplegar_monitores_windows
-from src.Interfaces.servidor import iniciar_servidor_ui, cambiar_estado_esfera
+# 🎯 Conexión directa al puente real del servidor
+from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
 
-# Instancias Globales
+# Instancias y Controles Globales
 cerebro_ia = None
 voz_ia = None
 oidos_ia = None
 gui = None
 titulo = "Señor"
 sistema_activo = False
-loop_asincrono_global = None
 
 def hilo_servidor_web():
-    """Ejecuta el servidor FastAPI en un hilo dedicado en segundo plano."""
+    """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
     try:
         servidor = iniciar_servidor_ui()
         servidor.run()
@@ -34,29 +35,36 @@ def hilo_servidor_web():
         print(f"⚠️ Error al inicializar el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
-    """Encapsula de forma segura los estados asíncronos para el WebSocket de FastAPI."""
-    if loop_asincrono_global and loop_asincrono_global.is_running():
-        asyncio.run_coroutine_threadsafe(cambiar_estado_esfera(estado, color_hex), loop_asincrono_global)
+    """Envía de forma segura los estados de voz e IA al loop en ejecución de FastAPI."""
+    transmitir_desde_hilo_externo(estado, color_hex)
 
 def encender_sistemas():
-    """Ejecuta el despliegue visual en el orden exacto solicitado (Monitores -> CustomTkinter -> Esfera)."""
+    """Ejecuta la secuencia de despliegue cronológico (Monitores -> CustomTkinter -> Esfera)."""
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
     sistema_activo = True
 
     print("⚡ Inicializando secuencia de despliegue cronológico...")
+    
+    # ==================================================
+    # PASO 1: SE ABRE PRIMERO SOLO LA VENTANA DE WINDOWS
+    # ==================================================
     print("🪟 [1/3] Desplegando herramientas del sistema (Monitores nativos)...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
         print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
 
-    time.sleep(0.4) # Ventana de tiempo estratégica para Windows
+    time.sleep(0.4) # Retraso estratégico para la organización de ventanas en Windows
 
+    # ==================================================
+    # PASO 2: SE DESPLIEGA LA INTERFAZ DE PYTHON
+    # ==================================================
     gui.actualizar_estado("⚙️ CONECTANDO COGNICIÓN...", "#7ef1ff")
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
     print("💻 [2/3] Panel CustomTkinter Activo.")
     
     try:
+        # Inicialización de Clientes API externos
         cerebro_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
 
@@ -65,6 +73,9 @@ def encender_sistemas():
         
         time.sleep(0.2)
 
+        # ==================================================
+        # PASO 3: SE LANZA LA INTERFAZ WEB DE LA ESFERA (BRAVE)
+        # ==================================================
         try:
             subprocess.Popen(
                 'start brave --app=http://127.0.0.1:8000 --window-size=450,450',
@@ -74,11 +85,12 @@ def encender_sistemas():
         except Exception as e:
             print(f"⚠️ Error al lanzar la interfaz web: {e}")
 
-        # REVAN emite saludo sonoro inicializando en cascada
+        # Saludo inicial sonoro de REVAN con el estado cromático correcto
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
         voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         
+        # Enlazamos el bucle repetitivo de procesamiento de voz
         gui.app.after(100, procesar_ciclo_voz)
         
     except Exception as e:
@@ -87,6 +99,7 @@ def encender_sistemas():
         print(f"❌ Error crítico al inicializar las APIs: {e}")
 
 def procesar_ciclo_voz():
+    """Administra los cambios de estado cromáticos basados en la actividad de voz."""
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo
 
     if gui.debe_cerrar:
@@ -98,14 +111,16 @@ def procesar_ciclo_voz():
         return
 
     try:
+        # 🎤 ESCUCHANDO: El usuario habla (Esfera pasa a Cian)
         gui.actualizar_estado("ESCUCHANDO...", "#58a6ff")
-        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") # Esfera muta a Cian
+        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         
         orden = oidos_ia.escuchar()
         
         if orden.strip():
             gui.agregar_mensaje("tu", orden)
             
+            # Comando de apagado inmediato
             if any(palabra in orden.lower() for palabra in ["salir", "apagar sistema", "desconectar", "adiós", "apágate"]):
                 gui.actualizar_estado("Desconectando...", "#f85149")
                 sincronizar_estado_esfera("DESCONECTANDO", "#f85149")
@@ -114,19 +129,22 @@ def procesar_ciclo_voz():
                 gui.app.quit()
                 return
 
+            # 🧠 PENSANDO: Gemini procesa la orden (Esfera pasa a Dorado)
             gui.actualizar_estado("🧠 PENSANDO...", "#ffaa00")
-            sincronizar_estado_esfera("PENSANDO", "#ffaa00") # Esfera muta a Dorado
+            sincronizar_estado_esfera("PENSANDO", "#ffaa00")
             
             respuesta_texto = cerebro_ia.generar_respuesta(orden)
             
+            # 🔊 HABLANDO: ElevenLabs reproduce el audio (Esfera pasa a Fucsia)
             gui.agregar_mensaje("revan", respuesta_texto)
             gui.actualizar_estado("🔊 REVAN HABLANDO...", "#ff0055")
-            sincronizar_estado_esfera("HABLANDO", "#ff0055") # Esfera muta a Fucsia
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             
             voz_ia.hablar(respuesta_texto)
             
+            # ⚡ RETORNO: El sistema vuelve a reposo (Esfera pasa a Azul)
             gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
-            sincronizar_estado_esfera("ESPERA", "#0077ff") # Esfera retorna a Azul
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
 
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN SISTEMA", "#f85149")
@@ -136,15 +154,13 @@ def procesar_ciclo_voz():
     gui.app.after(100, procesar_ciclo_voz)
 
 def main():
-    global oidos_ia, gui, sistema_activo, loop_asincrono_global, titulo
+    global oidos_ia, gui, sistema_activo, titulo
     
     print("🌌 Inicializando cargador base de REVAN...")
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     
-    loop_asincrono_global = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop_asincrono_global)
-
+    # Lanzamos el backend de red en segundo plano inmediatamente
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
 
@@ -163,7 +179,6 @@ def main():
 
     print("⚡ Desplegando interfaces tácticas...")
     gui = RevanGUI(titulo_usuario=titulo)
-    gui.loop_ui = loop_asincrono_global
 
     try:
         gui.mostrar_panel()

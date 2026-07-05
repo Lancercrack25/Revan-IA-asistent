@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -13,11 +14,17 @@ CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
 RAIZ_SRC = os.path.dirname(CARPETA_INTERFACES)
 CARPETA_STYLES = os.path.join(RAIZ_SRC, "Gui", "styles")
 
-# Montura de Alias Virtuales de Red
 app.mount("/static", StaticFiles(directory=CARPETA_WEB), name="static")
 app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
 
 conexiones_activas = []
+loop_real_servidor = None
+
+@app.on_event("startup")
+async def al_iniciar():
+    """Captura el bucle asíncrono en ejecución real de Uvicorn."""
+    global loop_real_servidor
+    loop_real_servidor = asyncio.get_running_loop()
 
 @app.get("/")
 async def obtener_index():
@@ -41,26 +48,21 @@ async def websocket_endpoint(websocket: WebSocket):
             conexiones_activas.remove(websocket)
 
 async def cambiar_estado_esfera(estado: str, color_hex: str):
-    """Enruta y distribuye los estados hacia el cliente JavaScript en tiempo real."""
+    """Trasmite el JSON por WebSockets."""
     if not conexiones_activas:
         return
-        
-    paquete = {
-        "estado": estado,
-        "color": color_hex
-    }
-    
+    paquete = {"estado": estado, "color": color_hex}
     for conexion in conexiones_activas:
         try:
             await conexion.send_text(json.dumps(paquete))
         except Exception:
             pass
 
+def transmitir_desde_hilo_externo(estado: str, color_hex: str):
+    """Puente seguro para inyectar estados desde el hilo de CustomTkinter."""
+    if loop_real_servidor and loop_real_servidor.is_running():
+        asyncio.run_coroutine_threadsafe(cambiar_estado_esfera(estado, color_hex), loop_real_servidor)
+
 def iniciar_servidor_ui():
-    config = uvicorn.Config(
-        app=app, 
-        host="127.0.0.1", 
-        port=8000, 
-        log_level="warning"
-    )
+    config = uvicorn.Config(app=app, host="127.0.0.1", port=8000, log_level="warning")
     return uvicorn.Server(config)
