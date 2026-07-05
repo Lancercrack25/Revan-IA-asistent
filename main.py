@@ -38,54 +38,47 @@ def hilo_servidor_web():
         print(f"⚠️ Error al inicializar el servidor web de la esfera: {e}")
 
 def encender_sistemas():
-    """Ejecuta la modularización táctica al recibir el aplauso."""
+    """Ejecuta la modularización táctica en el orden visual exacto solicitado."""
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
     sistema_activo = True
-
-    print("⚡ Inicializando secuencia de despliegue...")
-    
-    # 1. Se abren las ventanas nativas de Windows (Administrador de tareas, Monitor, etc.)
+    print("⚡ Inicializando secuencia de despliegue cronológico...")
     try:
-        desplegar_monitores_windows()
-    except Exception as e:
-        print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
-
-    # 2. DESPLIEGUE DEL WIDGET FLOTANTE EN BRAVE (Optimizado para tu navegador por defecto)
-    try:
-        # Estrategia 1: Intentar arrancar Brave directamente usando el CMD
+        # Forzamos la apertura del HUD de la esfera 3D
         subprocess.Popen(
-            'start brave --app=http://127.0.0.1:8000/static/index.html --window-size=450,450',
+            'start brave --app=http://127.0.0.1:8000 --window-size=450,450',
             shell=True
         )
-    except Exception:
-        try:
-            # Estrategia 2: Si falla el comando directo, buscamos la ruta típica de Brave en Windows
-            ruta_brave = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
-            if os.path.exists(ruta_brave):
-                subprocess.Popen([
-                    ruta_brave, 
-                    "--app=http://127.0.0.1:8000/static/index.html", 
-                    "--window-size=450,450"
-                ])
-            else:
-                # Estrategia 3: Respaldo de emergencia en el navegador predeterminado del sistema
-                import webbrowser
-                webbrowser.open("http://127.0.0.1:8000/static/index.html")
-        except Exception as e:
-            print(f"⚠️ No se pudo inicializar la interfaz flotante: {e}")
+        print("🌐 [1/3] Núcleo Web Desplegado (Esfera 3D).")
+    except Exception as e:
+        print(f"⚠️ Error al lanzar la interfaz web: {e}")
 
-    # 3. Conectamos los motores cognitivos e inteligencias sin romper el ciclo gráfico
+    # Le damos un mini respiro de 300ms a Windows para procesar la ventana de Brave
+    time.sleep(0.3)
+
+    # ==========================================
+    # PASO 2: LA INTERFAZ DE PYTHON TOMA EL CONTROL
+    # ==========================================
     gui.actualizar_estado("⚙️ CONECTANDO COGNICIÓN...", "#7ef1ff")
+    print("💻 [2/3] Panel CustomTkinter Activo y enlazando APIs.")
     
     try:
         cerebro_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
 
-        # 4. Activación completa en ambas interfaces simultáneamente
+        # Activación completa en pantalla
         gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
         gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas. Estoy listo, {titulo}.")
         
-        # El asistente habla para confirmar la carga
+        # ==========================================
+        # PASO 3: SE DESPLEGAN LAS VENTANAS DE WINDOWS
+        # ==========================================
+        print("🪟 [3/3] Desplegando herramientas del sistema (Monitores nativos)...")
+        try:
+            desplegar_monitores_windows()
+        except Exception as e:
+            print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
+
+        # REVAN habla una vez que TODO el arsenal está frente a tus ojos
         voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas, {titulo}.")
         
         # Lanzamos el bucle continuo de escucha de voz
@@ -93,7 +86,7 @@ def encender_sistemas():
         
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
-        print(f"❌ Error crítico al inicializar las APIs (Gemini/ElevenLabs): {e}")
+        print(f"❌ Error crítico al inicializar las APIs: {e}")
 
 def procesar_ciclo_voz():
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo

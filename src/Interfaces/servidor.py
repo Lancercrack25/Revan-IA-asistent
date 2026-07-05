@@ -1,25 +1,32 @@
 import os
-from fastapi import FastAPI, WebSocket
+import json
+import uvicorn
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
-# 🛠️ CORRECCIÓN DE RUTAS TÁCTICAS:
-# os.path.abspath(__file__) -> src/Interfaces/servidor.py
-# os.path.dirname(...)       -> src/Interfaces/
+# 🎯 CONFIGURACIÓN AJUSTADA A TU ÁRBOL REAL EN PANTALLA:
+# 1. Nos paramos en src/Interfaces/
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 
-# Bajamos directo a la carpeta 'web' que está ahí al lado
+# 2. Entramos directo a la carpeta 'web' que es hermana de servidor.py
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
 
-# Subimos dos niveles para llegar a 'src' y luego entramos a 'Gui/styles'
-BASE_DIR = os.path.dirname(os.path.dirname(CARPETA_INTERFACES))
-CARPETA_STYLES = os.path.join(BASE_DIR, "src", "Gui", "styles")
+# 3. Subimos UN SOLO NIVEL para llegar a la raíz de 'src/'
+RAIZ_SRC = os.path.dirname(CARPETA_INTERFACES)
 
-# Montamos los recursos estáticos con las rutas corregidas
+# 4. Bajamos de forma limpia hacia 'src/Gui/styles'
+CARPETA_STYLES = os.path.join(RAIZ_SRC, "Gui", "styles")
+
+
+# Montamos los recursos con los mapeos virtuales corregidos
 app.mount("/static", StaticFiles(directory=CARPETA_WEB), name="static")
 app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
+
+# Control de Navegadores Activos (Brave)
+conexiones_activas = []
 
 @app.get("/")
 async def obtener_index():
@@ -32,9 +39,36 @@ async def obtener_index():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    conexiones_activas.append(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
-            await websocket.send_text(data)
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        conexiones_activas.remove(websocket)
     except Exception:
-        pass
+        if websocket in conexiones_activas:
+            conexiones_activas.remove(websocket)
+
+async def cambiar_estado_esfera(estado: str, color_hex: str):
+    if not conexiones_activas:
+        return
+        
+    paquete = {
+        "estado": estado,
+        "color": color_hex
+    }
+    
+    for conexion in conexiones_activas:
+        try:
+            await conexion.send_text(json.dumps(paquete))
+        except Exception:
+            pass
+
+def iniciar_servidor_ui():
+    config = uvicorn.Config(
+        app=app, 
+        host="127.0.0.1", 
+        port=8000, 
+        log_level="warning"
+    )
+    return uvicorn.Server(config)
