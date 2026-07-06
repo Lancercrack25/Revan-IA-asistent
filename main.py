@@ -68,7 +68,7 @@ def encender_sistemas():
 
         try:
             subprocess.Popen(
-                'start brave --app=http://127.0.0.1:8000 --window-size=650,650',
+                'start brave --app=http://127.0.0.1:8000 --window-size=670,670',
                 shell=True
             )
             print("🌐 [3/3] Núcleo Web Desplegado (Esfera 3D).")
