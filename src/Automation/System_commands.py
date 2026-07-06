@@ -5,11 +5,7 @@ def desplegar_monitores_windows():
     Invoca las herramientas oficiales de diagnóstico y rendimiento de Windows
     de manera asíncrona para no congelar el script principal.
     """
-    try:
-        # 1. El Administrador de Tareas Oficial
-        subprocess.Popen("taskmgr.exe", shell=True)
-        
-        # 2. El Monitor de Recursos Avanzado (gráficas en vivo)
+    try:    
         subprocess.Popen("resmon.exe", shell=True)
         
         print("🖥️ Ecosistema nativo de Windows desplegado correctamente.")

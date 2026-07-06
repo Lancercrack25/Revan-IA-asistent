@@ -45,15 +45,6 @@ def encender_sistemas():
 
     print("⚡ Inicializando secuencia de despliegue cronológico...")
     
-    # ==================================================
-    # PASO 1: SE ABRE PRIMERO SOLO LA VENTANA DE WINDOWS
-    # ==================================================
-    print("🪟 [1/3] Desplegando herramientas del sistema (Monitores nativos)...")
-    try:
-        desplegar_monitores_windows()
-    except Exception as e:
-        print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
-
     time.sleep(0.4) # Retraso estratégico para la organización de ventanas en Windows
 
     # ==================================================
@@ -73,9 +64,6 @@ def encender_sistemas():
         
         time.sleep(0.2)
 
-        # ==================================================
-        # PASO 3: SE LANZA LA INTERFAZ WEB DE LA ESFERA (BRAVE)
-        # ==================================================
         try:
             subprocess.Popen(
                 'start brave --app=http://127.0.0.1:8000 --window-size=450,450',
