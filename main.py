@@ -68,7 +68,7 @@ def encender_sistemas():
 
         try:
             subprocess.Popen(
-                'start brave --app=http://127.0.0.1:8000 --window-size=450,450',
+                'start brave --app=http://127.0.0.1:8000 --window-size=650,650',
                 shell=True
             )
             print("🌐 [3/3] Núcleo Web Desplegado (Esfera 3D).")
@@ -111,7 +111,7 @@ def procesar_ciclo_voz():
             gui.agregar_mensaje("tu", orden)
             
             # Comando de apagado inmediato
-            if any(palabra in orden.lower() for palabra in ["salir", "apagar sistema", "desconectar", "adiós", "apágate"]):
+            if any(palabra in orden.lower() for palabra in ["salir", "apagar sistema", "desconectar"]):
                 gui.actualizar_estado("Desconectando...", "#f85149")
                 sincronizar_estado_esfera("DESCONECTANDO", "#f85149")
                 if voz_ia:

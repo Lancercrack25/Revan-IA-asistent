@@ -6,8 +6,8 @@
 body, html {
     margin: 0;
     padding: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 500vw;
+    height: 500vh;
     overflow: hidden;
     background-color: #04040a; /* Fondo oscuro profundo para mitigar el destello blanco de Brave */
     font-family: 'Segoe UI', 'Consolas', 'Courier New', monospace;
