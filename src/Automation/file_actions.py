@@ -1,6 +1,6 @@
 import os
 import subprocess
-
+#aqui lo que hace es hacer un mapeo con distintas posibles rutas para el escritorio, ya que puede estar en español o en ingles para poder ejecutar las acciones y abrir las carpetas de manera correcta
 def obtener_ruta_escritorio():
     """Detecta de forma inteligente la ruta real del Escritorio, con o sin OneDrive."""
     ruta_normal = os.path.join(os.path.expanduser("~"), "Desktop")

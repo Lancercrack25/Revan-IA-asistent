@@ -8,14 +8,14 @@ import subprocess
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
-# Importaciones del Sistema REVAN
-from src.Core.Gemini_client import GeminiClient
+# 🔌 Importaciones del Sistema REVAN (Cerebro Localizado)
+from src.Core.Ollama_client import OllamaClient  # 🎯 Cambiado de GeminiClient a tu nuevo Ollama local
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes
 from src.Gui.Dashboard import RevanGUI
 from src.Automation.System_commands import desplegar_monitores_windows
-# 🎯 Conexión directa al puente real del servidor
+# Conexión directa al puente real del servidor
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
 
 # Instancias y Controles Globales
@@ -57,12 +57,12 @@ def encender_sistemas():
     print("💻 [2/3] Panel CustomTkinter Activo.")
     
     try:
-        # Inicialización de Clientes API externos
-        cerebro_ia = GeminiClient()
+        # 🎯 Inicialización del Cerebro Local Ollama optimizado para tu GTX 1060
+        cerebro_ia = OllamaClient()
         voz_ia = ElevenLabsClient()
 
         gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
-        gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas. Estoy listo, {titulo}.")
+        gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas de forma local. Estoy listo, {titulo}.")
         
         time.sleep(0.2)
 
@@ -77,7 +77,7 @@ def encender_sistemas():
 
         # Saludo inicial sonoro de REVAN con el estado cromático correcto
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
-        voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas, {titulo}.")
+        voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas localmente, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         
         # Enlazamos el bucle repetitivo de procesamiento de voz
@@ -86,10 +86,10 @@ def encender_sistemas():
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
-        print(f"❌ Error crítico al inicializar las APIs: {e}")
+        print(f"❌ Error crítico al inicializar las APIs locales: {e}")
 
 def procesar_ciclo_voz():
-    """Administra los cambios de estado cromáticos basados en la actividad de voz."""
+    """Administra los cambios de estado cromáticos basados en la actividad de voz local."""
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo
 
     if gui.debe_cerrar:
@@ -119,10 +119,12 @@ def procesar_ciclo_voz():
                 gui.app.quit()
                 return
 
-            # 🧠 PENSANDO: Gemini procesa la orden (Esfera pasa a Dorado)
+            # 🧠 PENSANDO: Ollama procesa intenciones en VRAM (Esfera pasa a Dorado)
             gui.actualizar_estado("🧠 PENSANDO...", "#ffaa00")
             sincronizar_estado_esfera("PENSANDO", "#ffaa00")
             
+            # Ollama_client procesará internamente si hay una acción física de Windows
+            # y devolverá el texto del reporte táctico directo de la acción
             respuesta_texto = cerebro_ia.generar_respuesta(orden)
             
             # 🔊 HABLANDO: ElevenLabs reproduce el audio (Esfera pasa a Fucsia)
