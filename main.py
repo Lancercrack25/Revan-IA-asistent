@@ -44,12 +44,14 @@ def encender_sistemas():
     sistema_activo = True
 
     print("⚡ Inicializando secuencia de despliegue cronológico...")
-    
+    print("🪟 [1/3] Desplegando herramientas del sistema (Monitores nativos)...")
+    try:
+        desplegar_monitores_windows()
+    except Exception as e:
+        print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
+
     time.sleep(0.4) # Retraso estratégico para la organización de ventanas en Windows
 
-    # ==================================================
-    # PASO 2: SE DESPLIEGA LA INTERFAZ DE PYTHON
-    # ==================================================
     gui.actualizar_estado("⚙️ CONECTANDO COGNICIÓN...", "#7ef1ff")
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
     print("💻 [2/3] Panel CustomTkinter Activo.")
