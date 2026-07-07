@@ -9,7 +9,7 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
 # 🔌 Importaciones del Sistema REVAN (Cerebro Localizado)
-from src.Core.Ollama_client import OllamaClient  # 🎯 Cambiado de GeminiClient a tu nuevo Ollama local
+from src.Core.Ollama_client import OllamaClient  
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes
@@ -89,60 +89,58 @@ def encender_sistemas():
         print(f"❌ Error crítico al inicializar las APIs locales: {e}")
 
 def procesar_ciclo_voz():
-    """Administra los cambios de estado cromáticos basados en la actividad de voz local."""
-    global cerebro_ia, voz_ia, oidos_ia, gui, titulo
-
-    if gui.debe_cerrar:
-        gui.actualizar_estado("Desconectando...", "#f85149")
-        sincronizar_estado_esfera("DESCONECTANDO", "#f85149")
-        if voz_ia:
-            voz_ia.hablar(f"Entendido, {titulo}. Desconectando sistemas tácticos.")
-        gui.app.quit()
-        return
-
+    """Ciclo táctico en main.py que filtra el ruido ambiental mediante palabra clave."""
+    global cerebro_ia, voz_ia, oidos_ia, gui
     try:
-        # 🎤 ESCUCHANDO: El usuario habla (Esfera pasa a Cian)
-        gui.actualizar_estado("ESCUCHANDO...", "#58a6ff")
-        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
+        print("🔵 [REVAN]: Escuchando...")
+        sincronizar_estado_esfera("ESCUCHANDO", "#7ef1ff")
+        orden_sucia = oidos_ia.escuchar()
         
-        orden = oidos_ia.escuchar()
-        
-        if orden.strip():
-            gui.agregar_mensaje("tu", orden)
-            
-            # Comando de apagado inmediato
-            if any(palabra in orden.lower() for palabra in ["salir", "apagar sistema", "desconectar"]):
-                gui.actualizar_estado("Desconectando...", "#f85149")
-                sincronizar_estado_esfera("DESCONECTANDO", "#f85149")
-                if voz_ia:
-                    voz_ia.hablar(f"Entendido, {titulo}. Desconectando sistemas tácticos.")
-                gui.app.quit()
-                return
-
-            # 🧠 PENSANDO: Ollama procesa intenciones en VRAM (Esfera pasa a Dorado)
-            gui.actualizar_estado("🧠 PENSANDO...", "#ffaa00")
-            sincronizar_estado_esfera("PENSANDO", "#ffaa00")
-            
-            # Ollama_client procesará internamente si hay una acción física de Windows
-            # y devolverá el texto del reporte táctico directo de la acción
-            respuesta_texto = cerebro_ia.generar_respuesta(orden)
-            
-            # 🔊 HABLANDO: ElevenLabs reproduce el audio (Esfera pasa a Fucsia)
-            gui.agregar_mensaje("revan", respuesta_texto)
-            gui.actualizar_estado("🔊 REVAN HABLANDO...", "#ff0055")
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            
-            voz_ia.hablar(respuesta_texto)
-            
-            # ⚡ RETORNO: El sistema vuelve a reposo (Esfera pasa a Azul)
-            gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
+        # Si el micrófono no captó nada (Silencio), reabrimos ciclo de inmediato
+        if not orden_sucia:
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            gui.app.after(100, procesar_ciclo_voz)
+            return
+
+        orden_minusculas = orden_sucia.lower().strip()
+        print(f"🧠 [Matriz de captura]: '{orden_minusculas}'")
+
+        # 🎯 EL FILTRO ANTIRRUIDO CRÍTICO:
+        if not orden_minusculas.startswith("revan"):
+            print("🔊 [REVAN]: Interferencia o comando sin palabra clave detectado. Ignorando...")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            gui.app.after(100, procesar_ciclo_voz)
+            return
+
+        # Si llegó aquí, sí te dirigiste a la IA. Limpiamos el prefijo "revan"
+        orden_limpia = orden_minusculas.replace("revan", "").strip()
+        
+        # Caso por si solo dijiste su nombre sin orden
+        if not orden_limpia:
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar("Sistemas listos, Señor. ¿Qué comando desea ejecutar?")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            gui.app.after(100, procesar_ciclo_voz)
+            return
+
+        # 3. Enviamos la orden limpia al cerebro de Ollama parchado (Corregido: cerebro_ia)
+        sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+        respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+        
+        # Actualizamos la interfaz gráfica con el texto real
+        gui.agregar_mensaje("user", orden_sucia)
+        gui.agregar_mensaje("revan", respuesta_final)
+        
+        # 4. Vocalización asíncrona mediante hilos (Corregido: voz_ia)
+        sincronizar_estado_esfera("HABLANDO", "#ff0055")
+        voz_ia.hablar(respuesta_final)
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
 
     except Exception as e:
-        gui.actualizar_estado("⚠️ ERROR EN SISTEMA", "#f85149")
-        sincronizar_estado_esfera("ERROR", "#f85149")
-        print(f"Ocurrió un error en el ciclo de voz: {e}")
-
+        print(f"⚠️ Error detectado en el bucle táctico de voz: {e}")
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+    
+    # Mantenemos el ciclo vivo en Tkinter de forma segura
     gui.app.after(100, procesar_ciclo_voz)
 
 def main():
@@ -161,7 +159,7 @@ def main():
     print(" REVAN en modo pasivo. Esperando señal acústica (aplauso)...")
     while True:
         try:
-            captura = oidos_ia.escuchar(modo_pasivo=True)
+            captura = oidos_ia.escuchar()
             if captura.strip():
                 print(f"💥 ¡Señal acústica validada! Inicializando REVAN...")
                 break
