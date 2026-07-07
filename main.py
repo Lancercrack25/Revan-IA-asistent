@@ -26,6 +26,10 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 
+# 🧠 VARIABLES DE CONTROL DE ATENCIÓN (MODO JARVIS CHETADO)
+ultima_interaccion = 0  # Almacena el timestamp de la última orden procesada
+TIEMPO_ATENCION = 30    # Tiempo en segundos para mantener el canal abierto sin pedir el nombre
+
 def hilo_servidor_web():
     """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
     try:
@@ -87,8 +91,8 @@ def encender_sistemas():
         print(f"❌ Error crítico al inicializar las APIs locales: {e}")
 
 def procesar_ciclo_voz():
-    """Ciclo estratégico que filtra voces externas mediante palabra clave en cualquier posición."""
-    global cerebro_ia, voz_ia, oidos_ia, gui
+    """Ciclo avanzado estilo Jarvis con ventana de atención de tiempo dinámico."""
+    global cerebro_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
         print("🔵 [REVAN]: Escuchando...")
         sincronizar_estado_esfera("ESCUCHANDO", "#7ef1ff")
@@ -102,18 +106,29 @@ def procesar_ciclo_voz():
         orden_minusculas = orden_sucia.lower().strip()
         print(f"🧠 [Matriz de captura]: '{orden_minusculas}'")
 
-        # 🎯 FILTRO ANTIRRUIDO FLEXIBLE:
-        # Si la otra persona habla fuerte y no dice la palabra clave, el escudo la ignora de inmediato.
-        if "revan" not in orden_minusculas:
-            print("🔊 [REVAN]: Ruido ambiental o comando ajeno detectado. Ignorando...")
+        # Evaluar si estamos dentro de la ventana de tiempo activa tras una petición válida
+        tiempo_actual = time.time()
+        en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
+
+        # 🎯 ENRUTADOR CONTEXTUAL JARVIS:
+        if "revan" in orden_minusculas:
+            # Si se le llama por su nombre, limpia la cadena y abre/renueva el contador de atención
+            partes = orden_minusculas.split("revan", 1)
+            orden_limpia = partes[1].strip() if len(partes) > 1 else ""
+            ultima_interaccion = tiempo_actual  
+        elif en_ventana_atencion:
+            # Modo Conversación Fluida Activo: procesa la orden directa omitiendo el nombre
+            print("🔥 [MODO JARVIS]: Canal abierto. Procesando orden directa...")
+            orden_limpia = orden_minusculas
+            ultima_interaccion = tiempo_actual  # Cada interacción exitosa resetea los 30 segundos
+        else:
+            # Fuera de la ventana y sin invocación explícita, se filtra como ruido de fondo
+            print("🔊 [REVAN]: Ruido ambiental o conversación ajena detectada. Ignorando...")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             gui.app.after(100, procesar_ciclo_voz)
             return
 
-        # Limpiamos los saludos o muletillas que estén antes de su nombre
-        partes = orden_minusculas.split("revan", 1)
-        orden_limpia = partes[1].strip() if len(partes) > 1 else ""
-        
+        # Si se invoca el nombre de la IA pero no hay comando posterior
         if not orden_limpia:
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar("Sistemas listos, Señor. ¿Qué comando desea ejecutar?")
@@ -152,10 +167,11 @@ def main():
 
     oidos_ia = MicrophoneClient()
     
-    print(" REVAN en modo pasivo. Esperando señal acústica...")
+    print(" REVAN en modo pasivo. Esperando señal acústica (aplauso)...")
     while True:
         try:
-            captura = oidos_ia.escuchar()
+            # 🎯 PARÁMETRO CORREGIDO: Se reincorpora el control nativo para el pico del aplauso
+            captura = oidos_ia.escuchar(modo_pasivo=True)
             if captura.strip():
                 print(f"💥 ¡Señal acústica validada! Inicializando REVAN...")
                 break
