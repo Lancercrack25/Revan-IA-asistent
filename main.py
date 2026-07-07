@@ -3,11 +3,9 @@ import sys
 import time
 import threading
 import subprocess
-
 # Prevenir la generación de archivos de caché compilados (.pyc)
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
 # Importaciones del Sistema REVAN (Cerebro Localizado)
 from src.Core.Ollama_client import OllamaClient  
 from src.Core.Elevenlabs_client import ElevenLabsClient
@@ -18,6 +16,8 @@ from src.Automation.System_commands import desplegar_monitores_windows
 # Conexión directa al puente real del servidor
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
 from src.Database.init import inicializar_base_datos
+# NUEVA IMPORTACIÓN: El Director de Orquesta de tus Servicios
+from src.Services.agent_orchestrator import ejecutar_misión_compleja
 
 # Instancias y Controles Globales
 cerebro_ia = None
@@ -84,7 +84,6 @@ def encender_sistemas():
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         
         gui.app.after(100, procesar_ciclo_voz)
-        inicializar_base_datos()  # Inicializa la base de datos y las tablas si no existen
         
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
@@ -120,7 +119,7 @@ def procesar_ciclo_voz():
             # Modo Conversación Fluida Activo: procesa la orden directa omitiendo el nombre
             print("[MODO JARVIS]: Canal abierto. Procesando orden directa...")
             orden_limpia = orden_minusculas
-            ultima_interaccion = tiempo_actual  # Cada interacción exitosa resetea los 30 segundos
+            ultima_interaccion = tiempo_actual  # Cada interacción exitosa resetea la ventana
         else:
             # Fuera de la ventana y sin invocación explícita, se filtra como ruido de fondo
             print("[REVAN]: Ruido ambiental o conversación ajena detectada. Ignorando...")
@@ -136,10 +135,17 @@ def procesar_ciclo_voz():
             gui.app.after(100, procesar_ciclo_voz)
             return
 
-        # Procesamiento táctico con Ollama
+        # --- INTERCEPTOR DEL ORQUESTRADOR ---
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-        respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
         
+        # Le pasamos la orden primero al Orquestador por si es una misión compleja
+        respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
+        
+        # Si devuelve None, el Orquestador dice "esto no es mío", y se lo pasamos normal a Ollama
+        if respuesta_final is None:
+            respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+        # --------------------------------------
+
         # Sincronización con la interfaz gráfica
         gui.agregar_mensaje("user", orden_sucia)
         gui.agregar_mensaje("revan", respuesta_final)
@@ -159,6 +165,14 @@ def main():
     global oidos_ia, gui, sistema_activo, titulo
     
     print("Inicializando cargador base de REVAN...")
+    
+    # 🎯 CAMBIO DE LUGAR ESTRATÉGICO: Inicializamos la BD al arrancar la app, 
+    # antes del aplauso, para asegurar que el sistema esté listo desde el segundo uno.
+    try:
+        inicializar_base_datos()
+    except Exception as e:
+        print(f"⚠️ Alerta al desplegar base de datos: {e}")
+        
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     
@@ -170,7 +184,6 @@ def main():
     print(" REVAN en modo pasivo. Esperando señal acústica (aplauso)...")
     while True:
         try:
-            # PARÁMETRO CORREGIDO: Se reincorpora el control nativo para el pico del aplauso
             captura = oidos_ia.escuchar(modo_pasivo=True)
             if captura.strip():
                 print(f"¡Señal acústica validada! Inicializando REVAN...")
