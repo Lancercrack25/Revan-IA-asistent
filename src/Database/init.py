@@ -42,5 +42,6 @@ def crear_bd_si_no_existe():
 
 # ================= INICIALIZACIÓN =================
 
-def inicializar_sistema():
+def inicializar_base_datos():
     crear_bd_si_no_existe()
+    crear_tablas_si_no_existen(obtener_conexion())

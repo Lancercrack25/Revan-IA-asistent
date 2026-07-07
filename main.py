@@ -17,6 +17,7 @@ from src.Gui.Dashboard import RevanGUI
 from src.Automation.System_commands import desplegar_monitores_windows
 # Conexión directa al puente real del servidor
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
+from src.Database.init import inicializar_base_datos
 
 # Instancias y Controles Globales
 cerebro_ia = None
@@ -26,7 +27,6 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 
-# 🧠 VARIABLES DE CONTROL DE ATENCIÓN (MODO JARVIS CHETADO)
 ultima_interaccion = 0  # Almacena el timestamp de la última orden procesada
 TIEMPO_ATENCION = 15    # Tiempo en segundos para mantener el canal abierto sin pedir el nombre
 
@@ -66,7 +66,7 @@ def encender_sistemas():
         voz_ia = ElevenLabsClient()
 
         gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
-        gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas de forma local. Estoy listo, {titulo}.")
+        gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas exitosamente. Estoy listo, {titulo}.")
         
         time.sleep(0.2)
 
@@ -80,10 +80,11 @@ def encender_sistemas():
             print(f"⚠️ Error al lanzar la interfaz web: {e}")
 
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
-        voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas localmente, {titulo}.")
+        voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas exitosamente, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         
         gui.app.after(100, procesar_ciclo_voz)
+        inicializar_base_datos()  # Inicializa la base de datos y las tablas si no existen
         
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")

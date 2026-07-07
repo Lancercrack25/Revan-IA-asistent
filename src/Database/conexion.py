@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 #esta funcion carga las variables de entorno desde el archivo .env, cada uno tiene contraseñas y datos de conexión diferentes, por eso no se sube a github
 load_dotenv()
-sys.dont_write_bytecode = True  # Evita la creación de archivos .pyc
+sys.dont_write_bytecode = True  # Evita la creación de archivos
+
 # ================= CONFIGURACIÓN =================
 DB_CONFIG = {
     "host": os.getenv("DB_HOST"),
