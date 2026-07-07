@@ -1,7 +1,3 @@
-/* ==========================================================================
-   REVAN NEURAL CORE - SHADER ENGINE & CHROMATIC REALTIME MUTATION
-   ========================================================================== */
-
 let escena, camara, render, redNeuronal, nodosSinapticos, brilloNucleo;
 let estadoActual = "ESPERA";
 let colorObjetivo = new THREE.Color("#0077ff"); // Variable maestra de control de color
@@ -130,7 +126,7 @@ function bucleAnimacion() {
     requestAnimationFrame(bucleAnimacion);
     deltaTiempo += (estadoActual === "PENSANDO") ? 0.25 : 0.05;
 
-    // 🎯 MEJORADO: Interpolación lineal explícita por cuadro en la GPU para transiciones líquidas
+    // MEJORADO: Interpolación lineal explícita por cuadro en la GPU para transiciones líquidas
     redNeuronal.material.color.lerp(colorObjetivo, 0.08);
     nodosSinapticos.material.color.lerp(colorObjetivo, 0.08);
     brilloNucleo.material.color.lerp(colorObjetivo, 0.08);

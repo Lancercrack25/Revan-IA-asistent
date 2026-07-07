@@ -12,7 +12,7 @@ class GeminiClient:
         # Soportamos tanto tu cargador como las variables de entorno normales
         api_key = credenciales.get("GEMINI_API_KEY") if credenciales else os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("❌ No se encontró la GEMINI_API_KEY en las credenciales.")
+            raise ValueError("No se encontró la GEMINI_API_KEY en las credenciales.")
             
         # Inicializamos el nuevo cliente oficial de Google
         self.client = genai.Client(api_key=api_key)
@@ -32,7 +32,7 @@ class GeminiClient:
             system_instruction=instruccion_sistema
         )
         # 5. Iniciamos el chat con memoria usando el modelo nativo rápido
-        print("🧠 [REVAN]: Memoria e historial de conversación activados (SDK Moderno).")
+        print("[REVAN]: Memoria e historial de conversación activados (SDK Moderno).")
         self.chat = self.client.chats.create(
             model="gemini-2.5-flash",
             config=config

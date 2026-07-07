@@ -35,7 +35,7 @@ def crear_bd_si_no_existe():
 
         cur.close()
     except Exception as e:
-        print("❌ Error creando base de datos:", e)
+        print("Error creando base de datos:", e)
     finally:
         if conn:
             conn.close()

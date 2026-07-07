@@ -8,7 +8,7 @@ import subprocess
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
-# 🔌 Importaciones del Sistema REVAN (Cerebro Localizado)
+# Importaciones del Sistema REVAN (Cerebro Localizado)
 from src.Core.Ollama_client import OllamaClient  
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
@@ -36,7 +36,7 @@ def hilo_servidor_web():
         servidor = iniciar_servidor_ui()
         servidor.run()
     except Exception as e:
-        print(f"⚠️ Error al inicializar el servidor web de la esfera: {e}")
+        print(f"Error al inicializar el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
     """Envía de forma segura los estados de voz e IA al loop en ejecución de FastAPI."""
@@ -47,25 +47,25 @@ def encender_sistemas():
     global cerebro_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
     sistema_activo = True
 
-    print("⚡ Inicializando secuencia de despliegue cronológico...")
+    print("Inicializando secuencia de despliegue cronológico...")
     print("🪟 [1/3] Desplegando herramientas del sistema (Monitores nativos)...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
-        print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
+        print(f" Aviso al desplegar monitores nativos: {e}")
 
     time.sleep(0.4) 
 
-    gui.actualizar_estado("⚙️ CONECTANDO COGNICIÓN...", "#7ef1ff")
+    gui.actualizar_estado("CONECTANDO COGNICIÓN...", "#7ef1ff")
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
-    print("💻 [2/3] Panel CustomTkinter Activo.")
+    print(" [2/3] Panel CustomTkinter Activo.")
     
     try:
         # Inicialización de motores locales
         cerebro_ia = OllamaClient()
         voz_ia = ElevenLabsClient()
 
-        gui.actualizar_estado("⚡ EN LÍNEA", "#7ef1ff")
+        gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
         gui.agregar_mensaje("revan", f"Protocolo de aplausos validado. Módulos de automatización e interfaces cargadas exitosamente. Estoy listo, {titulo}.")
         
         time.sleep(0.2)
@@ -75,9 +75,9 @@ def encender_sistemas():
                 'start brave --app=http://127.0.0.1:8000 --window-size=670,670',
                 shell=True
             )
-            print("🌐 [3/3] Núcleo Web Desplegado (Esfera 3D).")
+            print("[3/3] Núcleo Web Desplegado (Esfera 3D).")
         except Exception as e:
-            print(f"⚠️ Error al lanzar la interfaz web: {e}")
+            print(f"Error al lanzar la interfaz web: {e}")
 
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
         voz_ia.hablar(f"Sistemas en línea. Herramientas del sistema desplegadas exitosamente, {titulo}.")
@@ -89,13 +89,13 @@ def encender_sistemas():
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
-        print(f"❌ Error crítico al inicializar las APIs locales: {e}")
+        print(f"Error crítico al inicializar las APIs locales: {e}")
 
 def procesar_ciclo_voz():
     """Ciclo avanzado estilo Jarvis con ventana de atención de tiempo dinámico."""
     global cerebro_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
-        print("🔵 [REVAN]: Escuchando...")
+        print("[REVAN]: Escuchando...")
         sincronizar_estado_esfera("ESCUCHANDO", "#7ef1ff")
         orden_sucia = oidos_ia.escuchar()
         
@@ -105,13 +105,12 @@ def procesar_ciclo_voz():
             return
 
         orden_minusculas = orden_sucia.lower().strip()
-        print(f"🧠 [Matriz de captura]: '{orden_minusculas}'")
+        print(f"[Matriz de captura]: '{orden_minusculas}'")
 
         # Evaluar si estamos dentro de la ventana de tiempo activa tras una petición válida
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
-        # 🎯 ENRUTADOR CONTEXTUAL JARVIS:
         if "revan" in orden_minusculas:
             # Si se le llama por su nombre, limpia la cadena y abre/renueva el contador de atención
             partes = orden_minusculas.split("revan", 1)
@@ -119,12 +118,12 @@ def procesar_ciclo_voz():
             ultima_interaccion = tiempo_actual  
         elif en_ventana_atencion:
             # Modo Conversación Fluida Activo: procesa la orden directa omitiendo el nombre
-            print("🔥 [MODO JARVIS]: Canal abierto. Procesando orden directa...")
+            print("[MODO JARVIS]: Canal abierto. Procesando orden directa...")
             orden_limpia = orden_minusculas
             ultima_interaccion = tiempo_actual  # Cada interacción exitosa resetea los 30 segundos
         else:
             # Fuera de la ventana y sin invocación explícita, se filtra como ruido de fondo
-            print("🔊 [REVAN]: Ruido ambiental o conversación ajena detectada. Ignorando...")
+            print("[REVAN]: Ruido ambiental o conversación ajena detectada. Ignorando...")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             gui.app.after(100, procesar_ciclo_voz)
             return
@@ -151,7 +150,7 @@ def procesar_ciclo_voz():
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
     except Exception as e:
-        print(f"⚠️ Error detectado en el bucle táctico de voz: {e}")
+        print(f"Error detectado en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
     
     gui.app.after(100, procesar_ciclo_voz)
@@ -159,7 +158,7 @@ def procesar_ciclo_voz():
 def main():
     global oidos_ia, gui, sistema_activo, titulo
     
-    print("🌌 Inicializando cargador base de REVAN...")
+    print("Inicializando cargador base de REVAN...")
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     
@@ -171,10 +170,10 @@ def main():
     print(" REVAN en modo pasivo. Esperando señal acústica (aplauso)...")
     while True:
         try:
-            # 🎯 PARÁMETRO CORREGIDO: Se reincorpora el control nativo para el pico del aplauso
+            # PARÁMETRO CORREGIDO: Se reincorpora el control nativo para el pico del aplauso
             captura = oidos_ia.escuchar(modo_pasivo=True)
             if captura.strip():
-                print(f"💥 ¡Señal acústica validada! Inicializando REVAN...")
+                print(f"¡Señal acústica validada! Inicializando REVAN...")
                 break
         except Exception as e:
             print(f"Aviso en escaneo pasivo: {e}")

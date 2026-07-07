@@ -11,13 +11,13 @@ def crear_tablas_si_no_existen(conn):
     las tablas tácticas de forma automática si no existen.
     """
     if conn is None:
-        print("❌ Error: No se puede inicializar tablas sin una conexión activa.")
+        print("Error: No se puede inicializar tablas sin una conexión activa.")
         return
 
     try:
         cur = conn.cursor()
 
-        # 🎯 TABLA 1: HISTORIAL DE INTERACCIONES Y COMANDOS
+        # TABLA 1: HISTORIAL DE INTERACCIONES Y COMANDOS
         # Registra la fecha, la orden del usuario, la respuesta de REVAN y la acción JSON ejecutada.
         query_historial = """
         CREATE TABLE IF NOT EXISTS historial_interacciones (
@@ -29,7 +29,7 @@ def crear_tablas_si_no_existen(conn):
         );
         """
 
-        # 🎯 TABLA 2: MEMORIA DE LARGO PLAZO (SISTEMA DE RECUERDOS)
+        # TABLA 2: MEMORIA DE LARGO PLAZO (SISTEMA DE RECUERDOS)
         # Permite a REVAN asociar claves y valores permanentes (ej. clave: 'cumple_maestro', valor: '15 de Octubre')
         query_memoria = """
         CREATE TABLE IF NOT EXISTS memoria_largo_plazo (
@@ -46,10 +46,10 @@ def crear_tablas_si_no_existen(conn):
         
         # Guardamos los cambios de forma permanente en el disco duro
         conn.commit()
-        print("🗄️ [REVAN DB]: Tablas verificadas e inicializadas correctamente con IF NOT EXISTS.")
+        print("[REVAN DB]: Tablas verificadas e inicializadas correctamente con IF NOT EXISTS.")
         
         cur.close()
     except psycopg2.Error as e:
-        print("❌ Error de PostgreSQL al crear las tablas:", e)
+        print("Error de PostgreSQL al crear las tablas:", e)
         # En caso de fallo, revertimos la transacción para no corromper la BD
         conn.rollback()

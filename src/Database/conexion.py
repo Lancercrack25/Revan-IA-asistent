@@ -23,5 +23,5 @@ def obtener_conexion():
     try:
         return psycopg2.connect(**DB_CONFIG)
     except psycopg2.Error as e:
-        print("❌ Error de conexión:", e)
+        print("Error de conexión:", e)
         return None

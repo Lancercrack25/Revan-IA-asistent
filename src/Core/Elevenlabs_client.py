@@ -3,7 +3,7 @@ import asyncio
 import pygame
 import edge_tts
 import time
-import threading  # 👈 1. Importamos la librería de hilos táctica
+import threading  # Importamos la librería de hilos táctica
 
 class ElevenLabsClient:
     def __init__(self):
@@ -16,7 +16,7 @@ class ElevenLabsClient:
 
     def hablar(self, texto):
         """Vocaliza el texto en un hilo secundario para NO congelar Tkinter ni desincronizar comandos."""
-        # 👈 2. Metemos todo el proceso en un hilo independiente (daemon=True)
+        # Metemos todo el proceso en un hilo independiente (daemon=True)
         hilo_voz = threading.Thread(target=self._proceso_hablar_hilo, args=(texto,), daemon=True)
         hilo_voz.start()
 
@@ -29,7 +29,7 @@ class ElevenLabsClient:
             # 4. Reproducimos de forma controlada sin afectar a main.py
             self._reproducir_audio()
         except Exception as e:
-            print(f"⚠️ Error en el módulo de voz local: {e}")
+            print(f"Error en el módulo de voz local: {e}")
 
     async def _generar_audio(self, texto):
         texto_limpio = str(texto).replace("{", "").replace("}", "")

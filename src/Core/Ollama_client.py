@@ -98,13 +98,13 @@ class OllamaClient:
                             
                         ruta_completa = os.path.join(ruta_final, nombre_doc)
                         
-                        # 📄 Escritura física e inmediata del archivo en el almacenamiento
+                        # Escritura física e inmediata del archivo en el almacenamiento
                         try:
                             with open(ruta_completa, "wb") as f:
                                 f.write(b"")
-                            print(f"📄 [REVAN]: Archivo físico creado en: {ruta_completa}")
+                            print(f"[REVAN]: Archivo físico creado en: {ruta_completa}")
                         except Exception as file_err:
-                            print(f"⚠️ Error al escribir archivo: {file_err}")
+                            print(f"Error al escribir archivo: {file_err}")
 
                         resultado_sistema = ejecutar_aplicacion_office(app_tipo)
                         memoria_asistente = f"¡Listo! Se ha generado el documento '{nombre_doc}' en tu carpeta llamada '{carpeta_destino}'."
@@ -120,7 +120,7 @@ class OllamaClient:
                         return memoria_asistente
                         
                 except Exception as json_err:
-                    print(f"⚠️ Error al procesar JSON táctico: {json_err}")
+                    print(f"Error al procesar JSON táctico: {json_err}")
                     memoria_asistente = "Error al ejecutar el protocolo de comando."
 
             self.historial.append({"role": "assistant", "content": memoria_asistente})
@@ -131,5 +131,5 @@ class OllamaClient:
             return texto_respuesta
             
         except Exception as e:
-            print(f"❌ Error crítico en el Core Local de Ollama: {e}")
+            print(f"Error crítico en el Core Local de Ollama: {e}")
             return "Error de comunicación en mi núcleo cognitivo local."

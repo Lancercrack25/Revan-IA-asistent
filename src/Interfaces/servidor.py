@@ -32,7 +32,7 @@ async def obtener_index():
     if os.path.exists(ruta_index):
         with open(ruta_index, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content=f"<h1>⚠️ Error: index.html no encontrado</h1>", status_code=404)
+    return HTMLResponse(content=f"<h1> Error: index.html no encontrado</h1>", status_code=404)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
