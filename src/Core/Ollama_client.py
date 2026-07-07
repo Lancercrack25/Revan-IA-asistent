@@ -6,6 +6,8 @@ import json
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
+from src.Services.os_service import analizar_entorno_vision
+
 try:
     import ollama
 except ImportError:
@@ -114,6 +116,9 @@ class OllamaClient:
                         resultado_sistema = lanzar_aplicacion_usuario(datos.get("nombre", ""))
                     elif accion == "JUEGO":
                         resultado_sistema = lanzar_videojuego(datos.get("nombre", ""))
+                    elif accion == "VISION":
+                        memoria_asistente = analizar_entorno_vision()
+                        resultado_sistema = True
                         
                     if resultado_sistema:
                         self.historial.append({"role": "assistant", "content": memoria_asistente})
