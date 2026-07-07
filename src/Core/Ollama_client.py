@@ -13,8 +13,7 @@ except ImportError:
 
 # Importamos el Orquestador Central unificado
 from src.Automation.System_commands import (
-    desplegar_monitores_windows, 
-    ejecutar_limpieza_sistema, 
+    desplegar_monitores_windows,  
     crear_carpeta_tactica, 
     abrir_carpeta_sistema,  # 🎯 Importada para abrir tus carpetas físicas
     ejecutar_aplicacion_office, 
@@ -66,8 +65,6 @@ class OllamaClient:
                     
                     if accion == "MONITOR":
                         return desplegar_monitores_windows()
-                    elif accion == "LIMPIEZA":
-                        return ejecutar_limpieza_sistema()
                     elif accion == "CREAR_CARPETA":
                         return crear_carpeta_tactica(datos.get("ruta", "escritorio"), datos.get("nombre", "Nueva_Carpeta"))
                     elif accion == "ABRIR_CARPETA":
