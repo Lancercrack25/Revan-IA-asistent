@@ -29,19 +29,19 @@ class OllamaClient:
             {
                 "role": "system", 
                 "content": (
-                    "Eres REVAN, un asistente cyberpunk táctico militar. Responde siempre en español de forma concisa.\n"
+                    "Eres REVAN, un asistente advanced como Jarvis de las películas de Iron Man, pero con más personalidad.\n"
                     "REGLA CRÍTICA DE AUTOMATIZACIÓN:\n"
                     "Si el usuario ordena realizar una acción física (abrir o CREAR carpetas, archivos, apps), "
                     "DEBES responder EXCLUSIVAMENTE con un JSON plano sin bloques de código markdown ni texto adicional.\n\n"
                     "REGLAS DE ORO PARA COMANDOS:\n"
                     "1. Usa EXACTAMENTE el nombre que el usuario te dicte. PROHIBIDO inventar años como '2023'.\n"
                     "2. Si el usuario no especifica un nombre claro para la carpeta, asígnale el nombre 'Contenedor_Táctico'.\n"
-                    "3. Si te piden un 'Word', utiliza la acción 'OFFICE' con app 'word'.\n\n"
+                    "3. Si te piden un 'Word', utiliza la acción 'OFFICE' con app 'word', e incluye siempre las llaves 'nombre_archivo' y 'destino'.\n\n"
                     "Formatos JSON estrictos permitidos:\n"
                     "- Monitor de recursos: {\"accion\": \"MONITOR\"}\n"
                     "- Crear carpeta nueva: {\"accion\": \"CREAR_CARPETA\", \"ruta\": \"escritorio\", \"nombre\": \"USAR_NOMBRE_DICTADO\"}\n"
                     "- Abrir carpeta existente: {\"accion\": \"ABRIR_CARPETA\", \"nombre\": \"nombre\"}\n"
-                    "- Abrir Office: {\"accion\": \"OFFICE\", \"app\": \"word\" o \"excel\"}\n"
+                    "- Abrir/Crear Office: {\"accion\": \"OFFICE\", \"app\": \"word\" o \"excel\", \"nombre_archivo\": \"nombre\", \"destino\": \"nombre_carpeta\"}\n"
                     "- Videos/Brave: {\"accion\": \"VIDEO\", \"busqueda\": \"query\"}\n"
                     "- Abrir Apps: {\"accion\": \"APP\", \"nombre\": \"nombre_app\"}\n"
                     "- Abrir Videojuegos: {\"accion\": \"JUEGO\", \"nombre\": \"nombre_juego\"}\n\n"
@@ -52,7 +52,6 @@ class OllamaClient:
 
     def generar_respuesta(self, orden_usuario: str) -> str:
         try:
-            # 1. Registramos de inmediato lo que capturó el micrófono en el historial
             self.historial.append({"role": "user", "content": orden_usuario})
             
             respuesta = ollama.chat(
@@ -64,7 +63,6 @@ class OllamaClient:
             memoria_asistente = texto_respuesta
             resultado_sistema = ""
             
-            # 2. Interceptor Inteligente de Comandos JSON
             if texto_respuesta.startswith("{") and texto_respuesta.endswith("}"):
                 try:
                     datos = json.loads(texto_respuesta)
@@ -77,13 +75,39 @@ class OllamaClient:
                         if nombre_c.lower() == "usar_nombre_dictado" or not nombre_c:
                             nombre_c = "Contenedor_Táctico"
                         resultado_sistema = crear_carpeta_tactica(datos.get("ruta", "escritorio"), nombre_c)
-                        # Sobrescribimos la memoria para que REVAN recuerde el reporte físico, no el JSON
                         memoria_asistente = f"Hecho, Señor. Carpeta '{nombre_c}' creada con éxito en el escritorio."
                     elif accion == "ABRIR_CARPETA":
                         resultado_sistema = abrir_carpeta_sistema(datos.get("nombre", ""))
                     elif accion == "OFFICE":
-                        resultado_sistema = ejecutar_aplicacion_office(datos.get("app", "word"))
-                        memoria_asistente = "Entendido, Señor. Desplegando entorno de Microsoft Office."
+                        app_tipo = datos.get("app", "word")
+                        nombre_doc = datos.get("nombre_archivo", "Ejemplo")
+                        carpeta_destino = datos.get("destino", "")
+                        
+                        # Localizamos el escritorio dinámicamente en Windows
+                        escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
+                        if carpeta_destino:
+                            ruta_final = os.path.join(escritorio, carpeta_destino)
+                        else:
+                            ruta_final = escritorio
+                            
+                        os.makedirs(ruta_final, exist_ok=True)
+                        
+                        extension = ".docx" if app_tipo == "word" else ".xlsx"
+                        if not nombre_doc.endswith(extension):
+                            nombre_doc += extension
+                            
+                        ruta_completa = os.path.join(ruta_final, nombre_doc)
+                        
+                        # 📄 Escritura física e inmediata del archivo en el almacenamiento
+                        try:
+                            with open(ruta_completa, "wb") as f:
+                                f.write(b"")
+                            print(f"📄 [REVAN]: Archivo físico creado en: {ruta_completa}")
+                        except Exception as file_err:
+                            print(f"⚠️ Error al escribir archivo: {file_err}")
+
+                        resultado_sistema = ejecutar_aplicacion_office(app_tipo)
+                        memoria_asistente = f"¡Listo! Se ha generado el documento '{nombre_doc}' en tu carpeta llamada '{carpeta_destino}'."
                     elif accion == "VIDEO":
                         resultado_sistema = reproducir_video_brave(datos.get("busqueda", ""))
                     elif accion == "APP":
@@ -93,16 +117,14 @@ class OllamaClient:
                         
                     if resultado_sistema:
                         self.historial.append({"role": "assistant", "content": memoria_asistente})
-                        return resultado_sistema
+                        return memoria_asistente
                         
                 except Exception as json_err:
                     print(f"⚠️ Error al procesar JSON táctico: {json_err}")
                     memoria_asistente = "Error al ejecutar el protocolo de comando."
 
-            # 3. Si fue conversación normal, guardamos el texto plano
             self.historial.append({"role": "assistant", "content": memoria_asistente})
             
-            # Poda de historial circular para evitar saturación de VRAM en Qwen 1.5b
             if len(self.historial) > 12:
                 self.historial = [self.historial[0]] + self.historial[-10:]
             
