@@ -28,7 +28,7 @@ sistema_activo = False
 
 # 🧠 VARIABLES DE CONTROL DE ATENCIÓN (MODO JARVIS CHETADO)
 ultima_interaccion = 0  # Almacena el timestamp de la última orden procesada
-TIEMPO_ATENCION = 30    # Tiempo en segundos para mantener el canal abierto sin pedir el nombre
+TIEMPO_ATENCION = 15    # Tiempo en segundos para mantener el canal abierto sin pedir el nombre
 
 def hilo_servidor_web():
     """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
