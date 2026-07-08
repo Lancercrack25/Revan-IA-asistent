@@ -1,38 +1,45 @@
 import sys
 import os
-# Importamos los otros servicios que ya tienen lógica real
-from src.Services.os_service import registrar_accion_sistema
-from src.Services.research_service import buscar_y_resumir_tema
 
-sys.dont_write_bytecode = True
+sys.dont_write_bytecode = True  # Prevenir archivos de caché .pyc
 
 def ejecutar_misión_compleja(orden_usuario: str, cerebro_ia):
     """
-    Orquesta flujos de trabajo multi-paso analizando la orden del usuario 
-    y coordinando los servicios disponibles.
+    Evalúa si la orden requiere un flujo multi-paso avanzado.
+    Si es una orden simple o conversación común, retorna None de inmediato
+    para que el flujo siga su curso normal con Ollama sin congelar la GUI.
     """
-    print(f"[Orchestrator]: Analizando viabilidad de la misión: '{orden_usuario}'")
+    # 1. Normalizamos la cadena para evaluar
+    orden = orden_usuario.lower().strip()
     
-    # EJEMPLO DE FLUJO MULTI-PASO: "Investiga sobre Marte y guárdalo"
-    if "investiga" in orden_usuario.lower() and ("guarda" in orden_usuario.lower() or "escribe" in orden_usuario.lower()):
-        # Paso 1: Extraer qué quiere investigar (ej. quitarle la palabra investiga)
-        tema = orden_usuario.lower().replace("investiga sobre", "").replace("y guárdalo", "").strip()
+    # 2. FILTRO TÁCTICO: Si es una orden común de automatización, NO la tocamos aquí.
+    # Dejamos que Ollama_client la procese con su lógica experta de JSON.
+    palabras_clave_simples = ["crea", "carpeta", "archivo", "word", "excel", "abre", "busca", "navegador"]
+    if any(keyword in orden for keyword in palabras_clave_simples):
+        return None
+
+    # 3. ZONA DE MISIONES COMPLEJAS (Solo entra aquí si coincide exactamente)
+    # Ejemplo de misión compleja: "investiga profundamente sobre..."
+    if "investiga" in orden and ("guarda" in orden or "escribe" in orden):
+        print(f"🔮 [Orchestrator]: Ejecutando protocolo de investigación avanzada para: '{orden}'")
         
-        # Paso 2: Lanzar el Research Service
+        # Importamos aquí dentro para evitar referencias circulares lentas al arrancar
+        from src.Services.research_service import buscar_y_resumir_tema
+        from src.Services.os_service import registrar_accion_sistema
+        
+        tema = orden.replace("investiga sobre", "").replace("y guárdalo", "").strip()
         datos_encontrados = buscar_y_resumir_tema(tema)
         
         if "Error" in datos_encontrados or "No logré" in datos_encontrados:
-            return "Misión abortada en Fase de Investigación. " + datos_encontrados
+            return "Misión abortada. No se pudo recolectar información de la red principal."
             
-        # Paso 3: Pedirle a Ollama que redacte un resumen ejecutivo refinado con esos datos raw
-        prompt_refinado = f"Redacta un resumen ejecutivo muy breve (máximo 2 párrafos) basado en estos datos duros:\n{datos_encontrados}"
+        prompt_refinado = f"Redacta un resumen ejecutivo breve basado en estos datos:\n{datos_encontrados}"
         resumen_ia = cerebro_ia.generar_respuesta(prompt_refinado)
         
-        # Paso 4: Mandar a guardar la bitácora en PostgreSQL usando el OS Service
         registrar_accion_sistema(
-            orden=f"Investigación automatizada de {tema}",
+            orden=f"Investigación de {tema}",
             respuesta=resumen_ia,
             accion_tipo="RESEARCH_TASK"
         )
-        
-        return f"Misión completada, Señor. He investigado sobre {tema}, procesé los datos de forma local y registré el reporte ejecutivo en su base de datos PostgreSQL."
+        return f"Misión completada, Señor. Datos de {tema} procesados y registrados en PostgreSQL."
+    return None
