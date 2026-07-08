@@ -1,9 +1,13 @@
-#este archivo se encargara de logara la conexion con la base de datos de postgress
 import psycopg2
 from psycopg2 import sql
 import os
-from src.Database.conexion  import obtener_conexion,DB_CONFIG
-from src.Database.tablas  import crear_tablas_si_no_existen
+import sys
+
+# Prevenir generación de archivos .pyc
+sys.dont_write_bytecode = True
+
+from src.Database.conexion import obtener_conexion, DB_CONFIG
+from src.Database.tablas import crear_tablas_si_no_existen
 
 # ================= CREAR BD =================
 
@@ -43,5 +47,10 @@ def crear_bd_si_no_existe():
 # ================= INICIALIZACIÓN =================
 
 def inicializar_base_datos():
+    """Inicializa la base de datos y ejecuta la creación de tablas e infraestructura de estado."""
     crear_bd_si_no_existe()
-    crear_tablas_si_no_existen(obtener_conexion())
+    
+    # Obtenemos la conexión para que tablas.py ejecute las sentencias CREATE TABLE
+    conn = obtener_conexion()
+    if conn:
+        crear_tablas_si_no_existen(conn)

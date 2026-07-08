@@ -1,6 +1,7 @@
-#este archivo se encargara de inicializar las tablas de la base de datos de postgres
+# este archivo se encargara de inicializar las tablas de la base de datos de postgres
 import psycopg2
 from psycopg2 import sql
+import os
 import sys
 
 sys.dont_write_bytecode = True  # Evita la creación de archivos .pyc
@@ -18,7 +19,6 @@ def crear_tablas_si_no_existen(conn):
         cur = conn.cursor()
 
         # TABLA 1: HISTORIAL DE INTERACCIONES Y COMANDOS
-        # Registra la fecha, la orden del usuario, la respuesta de REVAN y la acción JSON ejecutada.
         query_historial = """
         CREATE TABLE IF NOT EXISTS historial_interacciones (
             id SERIAL PRIMARY KEY,
@@ -30,7 +30,6 @@ def crear_tablas_si_no_existen(conn):
         """
 
         # TABLA 2: MEMORIA DE LARGO PLAZO (SISTEMA DE RECUERDOS)
-        # Permite a REVAN asociar claves y valores permanentes (ej. clave: 'cumple_maestro', valor: '15 de Octubre')
         query_memoria = """
         CREATE TABLE IF NOT EXISTS memoria_largo_plazo (
             id SERIAL PRIMARY KEY,
@@ -40,16 +39,39 @@ def crear_tablas_si_no_existen(conn):
         );
         """
 
-        # Ejecutamos los scripts SQL en el servidor PostgreSQL
+        # TABLA 3: ESTADO DEL SISTEMA (FOCO Y RUTA ACTIVA EN TIEMPO REAL)
+        # Permite saber en qué carpeta está trabajando el usuario para crear subcarpetas o archivos ahí.
+        query_estado = """
+        CREATE TABLE IF NOT EXISTS estado_sistema (
+            clave VARCHAR(50) PRIMARY KEY,
+            valor TEXT NOT NULL,
+            actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+
+        # Ejecutamos las consultas SQL
         cur.execute(query_historial)
         cur.execute(query_memoria)
+        cur.execute(query_estado)
+
+        # INSERTAR ESTADO INICIAL (RUTA DEL ESCRITORIO POR DEFECTO)
+        ruta_escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
+        query_inicial_ruta = """
+        INSERT INTO estado_sistema (clave, valor)
+        VALUES ('ultima_ruta', %s)
+        ON CONFLICT (clave) DO NOTHING;
+        """
+        cur.execute(query_inicial_ruta, (ruta_escritorio,))
         
         # Guardamos los cambios de forma permanente en el disco duro
         conn.commit()
-        print("[REVAN DB]: Tablas verificadas e inicializadas correctamente con IF NOT EXISTS.")
+        print("[REVAN DB]: Tablas e infraestructura de estado inicializadas correctamente.")
         
         cur.close()
     except psycopg2.Error as e:
         print("Error de PostgreSQL al crear las tablas:", e)
         # En caso de fallo, revertimos la transacción para no corromper la BD
         conn.rollback()
+    finally:
+        if conn:
+            conn.close()

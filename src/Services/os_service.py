@@ -1,46 +1,157 @@
-import sys
 import os
+import sys
 import shutil
 import subprocess
 import psutil
-import ollama  # Aseguramos que esté disponible para visión
-from src.Camara.open_camera import capturar_pantallazo_camara  
+import cv2
+
+# Prevenir la generación de archivos .pyc
+sys.dont_write_bytecode = True
+
+try:
+    import ollama
+except ImportError:
+    print("⚠️ La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
+
 from src.Database.conexion import obtener_conexion
 
-sys.dont_write_bytecode = True  # Evita archivos .pyc
 
-# --- FUNCIÓN DE LOGS EXISTENTE ---
-def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str):
-    """Registra en PostgreSQL las acciones ejecutadas en el S.O."""
+def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
+    """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
         return False
+
     conn = obtener_conexion()
-    if not conn: return False
+    if not conn:
+        return False
+
     try:
         cur = conn.cursor()
-        query = "INSERT INTO historial_interacciones (orden_usuario, respuesta_revan, accion_ejecutada) VALUES (%s, %s, %s);"
+        query = """
+            INSERT INTO historial_interacciones (orden_usuario, respuesta_revan, accion_ejecutada)
+            VALUES (%s, %s, %s);
+        """
         cur.execute(query, (orden.strip(), respuesta.strip(), accion_tipo.upper()))
         conn.commit()
         cur.close()
         return True
     except Exception as e:
         print(f"❌ Error en OS Log: {e}")
+        conn.rollback()
         return False
     finally:
         conn.close()
 
-# --- 🔥 NUEVOS IMPLEMENTOS TÁCTICOS ---
 
-def ejecutar_limpieza_sistema():
+# --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
+
+def guardar_ruta_actual(ruta_absoluta: str) -> bool:
+    """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""
+    conn = obtener_conexion()
+    if not conn:
+        return False
+
+    try:
+        cur = conn.cursor()
+        query = """
+            INSERT INTO estado_sistema (clave, valor, actualizado_en)
+            VALUES ('ultima_ruta', %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (clave) 
+            DO UPDATE SET valor = EXCLUDED.valor, actualizado_en = CURRENT_TIMESTAMP;
+        """
+        cur.execute(query, (ruta_absoluta,))
+        conn.commit()
+        cur.close()
+        print(f"📁 [Estado]: Contexto de ruta actualizado -> {ruta_absoluta}")
+        return True
+    except Exception as e:
+        print(f"❌ Error al guardar la ruta activa en BD: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+def obtener_ruta_actual() -> str:
+    """Obtiene la última carpeta activa desde PostgreSQL. Si no hay, retorna el Escritorio."""
+    ruta_defecto = os.path.join(os.path.expanduser("~"), "Desktop")
+    conn = obtener_conexion()
+    if not conn:
+        return ruta_defecto
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT valor FROM estado_sistema WHERE clave = 'ultima_ruta';")
+        resultado = cur.fetchone()
+        cur.close()
+
+        if resultado and os.path.exists(resultado[0]):
+            return resultado[0]
+        return ruta_defecto
+    except Exception as e:
+        print(f"❌ Error al consultar la ruta activa: {e}")
+        return ruta_defecto
+    finally:
+        conn.close()
+
+
+# --- ACCIONES DE AUTOMATIZACIÓN DE CARPETAS ---
+
+def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     """
-    Purga la carpeta de archivos temporales de Windows para optimizar rendimiento.
+    Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
+    la abre en Windows Explorer y actualiza la ruta activa en PostgreSQL.
     """
+    escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
+    ruta_objetivo = os.path.join(escritorio, nombre_carpeta)
+
+    # 1. Intento directo
+    if os.path.exists(ruta_objetivo) and os.path.isdir(ruta_objetivo):
+        os.startfile(ruta_objetivo)
+        guardar_ruta_actual(ruta_objetivo)
+        return f"Carpeta '{nombre_carpeta}' abierta exitosamente. Foco de trabajo actualizado."
+
+    # 2. Búsqueda insensible a mayúsculas/minúsculas en el Escritorio
+    try:
+        for elemento in os.listdir(escritorio):
+            if elemento.lower() == nombre_carpeta.lower():
+                ruta_coincidencia = os.path.join(escritorio, elemento)
+                if os.path.isdir(ruta_coincidencia):
+                    os.startfile(ruta_coincidencia)
+                    guardar_ruta_actual(ruta_coincidencia)
+                    return f"Carpeta '{elemento}' localizada y abierta exitosamente."
+    except Exception as e:
+        print(f"Error en búsqueda secundaria: {e}")
+
+    return f"Negativo, Señor. No se localizó la carpeta '{nombre_carpeta}' en el Escritorio."
+
+
+def crear_carpeta_sistema(nombre_nueva_carpeta: str) -> str:
+    """
+    Crea una carpeta dentro del foco de trabajo activo (obtenido de PostgreSQL).
+    """
+    ruta_padre = obtener_ruta_actual()
+    ruta_final = os.path.join(ruta_padre, nombre_nueva_carpeta)
+
+    try:
+        os.makedirs(ruta_final, exist_ok=True)
+        guardar_ruta_actual(ruta_final)
+        
+        nombre_padre = os.path.basename(ruta_padre)
+        return f"Hecho, Señor. Carpeta '{nombre_nueva_carpeta}' creada con éxito dentro de '{nombre_padre}'."
+    except Exception as e:
+        return f"Error al intentar crear el directorio físico: {e}"
+
+
+# --- HERRAMIENTAS DE MANTENIMIENTO Y TELEMETRÍA ---
+
+def ejecutar_limpieza_sistema() -> str:
+    """Limpia los archivos temporales de Windows para liberar caché."""
     ruta_temp = os.environ.get("TEMP")
     archivos_eliminados = 0
-    carpetas_eliminadas = 0
-    
+
     if not ruta_temp or not os.path.exists(ruta_temp):
-        return "No se pudo localizar el sector de archivos temporales."
+        return "No se pudo acceder a la ruta de archivos temporales."
 
     for elemento in os.listdir(ruta_temp):
         ruta_completa = os.path.join(ruta_temp, elemento)
@@ -50,87 +161,63 @@ def ejecutar_limpieza_sistema():
                 archivos_eliminados += 1
             elif os.path.isdir(ruta_completa):
                 shutil.rmtree(ruta_completa)
-                carpetas_eliminadas += 1
         except Exception:
-            # Muchos archivos temporales están bloqueados porque Windows los usa en vivo, se ignoran de forma segura
             continue
-            
-    return f"Mantenimiento completado, Señor. Se purgaron {archivos_eliminados} archivos y {carpetas_eliminadas} directorios corruptos de la memoria temporal."
+
+    return f"Purga de sistema completada. Se eliminaron {archivos_eliminados} elementos del directorio temporal."
 
 
-def obtener_diagnostico_hardware():
-    """
-    Extrae los datos reales de carga de la CPU, RAM y espacio en disco duro.
-    """
+def obtener_diagnostico_hardware() -> str:
+    """Extrae consumo de CPU, Memoria RAM y espacio en Disco."""
     try:
         uso_cpu = psutil.cpu_percent(interval=0.5)
         uso_ram = psutil.virtual_memory().percent
-        disco = psutil.disk_usage('C:')
-        uso_disco = disco.percent
-        
-        reporte = (
-            f"Diagnóstico de hardware completado. Carga de CPU al {uso_cpu}%. "
-            f"Consumo de memoria RAM al {uso_ram}%. "
-            f"Almacenamiento del Disco Local C ocupado al {uso_disco}%."
-        )
-        return reporte
+        uso_disco = psutil.disk_usage('C:').percent
+        return f"Diagnóstico físico: CPU al {uso_cpu}%, Memoria RAM al {uso_ram}% y Disco C ocupado al {uso_disco}%."
     except Exception as e:
-        return f"Error al leer los sensores de telemetría física: {e}"
+        return f"Error al leer sensores de rendimiento: {e}"
 
 
-def buscar_archivo_en_escritorio(nombre_archivo: str):
-    """
-    Escanea el escritorio real buscando coincidencias con un archivo específico.
-    """
-    escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
-    coincidencias = []
+def analizar_entorno_vision() -> str:
+    """Captura un fotograma de la webcam y lo analiza con el modelo LLaVA en Ollama."""
+    print("📷 [REVAN Vision]: Activando sensor óptico...")
     
-    if not os.path.exists(escritorio):
-        return "No se pudo acceder al sector del escritorio."
-
-    for raiz, _, archivos in os.walk(escritorio):
-        for archivo in archivos:
-            if nombre_archivo.lower() in archivo.lower():
-                coincidencias.append(archivo)
-                
-    if coincidencias:
-        lista_archivos = ", ".join(coincidencias[:3]) # Limitamos a mostrar los 3 primeros
-        return f"Afirmativo, Señor. Encontré archivos que coinciden en el escritorio: {lista_archivos}."
-    else:
-        return f"Negativo, Señor. No localicé ningún archivo con el nombre '{nombre_archivo}' en el escritorio."
-
-def analizar_entorno_vision():
-    """
-    Dispara la captura de la cámara y procesa la imagen de forma local 
-    usando un modelo de visión eficiente en Ollama.
-    """
-    # 1. Tomamos la foto instantánea
-    ruta_imagen = capturar_pantallazo_camara()
-    if not ruta_imagen or not os.path.exists(ruta_imagen):
-        return "Negativo, Señor. No se pudo inicializar el hardware óptico o capturar la imagen."
-        
-    print("👁️ [REVAN Visión]: Procesando matriz de pixeles con Ollama...")
+    # Usar CAP_DSHOW en Windows para apertura instantánea del driver
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)
     
+    if not cap.isOpened():
+        return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
+
+    ret, frame = cap.read()
+    cap.release() # Liberar el dispositivo inmediatamente
+
+    if not ret or frame is None:
+        return "Error al capturar la imagen de la cámara."
+
+    ruta_foto_temp = "temp_vision.jpg"
+    cv2.imwrite(ruta_foto_temp, frame)
+
     try:
-        # 2. Le enviamos la imagen a Ollama. 
-        # NOTA: Requiere tener instalado un modelo de visión como 'llava' o 'qwen2.5-vision'
+        print("🧠 [REVAN Vision]: Procesando análisis visual con LLaVA...")
+        
         respuesta = ollama.chat(
-            model='llava:7b', # Cambia al modelo de visión que descargues con 'ollama run llava'
+            model='llava',
             messages=[{
                 'role': 'user',
-                'content': '¿Qué estás viendo en esta imagen? Sé breve, directo y responde en español.',
-                'images': [ruta_imagen]
+                'content': 'Describe brevemente en español y en una sola frase qué ves en esta imagen frente a la cámara.',
+                'images': [ruta_foto_temp]
             }]
         )
-        
-        descripcion = respuesta['message']['content'].strip()
-        
-        # 3. Limpieza: Borramos la foto del disco para no acumular basura en el proyecto
-        if os.path.exists(ruta_imagen):
-            os.remove(ruta_imagen)
-            
-        return f"Análisis óptico completado: {descripcion}"
-        
+
+        if os.path.exists(ruta_foto_temp):
+            os.remove(ruta_foto_temp)
+
+        analisis = respuesta['message']['content'].strip()
+        print(f"👁️ [Análisis]: {analisis}")
+        return f"Según mi sensor óptico: {analisis}"
+
     except Exception as e:
-        print(f"❌ Error en análisis de visión: {e}")
-        return "Error en el procesamiento síncronico de mi núcleo de visión local."
+        if os.path.exists(ruta_foto_temp):
+            os.remove(ruta_foto_temp)
+        print(f"❌ Error en el módulo de visión: {e}")
+        return "Tuve un problema al procesar la visión. Asegúrate de tener instalado el modelo 'llava' en Ollama ejecutando: ollama run llava"
