@@ -16,6 +16,23 @@ except ImportError:
 from src.Database.conexion import obtener_conexion
 
 
+# --- DETECCIÓN DINÁMICA DE RUTA DEL ESCRITORIO ---
+
+def obtener_ruta_escritorio() -> str:
+    """Detecta de forma inteligente la ruta real del Escritorio, con o sin OneDrive."""
+    ruta_normal = os.path.join(os.path.expanduser("~"), "Desktop")
+    ruta_onedrive = os.path.join(os.path.expanduser("~"), "OneDrive", "Escritorio")
+    ruta_onedrive_en = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop")
+    
+    if os.path.exists(ruta_onedrive):
+        return ruta_onedrive
+    elif os.path.exists(ruta_onedrive_en):
+        return ruta_onedrive_en
+    return ruta_normal
+
+
+# --- AUDITORÍA Y REGISTRO ---
+
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
@@ -73,8 +90,8 @@ def guardar_ruta_actual(ruta_absoluta: str) -> bool:
 
 
 def obtener_ruta_actual() -> str:
-    """Obtiene la última carpeta activa desde PostgreSQL. Si no hay, retorna el Escritorio."""
-    ruta_defecto = os.path.join(os.path.expanduser("~"), "Desktop")
+    """Obtiene la última carpeta activa desde PostgreSQL. Si no hay, retorna el Escritorio real."""
+    ruta_defecto = obtener_ruta_escritorio()
     conn = obtener_conexion()
     if not conn:
         return ruta_defecto
@@ -102,7 +119,7 @@ def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
     la abre en Windows Explorer y actualiza la ruta activa en PostgreSQL.
     """
-    escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
+    escritorio = obtener_ruta_escritorio()
     ruta_objetivo = os.path.join(escritorio, nombre_carpeta)
 
     # 1. Intento directo

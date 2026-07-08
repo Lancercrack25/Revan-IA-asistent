@@ -3,35 +3,34 @@ import asyncio
 import pygame
 import edge_tts
 import time
-import threading  # Importamos la librería de hilos táctica
 
 class ElevenLabsClient:
     def __init__(self):
         """Inicializa el motor de voz neural local compatible con Tkinter y GUI."""
-        self.voice = "es-MX-JorgeNeural"  # O la que prefieras probar
+        self.voice = "es-MX-JorgeNeural"  # Voz neuronal en español mexicano
         self.archivo_temporal = "revan_voice.mp3"
         
-        # Inicializamos el mezclador de pygame de forma segura
-        pygame.mixer.init()
+        # Inicializamos el mezclador de pygame
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
 
     def hablar(self, texto):
-        """Vocaliza el texto en un hilo secundario para NO congelar Tkinter ni desincronizar comandos."""
-        # Metemos todo el proceso en un hilo independiente (daemon=True)
-        hilo_voz = threading.Thread(target=self._proceso_hablar_hilo, args=(texto,), daemon=True)
-        hilo_voz.start()
-
-    def _proceso_hablar_hilo(self, texto):
-        """Método interno que gestiona la generación y reproducción en segundo plano."""
+        """
+        Vocaliza el texto de forma SÍNCRONA. 
+        Mantiene retenida la ejecución MIENTRAS suena la voz para que la esfera 3D
+        se mantenga en rojo (#ff0055) exactamente hasta que REVAN termine de hablar.
+        """
         try:
-            # 3. Generamos el audio sincrónicamente en el loop del hilo secundario
+            # 1. Generar el archivo de audio
             asyncio.run(self._generar_audio(texto))
             
-            # 4. Reproducimos de forma controlada sin afectar a main.py
+            # 2. Reproducir y esperar a que finalice el audio
             self._reproducir_audio()
         except Exception as e:
-            print(f"Error en el módulo de voz local: {e}")
+            print(f"❌ Error en el módulo de voz local: {e}")
 
     async def _generar_audio(self, texto):
+        """Limpia el texto y descarga el audio desde la API de Edge-TTS."""
         texto_limpio = str(texto).replace("{", "").replace("}", "")
         texto_limpio = texto_limpio.replace("[", "").replace("]", "").strip()
         
@@ -42,21 +41,20 @@ class ElevenLabsClient:
         await communicate.save(self.archivo_temporal)
 
     def _reproducir_audio(self):
+        """Carga en Pygame y bloquea el hilo hasta que la reproducción termina."""
         if os.path.exists(self.archivo_temporal):
-            # Cargamos y disparamos el audio inmediatamente
             pygame.mixer.music.load(self.archivo_temporal)
             pygame.mixer.music.play()
             
-            # Al estar en su propio hilo, este bucle ya no congela la app ni interrumpe el micrófono
+            # 🎯 Bucle de espera activo: Mantiene bloqueada la función mientras el audio suena
             while pygame.mixer.music.get_busy():
                 time.sleep(0.05) 
                 
-            # Forzamos la detención absoluta y descargamos el archivo
+            # Limpieza del reproductor y del archivo temporal
             pygame.mixer.music.stop()
             pygame.mixer.music.unload()
             
-            # Borramos el temporal de inmediato
             try:
                 os.remove(self.archivo_temporal)
-            except:
+            except Exception:
                 pass

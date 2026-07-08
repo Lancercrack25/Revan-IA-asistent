@@ -91,30 +91,34 @@ function conectarServidorCore() {
         const comando = JSON.parse(evento.data);
         estadoActual = comando.estado;
         
-        // Asignación de mutaciones cromáticas y comportamiento físico
+        // 🎯 FIX: Normalizamos el nombre del estado (Acepta tanto PENSANDO como PROCESANDO)
         if (estadoActual === "ESCUCHANDO") {
-            colorObjetivo.set("#00ffcc"); // Cian Eléctrico
+            colorObjetivo.set(comando.color || "#00ffcc"); // Cian / Azul claro
             velocidadGiro = 0.015;
             amplitudOnda = 0.15;
-        } else if (estadoActual === "PENSANDO") {
-            colorObjetivo.set("#ffaa00"); // Ámbar / Dorado cuántico
+        } else if (estadoActual === "PENSANDO" || estadoActual === "PROCESANDO") {
+            colorObjetivo.set(comando.color || "#ffaa00"); // Ámbar / Dorado cuántico
             velocidadGiro = 0.06;
             amplitudOnda = 0.05;
         } else if (estadoActual === "HABLANDO") {
-            colorObjetivo.set("#ff0055"); // Fucsia de alta frecuencia
+            colorObjetivo.set(comando.color || "#ff0055"); // Fucsia / Rojo
             velocidadGiro = 0.008;
             amplitudOnda = 0.35;
         } else {
-            colorObjetivo.set("#0077ff"); // Azul estándar
+            colorObjetivo.set(comando.color || "#0077ff"); // Azul estándar (ESPERA)
             velocidadGiro = 0.004;
             amplitudOnda = 0.03;
         }
 
-        // Modificación del entorno CSS HUD en tiempo de ejecución
-        hudTexto.innerText = `REVAN V1.0 | ${comando.estado}`;
-        hudTexto.style.color = colorObjetivo.getStyle();
-        hudContenedor.style.borderColor = colorObjetivo.getStyle();
-        hudContenedor.style.boxShadow = `0 0 30px ${colorObjetivo.getStyle()}44, inset 0 0 15px ${colorObjetivo.getStyle()}11`;
+        // Modificación del entorno CSS HUD en tiempo de ejecución (Verificando existencia de elementos)
+        if (hudTexto) {
+            hudTexto.innerText = `REVAN V1.0 | ${estadoActual}`;
+            hudTexto.style.color = colorObjetivo.getStyle();
+        }
+        if (hudContenedor) {
+            hudContenedor.style.borderColor = colorObjetivo.getStyle();
+            hudContenedor.style.boxShadow = `0 0 30px ${colorObjetivo.getStyle()}44, inset 0 0 15px ${colorObjetivo.getStyle()}11`;
+        }
     };
 
     socket.onclose = function() {

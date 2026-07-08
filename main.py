@@ -27,7 +27,7 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos
+TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
 
 def hilo_servidor_web():
     """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
@@ -43,6 +43,27 @@ def sincronizar_estado_esfera(estado, color_hex):
         transmitir_desde_hilo_externo(estado, color_hex)
     except Exception as e:
         print(f"⚠️ Error al sincronizar esfera: {e}")
+
+def apagar_sistema():
+    """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
+    global sistema_activo, gui
+    print("\n🛑 [REVAN]: Iniciando secuencia de desconexión...")
+    sistema_activo = False
+    
+    # Notificar y despedir por voz
+    sincronizar_estado_esfera("HABLANDO", "#ff0055")
+    if voz_ia:
+        voz_ia.hablar(f"Desconectando sistemas. Hasta luego, {titulo}.")
+    
+    sincronizar_estado_esfera("DESCONECTADO", "#444444")
+    time.sleep(0.5)
+
+    # Cerrar la interfaz Tkinter de forma segura
+    if gui and hasattr(gui, 'app'):
+        gui.app.after(100, gui.app.destroy)
+
+    print("👋 [REVAN]: Sistema totalmente apagado.")
+    sys.exit(0)
 
 def encender_sistemas():
     """Secuencia de despliegue cronológico (Monitores -> CustomTkinter -> Esfera -> Hilo de Voz)."""
@@ -81,11 +102,12 @@ def encender_sistemas():
         except Exception as e:
             print(f"Error al lanzar la interfaz web: {e}")
 
+        # Vocalización de bienvenida
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
         voz_ia.hablar(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         
-        # 🎯 SOLUCIÓN CRÍTICA: La escucha corre en un HILO SECUNDARIO para no congelar la GUI/Esfera
+        # Escucha asíncrona dedicada en segundo plano
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
         
@@ -95,74 +117,89 @@ def encender_sistemas():
         print(f"❌ Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
-    """Bucle infinito de escucha ejecutado exclusivamente fuera del hilo principal de la GUI."""
+    """Bucle infinito de escucha fuera del hilo principal de la GUI."""
     global sistema_activo
     while sistema_activo:
         procesar_ciclo_voz()
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz con manejo preciso de estados de esfera y orquestador."""
+    """Ciclo táctico de voz con manejo ultra-preciso de transiciones cromáticas."""
     global cerebro_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
+        # 1. 🟢 ESTADO: ESCUCHANDO (Cian / Verde agua)
+        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") 
         print("\n[REVAN]: Escuchando...")
-        sincronizar_estado_esfera("ESCUCHANDO", "#7ef1ff") # 🔵 AZUL CLARO
         
         orden_sucia = oidos_ia.escuchar()
         
-        if not orden_sucia:
-            sincronizar_estado_esfera("ESPERA", "#0077ff") # 🔵 AZUL OSCURO
+        # Si no capturó audio o fue ruido ambiental vacío
+        if not orden_sucia or not orden_sucia.strip():
+            sincronizar_estado_esfera("ESPERA", "#0077ff") # 🔵 AZUL ESPERA
             return
 
         orden_minusculas = orden_sucia.lower().strip()
-        print(f"[Captura]: '{orden_minusculas}'")
+        print(f"🗣️ [Captura]: '{orden_minusculas}'")
 
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
-        # Filtrado inteligente de comandos e invocación
+        # Filtrado inteligente por MODO JARVIS / Invocación
         if "revan" in orden_minusculas:
             partes = orden_minusculas.split("revan", 1)
             orden_limpia = partes[1].strip() if len(partes) > 1 else ""
             ultima_interaccion = tiempo_actual  
         elif en_ventana_atencion:
-            print("[MODO JARVIS]: Canal abierto. Procesando orden directa...")
+            print("⚡ [MODO JARVIS]: Canal abierto. Procesando orden directa...")
             orden_limpia = orden_minusculas
             ultima_interaccion = tiempo_actual  
         else:
-            print("[REVAN]: Ruido ambiental ignorado.")
+            print("🤫 [REVAN]: Ruido de fondo o conversación ajena ignorada.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
+        # --- INTERCEPTOR DE APAGADO / DESCONEXIÓN ---
+        palabras_desconexion = ["desconectar", "desconéctate", "apagar", "apágate", "cerrar programa", "adiós revan", "desconexión"]
+        if any(cmd in orden_minusculas for cmd in palabras_desconexion):
+            apagar_sistema()
+            return
+
+        # Si sólo dijo "Revan" sin comando adicional
         if not orden_limpia:
             sincronizar_estado_esfera("HABLANDO", "#ff0055") # 🔴 ROJO
-            voz_ia.hablar("Sistemas listos, Señor. ¿Qué comando desea ejecutar?")
+            time.sleep(0.15)
+            voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        # --- INTERCEPTOR DE PROCESAMIENTO ---
-        sincronizar_estado_esfera("PROCESANDO", "#ffaa00") # 🟡 AMARILLO
+        # 2. 🟡 ESTADO: PROCESANDO / PENSANDO (Amarillo / Dorado)
+        sincronizar_estado_esfera("PROCESANDO", "#ffaa00") 
+        print("🧠 [REVAN]: Procesando inteligencia...")
 
-        # Intercepción rápida para cámara (evita que el orquestador busque carpetas inventadas)
-        if any(w in orden_limpia for w in ["camara", "cámara", "enciende la camara", "enciende la cámara", "que ves", "qué ves"]):
+        # Intercepción rápida para cámara
+        if any(w in orden_limpia for w in ["camara", "cámara", "que ves", "qué ves"]):
             orden_limpia = "enciende la camara y dime que ves"
 
         # Evaluar la misión en el orquestador
         respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
         
-        # Si el orquestador no la capturó, pasa a Ollama directamente
+        # Si el orquestador no la capturó, consulta a Ollama
         if respuesta_final is None:
             respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
 
         # Actualización segura de Tkinter (Thread-safe)
         if gui and hasattr(gui, 'app'):
-            gui.app.after(0, lambda user_text=orden_sucia: gui.agregar_mensaje("user", user_text))
-            gui.app.after(0, lambda bot_text=respuesta_final: gui.agregar_mensaje("revan", bot_text))
+            gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
+            gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
 
-        # Vocalización y cambio de estado a hablando
-        sincronizar_estado_esfera("HABLANDO", "#ff0055") # 🔴 ROJO
+        # 3. 🔴 ESTADO: HABLANDO (Fucsia / Rojo)
+        sincronizar_estado_esfera("HABLANDO", "#ff0055") 
+        time.sleep(0.15) # 🎯 Pausa crítica para forzar la actualización del color rojo en la esfera Web
         voz_ia.hablar(respuesta_final)
-        sincronizar_estado_esfera("ESPERA", "#0077ff") # 🔵 AZUL OSCURO
+        time.sleep(0.2)
+        
+        # 4. 🔵 ESTADO: ESPERA / REPOSO (Azul Estándar)
+        sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:
         print(f"❌ Error en el bucle táctico de voz: {e}")
@@ -181,7 +218,7 @@ def main():
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     
-    # Servidor web en hilo independiente
+    # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
 
@@ -192,7 +229,7 @@ def main():
         try:
             captura = oidos_ia.escuchar(modo_pasivo=True)
             if captura and captura.strip():
-                print(f"⚡ ¡Señal acústica validada! Inicializando REVAN...")
+                print("⚡ ¡Señal acústica validada! Inicializando REVAN...")
                 break
         except Exception as e:
             print(f"Aviso en escaneo pasivo: {e}")
@@ -207,7 +244,7 @@ def main():
         if hasattr(gui, 'app'):
             gui.app.deiconify()
             
-    # Arrancar secuencia
+    # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
