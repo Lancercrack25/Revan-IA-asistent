@@ -254,8 +254,7 @@ def analizar_entorno_vision() -> str:
 
         # Igual que con qwen2.5: total_duration (nanosegundos) de Ollama
         # incluye la carga del modelo si tuvo que meterlo a VRAM/RAM. Con 4GB
-        # de VRAM, llava probablemente no cabe junto con qwen2.5:1.5b, así que
-        # aquí es donde se espera ver el golpe de latencia por recarga.
+        # de VRAM, llava probablemente no cabe junto con qwen2.5:1.5b
         total_ns = respuesta.get("total_duration")
         if total_ns is not None:
             print(f"[LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")

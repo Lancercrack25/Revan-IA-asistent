@@ -3,11 +3,9 @@ import sys
 import time
 import threading
 import subprocess
-
 # Prevenir la generación de archivos de caché compilados (.pyc)
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
 # Importaciones del Sistema REVAN
 from src.Core.Ollama_client import OllamaClient  
 from src.Core.Elevenlabs_client import ElevenLabsClient
@@ -25,7 +23,7 @@ try:
     HAS_GEMINI_LIB = True
 except ImportError:
     HAS_GEMINI_LIB = False
-    print("⚠️ Librería 'google-generativeai' no detectada. Ejecuta: pip install google-generativeai")
+    print(" Librería 'google-generativeai' no detectada. Ejecuta: pip install google-generativeai")
 
 # Clase de Soporte para Gemini API
 class GeminiClient:
@@ -48,9 +46,9 @@ class GeminiClient:
                 self.activo = True
                 print("✨ [GeminiClient]: Motor conversacional de Gemini inicializado con éxito.")
             except Exception as e:
-                print(f"⚠️ Error al inicializar Gemini API: {e}")
+                print(f" Error al inicializar Gemini API: {e}")
         else:
-            print("⚠️ GeminiClient desactivado (Falta API Key o librería).")
+            print(" GeminiClient desactivado (Falta API Key o librería).")
 
     def generar_respuesta(self, orden_usuario: str) -> str:
         if not self.activo:
@@ -93,7 +91,7 @@ def sincronizar_estado_esfera(estado, color_hex):
     try:
         transmitir_desde_hilo_externo(estado, color_hex)
     except Exception as e:
-        print(f"⚠️ Error al sincronizar esfera: {e}")
+        print(f"Error al sincronizar esfera: {e}")
 
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
@@ -113,7 +111,7 @@ def apagar_sistema():
     if gui and hasattr(gui, 'app'):
         gui.app.after(100, gui.app.destroy)
 
-    print("👋 [REVAN]: Sistema totalmente apagado.")
+    print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
 def encender_sistemas():
@@ -121,7 +119,7 @@ def encender_sistemas():
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
     sistema_activo = True
 
-    print("🚀 Inicializando secuencia de despliegue cronológico...")
+    print("Inicializando secuencia de despliegue cronológico...")
     print("🪟 [1/3] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
@@ -132,7 +130,7 @@ def encender_sistemas():
 
     gui.actualizar_estado("CONECTANDO COGNICIÓN...", "#7ef1ff")
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
-    print("🖥️ [2/3] Panel CustomTkinter Activo.")
+    print("[2/3] Panel CustomTkinter Activo.")
     
     try:
         ajustes = cargar_ajustes() or {}
@@ -153,7 +151,7 @@ def encender_sistemas():
                 'start brave --app=http://127.0.0.1:8000 --window-size=670,670',
                 shell=True
             )
-            print("🌐 [3/3] Núcleo Web Desplegado (Esfera 3D).")
+            print("[3/3] Núcleo Web Desplegado (Esfera 3D).")
         except Exception as e:
             print(f"Error al lanzar la interfaz web: {e}")
 
@@ -167,7 +165,7 @@ def encender_sistemas():
         hilo_voz.start()
         
     except Exception as e:
-        gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
+        gui.actualizar_estado("ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
         print(f" Error crítico al inicializar las APIs locales: {e}")
 
@@ -194,7 +192,7 @@ def procesar_ciclo_voz():
             return
 
         orden_minusculas = orden_sucia.lower().strip()
-        print(f"🗣️ [Captura]: '{orden_minusculas}'")
+        print(f"[Captura]: '{orden_minusculas}'")
 
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
@@ -209,7 +207,7 @@ def procesar_ciclo_voz():
             orden_limpia = orden_minusculas
             ultima_interaccion = tiempo_actual  
         else:
-            print("🤫 [REVAN]: Ruido de fondo o conversación ajena ignorada.")
+            print("[REVAN]: Ruido de fondo o conversación ajena ignorada.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
@@ -227,9 +225,9 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        # 2. 🟡 ESTADO: PROCESANDO / PENSANDO (Amarillo / Dorado)
+        # 2. ESTADO: PROCESANDO / PENSANDO (Amarillo / Dorado)
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00") 
-        print("🧠 [REVAN]: Procesando inteligencia...")
+        print("[REVAN]: Procesando inteligencia...")
 
         # Intercepción rápida para cámara
         if any(w in orden_limpia for w in ["camara", "cámara", "que ves", "qué ves"]):
@@ -243,15 +241,15 @@ def procesar_ciclo_voz():
             es_comando_accion = any(palabra in orden_limpia for palabra in PALABRAS_CLAVE_ACCION)
 
             if es_comando_accion:
-                print("⚡ [Enrutador]: Orden táctica detectada -> Derivando a OLLAMA LOCAL")
+                print("[Enrutador]: Orden táctica detectada -> Derivando a OLLAMA LOCAL")
                 respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
             else:
-                print("✨ [Enrutador]: Conversación/Conocimiento detectado -> Derivando a GEMINI API")
+                print("[Enrutador]: Conversación/Conocimiento detectado -> Derivando a GEMINI API")
                 respuesta_final = gemini_ia.generar_respuesta(orden_limpia) if gemini_ia else None
 
                 # Fallback de seguridad: Si Gemini no está configurado o falla, responde Ollama
                 if respuesta_final is None:
-                    print("⚠️ [Enrutador]: Gemini no disponible. Usando Ollama como respaldo...")
+                    print("[Enrutador]: Gemini no disponible. Usando Ollama como respaldo...")
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
 
         # Actualización segura de Tkinter (Thread-safe)
@@ -265,7 +263,7 @@ def procesar_ciclo_voz():
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
-        # 4. 🔵 ESTADO: ESPERA / REPOSO (Azul Estándar)
+        # 4.ESTADO: ESPERA / REPOSO (Azul Estándar)
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:
@@ -275,12 +273,12 @@ def procesar_ciclo_voz():
 def main():
     global oidos_ia, gui, sistema_activo, titulo
     
-    print("🚀 [REVAN]: Inicializando infraestructura base...")
+    print("[REVAN]: Inicializando infraestructura base...")
     
     try:
         inicializar_base_datos()
     except Exception as e:
-        print(f"⚠️ Alerta al desplegar base de datos: {e}")
+        print(f" Alerta al desplegar base de datos: {e}")
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
@@ -291,7 +289,7 @@ def main():
 
     oidos_ia = MicrophoneClient()
     
-    print("🎙️ REVAN en modo pasivo. Esperando señal acústica...")
+    print("REVAN en modo pasivo. Esperando señal acústica...")
     while True:
         try:
             captura = oidos_ia.escuchar(modo_pasivo=True)
@@ -302,7 +300,7 @@ def main():
             print(f"Aviso en escaneo pasivo: {e}")
         time.sleep(0.1)
 
-    print("🖥️ Desplegando interfaz gráfica...")
+    print("Desplegando interfaz gráfica...")
     gui = RevanGUI(titulo_usuario=titulo)
 
     try:
