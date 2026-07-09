@@ -1,0 +1,1 @@
+#este codigo s enecargara de analizar los errores que hay en este proyecto paara asi poder dar un diagnostico de los mismos y poder corregirlos de manera eficiente y rapida
