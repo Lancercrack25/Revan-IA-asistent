@@ -45,7 +45,6 @@ def crear_bd_si_no_existe():
             conn.close()
 
 # ================= INICIALIZACIÓN =================
-
 def inicializar_base_datos():
     """Inicializa la base de datos y ejecuta la creación de tablas e infraestructura de estado."""
     crear_bd_si_no_existe()

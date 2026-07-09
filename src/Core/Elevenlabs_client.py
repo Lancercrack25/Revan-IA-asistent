@@ -9,7 +9,6 @@ class ElevenLabsClient:
         """Inicializa el motor de voz neural local compatible con Tkinter y GUI."""
         self.voice = "es-MX-JorgeNeural"  # Voz neuronal en español mexicano
         self.archivo_temporal = "revan_voice.mp3"
-        
         # Inicializamos el mezclador de pygame
         if not pygame.mixer.get_init():
             pygame.mixer.init()
@@ -66,3 +65,4 @@ class ElevenLabsClient:
                 os.remove(self.archivo_temporal)
             except Exception:
                 pass
+#proximamente sera remplazado por algo muy similair, genial y gratis

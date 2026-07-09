@@ -32,11 +32,7 @@ from src.Automation.System_commands import (
 class OllamaClient:
     # Si el usuario menciona alguna de estas palabras pero el modelo NO
     # devuelve un JSON de acción, se asume que "se le olvidó" y se hace un
-    # reintento forzado y aislado (ver _forzar_json_accion) en vez de
-    # aceptar una respuesta puramente conversacional para una orden que sí
-    # pedía ejecutar algo (esto fue lo que pasó con Word y con el navegador
-    # en las pruebas: el modelo llegó a Ollama pero contestó platicando en
-    # vez de devolver el JSON de OFFICE/VIDEO).
+    # reintento forzado y aislado (ver _forzar_json_accion)
     PALABRAS_ACCION = [
         "carpeta", "word", "excel", "documento",
         "navegador", "video", "busca", "reproduce", "brave",
@@ -69,7 +65,6 @@ class OllamaClient:
                     "- Videos/Brave: {\"accion\": \"VIDEO\", \"busqueda\": \"query\"}\n"
                     "- Abrir Apps: {\"accion\": \"APP\", \"nombre\": \"nombre_app\"}\n"
                     "- Abrir Videojuegos: {\"accion\": \"JUEGO\", \"nombre\": \"nombre_juego\"}\n\n"
-                    "Si es una conversación ordinaria, responde en texto plano de forma breve e inteligente."
                 )
             }
         ]

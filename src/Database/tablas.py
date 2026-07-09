@@ -14,7 +14,6 @@ def crear_tablas_si_no_existen(conn):
     if conn is None:
         print("Error: No se puede inicializar tablas sin una conexión activa.")
         return
-
     try:
         cur = conn.cursor()
 
@@ -62,7 +61,6 @@ def crear_tablas_si_no_existen(conn):
         ON CONFLICT (clave) DO NOTHING;
         """
         cur.execute(query_inicial_ruta, (ruta_escritorio,))
-        
         # Guardamos los cambios de forma permanente en el disco duro
         conn.commit()
         print("[REVAN DB]: Tablas e infraestructura de estado inicializadas correctamente.")
@@ -70,6 +68,7 @@ def crear_tablas_si_no_existen(conn):
         cur.close()
     except psycopg2.Error as e:
         print("Error de PostgreSQL al crear las tablas:", e)
+        print("Revisar la configuración de la base de datos y los permisos del usuario.")
         # En caso de fallo, revertimos la transacción para no corromper la BD
         conn.rollback()
     finally:
