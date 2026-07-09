@@ -21,7 +21,7 @@ def ejecutar_misión_compleja(orden_usuario: str, cerebro_ia):
     # 3. ZONA DE MISIONES COMPLEJAS (Solo entra aquí si coincide exactamente)
     # Ejemplo de misión compleja: "investiga profundamente sobre..."
     if "investiga" in orden and ("guarda" in orden or "escribe" in orden):
-        print(f"🔮 [Orchestrator]: Ejecutando protocolo de investigación avanzada para: '{orden}'")
+        print(f"[Orchestrator]: Ejecutando protocolo de investigación avanzada para: '{orden}'")
         
         # Importamos aquí dentro para evitar referencias circulares lentas al arrancar
         from src.Services.research_service import buscar_y_resumir_tema

@@ -35,7 +35,7 @@ def hilo_servidor_web():
         servidor = iniciar_servidor_ui()
         servidor.run()
     except Exception as e:
-        print(f"❌ Error en el servidor web de la esfera: {e}")
+        print(f" Error en el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
     """Envía los estados de voz e IA al loop de la esfera 3D vía WebSocket."""
@@ -114,7 +114,7 @@ def encender_sistemas():
     except Exception as e:
         gui.actualizar_estado("⚠️ ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
-        print(f"❌ Error crítico al inicializar las APIs locales: {e}")
+        print(f" Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
     """Bucle infinito de escucha fuera del hilo principal de la GUI."""
@@ -127,7 +127,7 @@ def procesar_ciclo_voz():
     """Ciclo táctico de voz con manejo ultra-preciso de transiciones cromáticas."""
     global cerebro_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
-        # 1. 🟢 ESTADO: ESCUCHANDO (Cian / Verde agua)
+        # 1. ESTADO: ESCUCHANDO (Cian / Verde agua)
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") 
         print("\n[REVAN]: Escuchando...")
         
@@ -135,7 +135,7 @@ def procesar_ciclo_voz():
         
         # Si no capturó audio o fue ruido ambiental vacío
         if not orden_sucia or not orden_sucia.strip():
-            sincronizar_estado_esfera("ESPERA", "#0077ff") # 🔵 AZUL ESPERA
+            sincronizar_estado_esfera("ESPERA", "#0077ff") # AZUL ESPERA
             return
 
         orden_minusculas = orden_sucia.lower().strip()
@@ -150,7 +150,7 @@ def procesar_ciclo_voz():
             orden_limpia = partes[1].strip() if len(partes) > 1 else ""
             ultima_interaccion = tiempo_actual  
         elif en_ventana_atencion:
-            print("⚡ [MODO JARVIS]: Canal abierto. Procesando orden directa...")
+            print("[MODO JARVIS]: Canal abierto. Procesando orden directa...")
             orden_limpia = orden_minusculas
             ultima_interaccion = tiempo_actual  
         else:
@@ -166,7 +166,7 @@ def procesar_ciclo_voz():
 
         # Si sólo dijo "Revan" sin comando adicional
         if not orden_limpia:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055") # 🔴 ROJO
+            sincronizar_estado_esfera("HABLANDO", "#ff0055") # ROJO
             time.sleep(0.15)
             voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -192,9 +192,9 @@ def procesar_ciclo_voz():
             gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
             gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
 
-        # 3. 🔴 ESTADO: HABLANDO (Fucsia / Rojo)
+        # 3. ESTADO: HABLANDO (Fucsia / Rojo)
         sincronizar_estado_esfera("HABLANDO", "#ff0055") 
-        time.sleep(0.15) # 🎯 Pausa crítica para forzar la actualización del color rojo en la esfera Web
+        time.sleep(0.15) # Pausa crítica para forzar la actualización del color rojo en la esfera Web
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
@@ -202,7 +202,7 @@ def procesar_ciclo_voz():
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:
-        print(f"❌ Error en el bucle táctico de voz: {e}")
+        print(f" Error en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
 def main():
@@ -229,7 +229,7 @@ def main():
         try:
             captura = oidos_ia.escuchar(modo_pasivo=True)
             if captura and captura.strip():
-                print("⚡ ¡Señal acústica validada! Inicializando REVAN...")
+                print("¡Señal acústica validada! Inicializando REVAN...")
                 break
         except Exception as e:
             print(f"Aviso en escaneo pasivo: {e}")

@@ -6,7 +6,7 @@ class MicrophoneClient(IVoiceInput):
         self.reconocedor = sr.Recognizer()
         self.reconocedor.dynamic_energy_threshold = True
         
-        # 🎯 AJUSTES DE TOLERANCIA FÓNICA (EVITA CORTES PREMATUROS)
+        # AJUSTES DE TOLERANCIA FÓNICA (EVITA CORTES PREMATUROS)
         # Sube de 0.8 a 1.3 segundos. Esto le da a REVAN un respiro para esperar que termines la frase completa.
         self.reconocedor.pause_threshold = 1.3 
         # Segundos mínimos de silencio que deben ocurrir tras una frase para validarla

@@ -26,16 +26,16 @@ class ElevenLabsClient:
             t0 = time.time()
             asyncio.run(self._generar_audio(texto))
             t_generacion = time.time() - t0
-            print(f"⏱️ [TTS] Descarga/generación de audio: {t_generacion:.2f}s")
+            print(f"[TTS] Descarga/generación de audio: {t_generacion:.2f}s")
 
             # 2. Reproducir y esperar a que finalice el audio (esto es tiempo
             #    "real" de habla, no es retraso evitable, es proporcional al texto)
             t1 = time.time()
             self._reproducir_audio()
             t_reproduccion = time.time() - t1
-            print(f"⏱️ [TTS] Reproducción (voz sonando): {t_reproduccion:.2f}s")
+            print(f"[TTS] Reproducción (voz sonando): {t_reproduccion:.2f}s")
         except Exception as e:
-            print(f"❌ Error en el módulo de voz local: {e}")
+            print(f" Error en el módulo de voz local: {e}")
 
     async def _generar_audio(self, texto):
         """Limpia el texto y descarga el audio desde la API de Edge-TTS."""
@@ -54,7 +54,7 @@ class ElevenLabsClient:
             pygame.mixer.music.load(self.archivo_temporal)
             pygame.mixer.music.play()
             
-            # 🎯 Bucle de espera activo: Mantiene bloqueada la función mientras el audio suena
+            # Bucle de espera activo: Mantiene bloqueada la función mientras el audio suena
             while pygame.mixer.music.get_busy():
                 time.sleep(0.05) 
                 

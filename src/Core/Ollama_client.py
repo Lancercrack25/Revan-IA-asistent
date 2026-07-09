@@ -19,7 +19,7 @@ from src.Services.os_service import (
 try:
     import ollama
 except ImportError:
-    print("⚠️ La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
+    print("La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
 
 from src.Automation.System_commands import (
     desplegar_monitores_windows, 
@@ -101,9 +101,9 @@ class OllamaClient:
         try:
             orden_clean = orden_usuario.lower().strip()
 
-            # 🎯 INTERCEPTOR 1: Disparo directo para visión y cámara
+            #  INTERCEPTOR 1: Disparo directo para visión y cámara
             if any(k in orden_clean for k in ["camara", "cámara", "enciende la camara", "enciende la cámara", "que ves", "qué ves", "ver entorno"]):
-                print("📷 [OllamaClient]: Intercepción directa del sensor óptico...")
+                print("[OllamaClient]: Intercepción directa del sensor óptico...")
                 memoria_asistente = analizar_entorno_vision()
                 registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
                 self.historial.append({"role": "user", "content": orden_usuario})
@@ -118,7 +118,7 @@ class OllamaClient:
                 messages=self.historial
             )
 
-            # ⏱️ 'eval_duration' y 'total_duration' vienen en nanosegundos y los
+            # 'eval_duration' y 'total_duration' vienen en nanosegundos y los
             # entrega el propio Ollama. total_duration incluye carga del modelo
             # si tuvo que cargarlo/recargarlo en VRAM (ej. tras usar la cámara
             # con llava). Si ves total_duration mucho más alto que eval_duration,
@@ -126,7 +126,7 @@ class OllamaClient:
             total_ns = respuesta.get("total_duration")
             eval_ns = respuesta.get("eval_duration")
             if total_ns is not None:
-                print(f"⏱️ [Ollama] Tiempo total: {total_ns/1e9:.2f}s | Solo inferencia: {(eval_ns or 0)/1e9:.2f}s")
+                print(f"[Ollama] Tiempo total: {total_ns/1e9:.2f}s | Solo inferencia: {(eval_ns or 0)/1e9:.2f}s")
             
             texto_respuesta = respuesta['message']['content'].strip()
             memoria_asistente = texto_respuesta
@@ -137,7 +137,7 @@ class OllamaClient:
 
             if datos and isinstance(datos, dict) and "accion" in datos:
                 accion = datos.get("accion")
-                print(f"⚡ [OllamaClient]: Acción detectada -> {accion}")
+                print(f"[OllamaClient]: Acción detectada -> {accion}")
 
                 if accion == "MONITOR":
                     resultado_sistema = desplegar_monitores_windows()
@@ -185,7 +185,7 @@ class OllamaClient:
                             f.write(b"")
                         print(f"[REVAN]: Archivo físico generado en: {ruta_completa}")
                     except Exception as file_err:
-                        print(f"❌ Error al escribir archivo físico: {file_err}")
+                        print(f"Error al escribir archivo físico: {file_err}")
 
                     resultado_sistema = ejecutar_aplicacion_office(app_tipo)
                     nombre_directorio_actual = os.path.basename(ruta_final)
@@ -217,7 +217,7 @@ class OllamaClient:
                     # nuestra lista (nombre inventado, typo, etc). Antes esto
                     # caía al flujo normal y el TTS terminaba leyendo el JSON
                     # crudo en voz alta. Ahora damos una respuesta de respaldo.
-                    print(f"⚠️ [OllamaClient]: Acción desconocida recibida del modelo: {accion!r}")
+                    print(f"[OllamaClient]: Acción desconocida recibida del modelo: {accion!r}")
                     memoria_asistente = "No reconocí bien esa instrucción, Señor. ¿Puede repetirla de otra forma?"
                     resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "ACCION_DESCONOCIDA")
@@ -236,5 +236,5 @@ class OllamaClient:
             return texto_respuesta
             
         except Exception as e:
-            print(f"❌ Error crítico en el Core Local de Ollama: {e}")
+            print(f"Error crítico en el Core Local de Ollama: {e}")
             return "Error de comunicación en mi núcleo cognitivo local."
