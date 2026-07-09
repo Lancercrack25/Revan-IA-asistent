@@ -312,6 +312,6 @@ def main():
     # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
-
+#aqui se ejecuta todo
 if __name__ == "__main__":
     main()
