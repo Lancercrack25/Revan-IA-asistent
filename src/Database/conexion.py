@@ -27,7 +27,7 @@ def obtener_conexion():
     except psycopg2.Error as e:
         print("Error de conexión:", e)
         return None
-
+    
 _pool = None
 
 def _obtener_pool():

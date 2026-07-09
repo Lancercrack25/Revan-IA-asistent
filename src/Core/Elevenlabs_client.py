@@ -21,11 +21,19 @@ class ElevenLabsClient:
         se mantenga en rojo (#ff0055) exactamente hasta que REVAN termine de hablar.
         """
         try:
-            # 1. Generar el archivo de audio
+            # 1. Generar el archivo de audio (esto es lo que depende de tu conexión
+            #    a internet, ya que edge_tts llama a servidores de Microsoft)
+            t0 = time.time()
             asyncio.run(self._generar_audio(texto))
-            
-            # 2. Reproducir y esperar a que finalice el audio
+            t_generacion = time.time() - t0
+            print(f"⏱️ [TTS] Descarga/generación de audio: {t_generacion:.2f}s")
+
+            # 2. Reproducir y esperar a que finalice el audio (esto es tiempo
+            #    "real" de habla, no es retraso evitable, es proporcional al texto)
+            t1 = time.time()
             self._reproducir_audio()
+            t_reproduccion = time.time() - t1
+            print(f"⏱️ [TTS] Reproducción (voz sonando): {t_reproduccion:.2f}s")
         except Exception as e:
             print(f"❌ Error en el módulo de voz local: {e}")
 

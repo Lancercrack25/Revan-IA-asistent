@@ -117,6 +117,16 @@ class OllamaClient:
                 model=self.modelo,
                 messages=self.historial
             )
+
+            # ⏱️ 'eval_duration' y 'total_duration' vienen en nanosegundos y los
+            # entrega el propio Ollama. total_duration incluye carga del modelo
+            # si tuvo que cargarlo/recargarlo en VRAM (ej. tras usar la cámara
+            # con llava). Si ves total_duration mucho más alto que eval_duration,
+            # es señal de que Ollama tuvo que recargar el modelo.
+            total_ns = respuesta.get("total_duration")
+            eval_ns = respuesta.get("eval_duration")
+            if total_ns is not None:
+                print(f"⏱️ [Ollama] Tiempo total: {total_ns/1e9:.2f}s | Solo inferencia: {(eval_ns or 0)/1e9:.2f}s")
             
             texto_respuesta = respuesta['message']['content'].strip()
             memoria_asistente = texto_respuesta
