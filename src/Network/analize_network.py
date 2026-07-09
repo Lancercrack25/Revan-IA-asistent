@@ -1,0 +1,1 @@
+#este archivo se encargara de realizar un analisis de la red y obtener informacion relevante sobre la misma

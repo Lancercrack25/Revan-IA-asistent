@@ -27,7 +27,7 @@ def capturar_pantallazo_camara():
     # Guardamos la imagen de forma temporal en la raíz del proyecto
     ruta_guardado = os.path.join(os.path.dirname(__file__), "..", "..", "captura_tactica.jpg")
     ruta_abs = os.path.abspath(ruta_guardado)
-    
+    # Guardamos la imagen capturada en la ruta especificada
     cv2.imwrite(ruta_abs, frame)
     print(f"[Cámara]: Captura táctica resguardada en {ruta_abs}")
     return ruta_abs
