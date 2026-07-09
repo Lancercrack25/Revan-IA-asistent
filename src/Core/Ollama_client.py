@@ -48,7 +48,8 @@ class OllamaClient:
                     "Formatos JSON estrictos permitidos:\n"
                     "- Activar Cámara / Ver entorno: {\"accion\": \"VISION\"}\n"
                     "- Monitor de recursos: {\"accion\": \"MONITOR\"}\n"
-                    "- Crear carpeta nueva: {\"accion\": \"CREAR_CARPETA\", \"ruta\": \"actual\", \"nombre\": \"USAR_NOMBRE_DICTADO\"}\n"
+                    "- Crear carpeta nueva: {\"accion\": \"CREAR_CARPETA\", \"ruta\": \"actual|escritorio|documentos\", \"nombre\": \"USAR_NOMBRE_DICTADO\"}\n"
+                    "  (usa 'escritorio' o 'documentos' SOLO si el usuario lo menciona explícitamente; si no dijo nada, usa 'actual')\n"
                     "- Abrir carpeta existente: {\"accion\": \"ABRIR_CARPETA\", \"nombre\": \"nombre\"}\n"
                     "- Abrir/Crear Office: {\"accion\": \"OFFICE\", \"app\": \"word\", \"nombre_archivo\": \"nombre\", \"destino\": \"actual\"}\n"
                     "- Videos/Brave: {\"accion\": \"VIDEO\", \"busqueda\": \"query\"}\n"
@@ -60,18 +61,40 @@ class OllamaClient:
         ]
 
     def _extraer_json(self, texto: str):
-        """Extrae de forma segura un objeto JSON del texto devuelto por la IA."""
+        """Extrae de forma segura un objeto JSON del texto devuelto por la IA.
+        Antes usaba una regex voraz (\\{.*\\} con DOTALL) que podía capturar
+        basura si había texto o llaves sueltas antes/después del JSON real.
+        Ahora se apoya en json.JSONDecoder().raw_decode, que intenta parsear
+        a partir de cada '{' encontrado hasta dar con un objeto válido.
+        """
+        texto = texto.strip()
+
+        # 1. Intentar parseo directo
         try:
-            # 1. Intentar parseo directo
-            return json.loads(texto.strip())
+            return json.loads(texto)
         except json.JSONDecodeError:
-            # 2. Buscar patrón JSON mediante Expresiones Regulares
-            match = re.search(r'\{.*\}', texto, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group(0))
-                except json.JSONDecodeError:
-                    pass
+            pass
+
+        # 2. Quitar fences de markdown si el modelo los agregó (```json ... ```)
+        sin_fences = re.sub(r'```(?:json)?', '', texto, flags=re.IGNORECASE).strip()
+        if sin_fences != texto:
+            try:
+                return json.loads(sin_fences)
+            except json.JSONDecodeError:
+                texto = sin_fences
+
+        # 3. Buscar el primer objeto JSON válido en el texto, sin importar
+        #    qué haya antes o después.
+        decoder = json.JSONDecoder()
+        for i, ch in enumerate(texto):
+            if ch != "{":
+                continue
+            try:
+                objeto, _ = decoder.raw_decode(texto[i:])
+                return objeto
+            except json.JSONDecodeError:
+                continue
+
         return None
 
     def generar_respuesta(self, orden_usuario: str) -> str:
@@ -115,8 +138,9 @@ class OllamaClient:
                     nombre_c = datos.get("nombre", "Contenedor_Táctico")
                     if str(nombre_c).lower() in ["usar_nombre_dictado", ""] or not nombre_c:
                         nombre_c = "Contenedor_Táctico"
-                    
-                    memoria_asistente = crear_carpeta_sistema(nombre_c)
+                    ruta_c = datos.get("ruta", "actual")
+
+                    memoria_asistente = crear_carpeta_sistema(nombre_c, ruta_c)
                     resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "CREAR_CARPETA")
 
@@ -176,6 +200,16 @@ class OllamaClient:
                     memoria_asistente = analizar_entorno_vision()
                     resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
+
+                else:
+                    # La IA devolvió un JSON con una 'accion' que no está en
+                    # nuestra lista (nombre inventado, typo, etc). Antes esto
+                    # caía al flujo normal y el TTS terminaba leyendo el JSON
+                    # crudo en voz alta. Ahora damos una respuesta de respaldo.
+                    print(f"⚠️ [OllamaClient]: Acción desconocida recibida del modelo: {accion!r}")
+                    memoria_asistente = "No reconocí bien esa instrucción, Señor. ¿Puede repetirla de otra forma?"
+                    resultado_sistema = True
+                    registrar_accion_sistema(orden_usuario, memoria_asistente, "ACCION_DESCONOCIDA")
 
                 if resultado_sistema:
                     self.historial.append({"role": "assistant", "content": memoria_asistente})

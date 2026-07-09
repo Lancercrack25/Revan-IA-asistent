@@ -1,6 +1,6 @@
 import os
 import subprocess
-from src.Automation.file_actions import obtener_ruta_escritorio
+from src.Services.os_service import obtener_ruta_escritorio
 
 def lanzar_aplicacion_usuario(nombre_app):
     """Busca y ejecuta las plataformas o apps usando los accesos directos de tu Escritorio."""

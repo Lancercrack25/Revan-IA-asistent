@@ -13,7 +13,7 @@ try:
 except ImportError:
     print("⚠️ La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
 
-from src.Database.conexion import obtener_conexion
+from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 
 
 # --- DETECCIÓN DINÁMICA DE RUTA DEL ESCRITORIO ---
@@ -38,7 +38,7 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
     if not orden.strip() or not respuesta.strip():
         return False
 
-    conn = obtener_conexion()
+    conn = obtener_conexion_pool()
     if not conn:
         return False
 
@@ -57,14 +57,14 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
         conn.rollback()
         return False
     finally:
-        conn.close()
+        liberar_conexion(conn)
 
 
 # --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
 
 def guardar_ruta_actual(ruta_absoluta: str) -> bool:
     """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""
-    conn = obtener_conexion()
+    conn = obtener_conexion_pool()
     if not conn:
         return False
 
@@ -86,13 +86,13 @@ def guardar_ruta_actual(ruta_absoluta: str) -> bool:
         conn.rollback()
         return False
     finally:
-        conn.close()
+        liberar_conexion(conn)
 
 
 def obtener_ruta_actual() -> str:
     """Obtiene la última carpeta activa desde PostgreSQL. Si no hay, retorna el Escritorio real."""
     ruta_defecto = obtener_ruta_escritorio()
-    conn = obtener_conexion()
+    conn = obtener_conexion_pool()
     if not conn:
         return ruta_defecto
 
@@ -109,7 +109,7 @@ def obtener_ruta_actual() -> str:
         print(f"❌ Error al consultar la ruta activa: {e}")
         return ruta_defecto
     finally:
-        conn.close()
+        liberar_conexion(conn)
 
 
 # --- ACCIONES DE AUTOMATIZACIÓN DE CARPETAS ---
@@ -143,18 +143,44 @@ def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     return f"Negativo, Señor. No se localizó la carpeta '{nombre_carpeta}' en el Escritorio."
 
 
-def crear_carpeta_sistema(nombre_nueva_carpeta: str) -> str:
+def _sanear_nombre_carpeta(nombre: str) -> str:
+    """Quita caracteres inválidos en rutas de Windows para evitar que os.makedirs falle."""
+    invalidos = '<>:"/\\|?*'
+    limpio = "".join(c for c in nombre if c not in invalidos).strip()
+    return limpio or "Contenedor_Táctico"
+
+
+def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") -> str:
     """
-    Crea una carpeta dentro del foco de trabajo activo (obtenido de PostgreSQL).
+    Crea una carpeta física.
+    ruta_base admite:
+      - "actual"    -> dentro del foco de trabajo activo (última ruta usada, en PostgreSQL)
+      - "escritorio" / "desktop" -> directo en el Escritorio
+      - "documentos" -> directo en Documentos
+      - cualquier otra ruta absoluta -> se usa tal cual
     """
-    ruta_padre = obtener_ruta_actual()
+    nombre_nueva_carpeta = _sanear_nombre_carpeta(nombre_nueva_carpeta)
+    base = (ruta_base or "actual").lower().strip()
+
+    if base in ("", "actual"):
+        ruta_padre = obtener_ruta_actual()
+    elif base in ("escritorio", "desktop"):
+        ruta_padre = obtener_ruta_escritorio()
+    elif "documento" in base:
+        ruta_padre = os.path.join(os.path.expanduser("~"), "Documents")
+    elif os.path.isabs(ruta_base):
+        ruta_padre = ruta_base
+    else:
+        # Ruta relativa desconocida: la tratamos como subcarpeta del Escritorio
+        ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
+
     ruta_final = os.path.join(ruta_padre, nombre_nueva_carpeta)
 
     try:
         os.makedirs(ruta_final, exist_ok=True)
         guardar_ruta_actual(ruta_final)
-        
-        nombre_padre = os.path.basename(ruta_padre)
+
+        nombre_padre = os.path.basename(ruta_padre) or ruta_padre
         return f"Hecho, Señor. Carpeta '{nombre_nueva_carpeta}' creada con éxito dentro de '{nombre_padre}'."
     except Exception as e:
         return f"Error al intentar crear el directorio físico: {e}"
