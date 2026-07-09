@@ -61,12 +61,7 @@ class OllamaClient:
         ]
 
     def _extraer_json(self, texto: str):
-        """Extrae de forma segura un objeto JSON del texto devuelto por la IA.
-        Antes usaba una regex voraz (\\{.*\\} con DOTALL) que podía capturar
-        basura si había texto o llaves sueltas antes/después del JSON real.
-        Ahora se apoya en json.JSONDecoder().raw_decode, que intenta parsear
-        a partir de cada '{' encontrado hasta dar con un objeto válido.
-        """
+        """Extrae de forma segura un objeto JSON del texto devuelto por la IA."""
         texto = texto.strip()
 
         # 1. Intentar parseo directo
@@ -75,7 +70,7 @@ class OllamaClient:
         except json.JSONDecodeError:
             pass
 
-        # 2. Quitar fences de markdown si el modelo los agregó (```json ... ```)
+        # 2. Quitar fences de markdown
         sin_fences = re.sub(r'```(?:json)?', '', texto, flags=re.IGNORECASE).strip()
         if sin_fences != texto:
             try:
@@ -83,8 +78,7 @@ class OllamaClient:
             except json.JSONDecodeError:
                 texto = sin_fences
 
-        # 3. Buscar el primer objeto JSON válido en el texto, sin importar
-        #    qué haya antes o después.
+        # 3. Decodificar desde la primera llave encontrada
         decoder = json.JSONDecoder()
         for i, ch in enumerate(texto):
             if ch != "{":
@@ -97,20 +91,36 @@ class OllamaClient:
 
         return None
 
+    def _recortar_historial(self):
+        """Mantiene el historial dentro de un límite sin romper la alternancia User/Assistant."""
+        if len(self.historial) <= 12:
+            return
+
+        system_msg = self.historial[0]
+        mensajes_recientes = self.historial[-10:]
+
+        # Asegurar que el primer mensaje tras el system prompt sea del 'user'
+        while mensajes_recientes and mensajes_recientes[0].get("role") != "user":
+            mensajes_recientes.pop(0)
+
+        self.historial = [system_msg] + mensajes_recientes
+
     def generar_respuesta(self, orden_usuario: str) -> str:
         try:
             orden_clean = orden_usuario.lower().strip()
 
-            #  INTERCEPTOR 1: Disparo directo para visión y cámara
+            # INTERCEPTOR 1: Disparo directo para visión y cámara
             if any(k in orden_clean for k in ["camara", "cámara", "enciende la camara", "enciende la cámara", "que ves", "qué ves", "ver entorno"]):
                 print("[OllamaClient]: Intercepción directa del sensor óptico...")
                 memoria_asistente = analizar_entorno_vision()
                 registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
+                
                 self.historial.append({"role": "user", "content": orden_usuario})
                 self.historial.append({"role": "assistant", "content": memoria_asistente})
+                self._recortar_historial()
                 return memoria_asistente
 
-            # Añadir interacción al historial de Ollama
+            # Registrar entrada del usuario
             self.historial.append({"role": "user", "content": orden_usuario})
             
             respuesta = ollama.chat(
@@ -118,11 +128,6 @@ class OllamaClient:
                 messages=self.historial
             )
 
-            # 'eval_duration' y 'total_duration' vienen en nanosegundos y los
-            # entrega el propio Ollama. total_duration incluye carga del modelo
-            # si tuvo que cargarlo/recargarlo en VRAM (ej. tras usar la cámara
-            # con llava). Si ves total_duration mucho más alto que eval_duration,
-            # es señal de que Ollama tuvo que recargar el modelo.
             total_ns = respuesta.get("total_duration")
             eval_ns = respuesta.get("eval_duration")
             if total_ns is not None:
@@ -130,7 +135,6 @@ class OllamaClient:
             
             texto_respuesta = respuesta['message']['content'].strip()
             memoria_asistente = texto_respuesta
-            resultado_sistema = False
 
             # Evaluar si la respuesta contiene un comando JSON
             datos = self._extraer_json(texto_respuesta)
@@ -140,7 +144,7 @@ class OllamaClient:
                 print(f"[OllamaClient]: Acción detectada -> {accion}")
 
                 if accion == "MONITOR":
-                    resultado_sistema = desplegar_monitores_windows()
+                    desplegar_monitores_windows()
                     memoria_asistente = "Monitores tácticos del sistema desplegados, Señor."
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "MONITOR")
 
@@ -149,16 +153,13 @@ class OllamaClient:
                     if str(nombre_c).lower() in ["usar_nombre_dictado", ""] or not nombre_c:
                         nombre_c = "Contenedor_Táctico"
                     ruta_c = datos.get("ruta", "actual")
-                    print(f"🔎 [Debug] JSON del modelo para CREAR_CARPETA: {datos}")
 
                     memoria_asistente = crear_carpeta_sistema(nombre_c, ruta_c)
-                    resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "CREAR_CARPETA")
 
                 elif accion == "ABRIR_CARPETA":
                     nombre_target = datos.get("nombre", "")
                     memoria_asistente = abrir_carpeta_sistema(nombre_target)
-                    resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "ABRIR_CARPETA")
 
                 elif accion == "OFFICE":
@@ -174,66 +175,41 @@ class OllamaClient:
                         
                     os.makedirs(ruta_final, exist_ok=True)
                     
-                    extension = ".docx" if app_tipo == "word" else ".xlsx"
-                    if not nombre_doc.endswith(extension):
-                        nombre_doc += extension
-                        
-                    ruta_completa = os.path.join(ruta_final, nombre_doc)
-                    
-                    try:
-                        with open(ruta_completa, "wb") as f:
-                            f.write(b"")
-                        print(f"[REVAN]: Archivo físico generado en: {ruta_completa}")
-                    except Exception as file_err:
-                        print(f"Error al escribir archivo físico: {file_err}")
-
-                    resultado_sistema = ejecutar_aplicacion_office(app_tipo)
+                    # Ejecutar la app (es mejor dejar que el proceso abra el documento o plantilla)
+                    ejecutar_aplicacion_office(app_tipo)
                     nombre_directorio_actual = os.path.basename(ruta_final)
-                    memoria_asistente = f"¡Listo, Señor! Documento '{nombre_doc}' generado exitosamente en '{nombre_directorio_actual}'."
+                    memoria_asistente = f"¡Listo, Señor! Abriendo {app_tipo.capitalize()} para el documento en '{nombre_directorio_actual}'."
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "OFFICE")
 
                 elif accion == "VIDEO":
-                    resultado_sistema = reproducir_video_brave(datos.get("busqueda", ""))
+                    reproducir_video_brave(datos.get("busqueda", ""))
                     memoria_asistente = f"Reproduciendo contenido sobre '{datos.get('busqueda', '')}' en Brave."
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "VIDEO")
 
                 elif accion == "APP":
-                    resultado_sistema = lanzar_aplicacion_usuario(datos.get("nombre", ""))
+                    lanzar_aplicacion_usuario(datos.get("nombre", ""))
                     memoria_asistente = f"Ejecutando aplicación {datos.get('nombre', '')}."
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "APP")
 
                 elif accion == "JUEGO":
-                    resultado_sistema = lanzar_videojuego(datos.get("nombre", ""))
+                    lanzar_videojuego(datos.get("nombre", ""))
                     memoria_asistente = f"Iniciando {datos.get('nombre', '')}, Señor."
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "JUEGO")
 
                 elif accion == "VISION":
                     memoria_asistente = analizar_entorno_vision()
-                    resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
 
                 else:
-                    # La IA devolvió un JSON con una 'accion' que no está en
-                    # nuestra lista (nombre inventado, typo, etc). Antes esto
-                    # caía al flujo normal y el TTS terminaba leyendo el JSON
-                    # crudo en voz alta. Ahora damos una respuesta de respaldo.
                     print(f"[OllamaClient]: Acción desconocida recibida del modelo: {accion!r}")
                     memoria_asistente = "No reconocí bien esa instrucción, Señor. ¿Puede repetirla de otra forma?"
-                    resultado_sistema = True
                     registrar_accion_sistema(orden_usuario, memoria_asistente, "ACCION_DESCONOCIDA")
 
-                if resultado_sistema:
-                    self.historial.append({"role": "assistant", "content": memoria_asistente})
-                    return memoria_asistente
-
-            # Si fue una respuesta conversacional normal
+            # Guardar en memoria y retornar respuesta hablable (evita retornar cadenas JSON)
             self.historial.append({"role": "assistant", "content": memoria_asistente})
-            
-            # Mantenimiento de ventana de memoria (últimas 10 interacciones)
-            if len(self.historial) > 12:
-                self.historial = [self.historial[0]] + self.historial[-10:]
-            
-            return texto_respuesta
+            self._recortar_historial()
+
+            return memoria_asistente
             
         except Exception as e:
             print(f"Error crítico en el Core Local de Ollama: {e}")

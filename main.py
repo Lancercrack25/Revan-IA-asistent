@@ -47,7 +47,7 @@ def sincronizar_estado_esfera(estado, color_hex):
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, gui
-    print("\n🛑 [REVAN]: Iniciando secuencia de desconexión...")
+    print("\n [REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
     
     # Notificar y despedir por voz
