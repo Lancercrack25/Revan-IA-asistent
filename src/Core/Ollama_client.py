@@ -149,6 +149,7 @@ class OllamaClient:
                     if str(nombre_c).lower() in ["usar_nombre_dictado", ""] or not nombre_c:
                         nombre_c = "Contenedor_Táctico"
                     ruta_c = datos.get("ruta", "actual")
+                    print(f"🔎 [Debug] JSON del modelo para CREAR_CARPETA: {datos}")
 
                     memoria_asistente = crear_carpeta_sistema(nombre_c, ruta_c)
                     resultado_sistema = True

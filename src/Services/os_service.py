@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import subprocess
+import time
 import psutil
 import cv2
 
@@ -155,19 +156,24 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     Crea una carpeta física.
     ruta_base admite:
       - "actual"    -> dentro del foco de trabajo activo (última ruta usada, en PostgreSQL)
-      - "escritorio" / "desktop" -> directo en el Escritorio
-      - "documentos" -> directo en Documentos
+      - algo que contenga "escritorio" / "desktop" -> directo en el Escritorio
+      - algo que contenga "documento" -> directo en Documentos
       - cualquier otra ruta absoluta -> se usa tal cual
     """
     nombre_nueva_carpeta = _sanear_nombre_carpeta(nombre_nueva_carpeta)
     base = (ruta_base or "actual").lower().strip()
 
-    if base in ("", "actual"):
-        ruta_padre = obtener_ruta_actual()
-    elif base in ("escritorio", "desktop"):
+    # OJO: antes esto era "base in ('escritorio', 'desktop')", una comparación
+    # EXACTA. Si el modelo mandaba algo como "en el escritorio" en vez de
+    # solo "escritorio", no hacía match y la carpeta terminaba anidada en una
+    # subcarpeta rara dentro del Escritorio (por el 'else' de más abajo).
+    # Ahora se busca la palabra dentro del texto, no una igualdad exacta.
+    if "escritorio" in base or "desktop" in base:
         ruta_padre = obtener_ruta_escritorio()
     elif "documento" in base:
         ruta_padre = os.path.join(os.path.expanduser("~"), "Documents")
+    elif base in ("", "actual"):
+        ruta_padre = obtener_ruta_actual()
     elif os.path.isabs(ruta_base):
         ruta_padre = ruta_base
     else:
@@ -175,13 +181,16 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
         ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
 
     ruta_final = os.path.join(ruta_padre, nombre_nueva_carpeta)
+    print(f"📁 [CrearCarpeta] ruta recibida del modelo: {ruta_base!r} -> ruta final: {ruta_final}")
 
     try:
         os.makedirs(ruta_final, exist_ok=True)
         guardar_ruta_actual(ruta_final)
 
-        nombre_padre = os.path.basename(ruta_padre) or ruta_padre
-        return f"Hecho, Señor. Carpeta '{nombre_nueva_carpeta}' creada con éxito dentro de '{nombre_padre}'."
+        # Se devuelve la ruta completa en el mensaje (antes solo el nombre
+        # del padre inmediato) para que sepas exactamente dónde quedó sin
+        # tener que ir a buscarla a ciegas.
+        return f"Hecho, Señor. Carpeta '{nombre_nueva_carpeta}' creada con éxito en: {ruta_final}"
     except Exception as e:
         return f"Error al intentar crear el directorio físico: {e}"
 
@@ -242,7 +251,8 @@ def analizar_entorno_vision() -> str:
 
     try:
         print("🧠 [REVAN Vision]: Procesando análisis visual con LLaVA...")
-        
+
+        t0 = time.time()
         respuesta = ollama.chat(
             model='llava',
             messages=[{
@@ -251,6 +261,17 @@ def analizar_entorno_vision() -> str:
                 'images': [ruta_foto_temp]
             }]
         )
+        t_llava = time.time() - t0
+
+        # ⏱️ Igual que con qwen2.5: total_duration (nanosegundos) de Ollama
+        # incluye la carga del modelo si tuvo que meterlo a VRAM/RAM. Con 4GB
+        # de VRAM, llava probablemente no cabe junto con qwen2.5:1.5b, así que
+        # aquí es donde se espera ver el golpe de latencia por recarga.
+        total_ns = respuesta.get("total_duration")
+        if total_ns is not None:
+            print(f"⏱️ [LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
+        else:
+            print(f"⏱️ [LLaVA] Medido en Python: {t_llava:.2f}s")
 
         if os.path.exists(ruta_foto_temp):
             os.remove(ruta_foto_temp)
