@@ -30,6 +30,20 @@ from src.Automation.System_commands import (
 )
 
 class OllamaClient:
+    # Si el usuario menciona alguna de estas palabras pero el modelo NO
+    # devuelve un JSON de acción, se asume que "se le olvidó" y se hace un
+    # reintento forzado y aislado (ver _forzar_json_accion) en vez de
+    # aceptar una respuesta puramente conversacional para una orden que sí
+    # pedía ejecutar algo (esto fue lo que pasó con Word y con el navegador
+    # en las pruebas: el modelo llegó a Ollama pero contestó platicando en
+    # vez de devolver el JSON de OFFICE/VIDEO).
+    PALABRAS_ACCION = [
+        "carpeta", "word", "excel", "documento",
+        "navegador", "video", "busca", "reproduce", "brave",
+        "app", "aplicación", "aplicacion", "juego",
+        "monitor", "recursos"
+    ]
+
     def __init__(self, modelo="qwen2.5:1.5b"):
         """Inicializa el cerebro local de REVAN optimizado para interacción por comandos JSON."""
         self.modelo = modelo
@@ -105,6 +119,34 @@ class OllamaClient:
 
         self.historial = [system_msg] + mensajes_recientes
 
+    def _forzar_json_accion(self, orden_usuario: str):
+        """
+        Reintento aislado: si el usuario mencionó una palabra de acción clara
+        (word, navegador, video, etc.) pero el modelo respondió con texto
+        conversacional en vez de JSON, se hace UNA llamada extra, fuera del
+        historial normal (para no arrastrar la conversación que ya lo
+        "despistó"), pidiendo EXCLUSIVAMENTE el JSON de acción.
+
+        Esto no es una solución perfecta: sigue siendo el mismo modelo chico
+        y puede volver a fallar. Pero reduce los casos donde una orden clara
+        se pierde en una respuesta puramente conversacional.
+        """
+        try:
+            mensaje_forzado = [
+                self.historial[0],  # mismo system prompt
+                {"role": "user", "content": (
+                    f'Orden del usuario: "{orden_usuario}"\n'
+                    "Responde EXCLUSIVAMENTE con el JSON de acción correspondiente, "
+                    "sin texto adicional, sin explicaciones, sin bloques de código."
+                )}
+            ]
+            respuesta = ollama.chat(model=self.modelo, messages=mensaje_forzado)
+            texto = respuesta['message']['content'].strip()
+            return self._extraer_json(texto)
+        except Exception as e:
+            print(f"[OllamaClient]: Falló el reintento forzado de JSON: {e}")
+            return None
+
     def generar_respuesta(self, orden_usuario: str) -> str:
         try:
             orden_clean = orden_usuario.lower().strip()
@@ -138,6 +180,17 @@ class OllamaClient:
 
             # Evaluar si la respuesta contiene un comando JSON
             datos = self._extraer_json(texto_respuesta)
+
+            # Si el usuario claramente pidió una acción (mencionó una de las
+            # PALABRAS_ACCION) pero el modelo no devolvió JSON, se reintenta
+            # UNA vez de forma forzada y aislada antes de rendirse y contestar
+            # de forma conversacional.
+            if (not datos or "accion" not in datos) and any(p in orden_clean for p in self.PALABRAS_ACCION):
+                print("[OllamaClient]: Orden con palabra de acción pero sin JSON. Reintentando forzado...")
+                datos_retry = self._forzar_json_accion(orden_usuario)
+                if datos_retry and isinstance(datos_retry, dict) and "accion" in datos_retry:
+                    print(f"[OllamaClient]: Reintento exitoso -> {datos_retry}")
+                    datos = datos_retry
 
             if datos and isinstance(datos, dict) and "accion" in datos:
                 accion = datos.get("accion")

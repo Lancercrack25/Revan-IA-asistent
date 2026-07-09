@@ -11,11 +11,9 @@ def capturar_pantallazo_camara():
     """
     # Intentamos abrir la cámara predeterminada (ID 0)
     camara = cv2.VideoCapture(0)
-    
     if not camara.isOpened():
-        print("❌ Error: No se pudo acceder a la cámara web.")
+        print("Error: No se pudo acceder a la cámara web.")
         return None
-        
     # Dejamos que la cámara se calibre un milisegundo para evitar fotos oscuras
     for _ in range(5):
         camara.read()
@@ -24,13 +22,12 @@ def capturar_pantallazo_camara():
     camara.release()  # Liberamos el hardware de inmediato para ahorrar energía
     
     if not lectura_exitosa:
-        print("❌ Error: No se pudo leer el flujo de la cámara.")
-        return None
-        
+        print("Error: No se pudo leer el flujo de la cámara.")
+        return None  
     # Guardamos la imagen de forma temporal en la raíz del proyecto
     ruta_guardado = os.path.join(os.path.dirname(__file__), "..", "..", "captura_tactica.jpg")
     ruta_abs = os.path.abspath(ruta_guardado)
     
     cv2.imwrite(ruta_abs, frame)
-    print(f"📸 [Cámara]: Captura táctica resguardada en {ruta_abs}")
+    print(f"[Cámara]: Captura táctica resguardada en {ruta_abs}")
     return ruta_abs

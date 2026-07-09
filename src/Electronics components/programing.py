@@ -1,0 +1,1 @@
+#este archivo se encargara de realizar la programacion automatica de ciertos componentes electronicos, como por ejemplo el arduino, el esp32, etc.
