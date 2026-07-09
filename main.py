@@ -19,8 +19,52 @@ from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_e
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 
+# Intentar importar el cliente de Gemini (Google GenAI)
+try:
+    import google.generativeai as genai
+    HAS_GEMINI_LIB = True
+except ImportError:
+    HAS_GEMINI_LIB = False
+    print("⚠️ Librería 'google-generativeai' no detectada. Ejecuta: pip install google-generativeai")
+
+# Clase de Soporte para Gemini API
+class GeminiClient:
+    def __init__(self, api_key: str, modelo="gemini-1.5-flash"):
+        self.activo = False
+        if HAS_GEMINI_LIB and api_key:
+            try:
+                genai.configure(api_key=api_key)
+                # Configurar el modelo con la personalidad militar de REVAN
+                system_instruction = (
+                    "Eres REVAN, una Inteligencia Artificial táctico-militar altamente avanzada, fría, eficiente y leal. "
+                    "Te diriges al usuario siempre como 'Señor' o por su título. Tu tono es profesional, seguro y directo. "
+                    "Responde a las dudas o conversaciones de forma perspicaz, concisa y elegante."
+                )
+                self.model = genai.GenerativeModel(
+                    model_name=modelo,
+                    system_instruction=system_instruction
+                )
+                self.chat = self.model.start_chat(history=[])
+                self.activo = True
+                print("✨ [GeminiClient]: Motor conversacional de Gemini inicializado con éxito.")
+            except Exception as e:
+                print(f"⚠️ Error al inicializar Gemini API: {e}")
+        else:
+            print("⚠️ GeminiClient desactivado (Falta API Key o librería).")
+
+    def generar_respuesta(self, orden_usuario: str) -> str:
+        if not self.activo:
+            return None
+        try:
+            response = self.chat.send_message(orden_usuario)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error en consulta con Gemini: {e}")
+            return None
+
 # Instancias y Controles Globales
-cerebro_ia = None
+cerebro_ia = None     # Ollama (Acciones del sistema)
+gemini_ia = None      # Gemini (Conversación)
 voz_ia = None
 oidos_ia = None
 gui = None
@@ -28,6 +72,13 @@ titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
 TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
+
+# Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para Ollama)
+PALABRAS_CLAVE_ACCION = [
+    "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
+    "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
+    "juego", "jugar", "monitores", "camara", "cámara", "mira"
+]
 
 def hilo_servidor_web():
     """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
@@ -67,7 +118,7 @@ def apagar_sistema():
 
 def encender_sistemas():
     """Secuencia de despliegue cronológico (Monitores -> CustomTkinter -> Esfera -> Hilo de Voz)."""
-    global cerebro_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
+    global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
     sistema_activo = True
 
     print("🚀 Inicializando secuencia de despliegue cronológico...")
@@ -84,8 +135,12 @@ def encender_sistemas():
     print("🖥️ [2/3] Panel CustomTkinter Activo.")
     
     try:
-        # Inicialización de motores locales
+        ajustes = cargar_ajustes() or {}
+        api_key_gemini = ajustes.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+
+        # Inicialización de motores cognitivos (Doble Núcleo: Ollama + Gemini)
         cerebro_ia = OllamaClient()
+        gemini_ia = GeminiClient(api_key=api_key_gemini)
         voz_ia = ElevenLabsClient()
 
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
@@ -124,8 +179,8 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz con manejo ultra-preciso de transiciones cromáticas."""
-    global cerebro_ia, voz_ia, oidos_ia, gui, ultima_interaccion
+    """Ciclo táctico de voz con enrutamiento inteligente (Ollama vs Gemini)."""
+    global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
         # 1. ESTADO: ESCUCHANDO (Cian / Verde agua)
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") 
@@ -135,7 +190,7 @@ def procesar_ciclo_voz():
         
         # Si no capturó audio o fue ruido ambiental vacío
         if not orden_sucia or not orden_sucia.strip():
-            sincronizar_estado_esfera("ESPERA", "#0077ff") # AZUL ESPERA
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
         orden_minusculas = orden_sucia.lower().strip()
@@ -166,7 +221,7 @@ def procesar_ciclo_voz():
 
         # Si sólo dijo "Revan" sin comando adicional
         if not orden_limpia:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055") # ROJO
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             time.sleep(0.15)
             voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -180,12 +235,24 @@ def procesar_ciclo_voz():
         if any(w in orden_limpia for w in ["camara", "cámara", "que ves", "qué ves"]):
             orden_limpia = "enciende la camara y dime que ves"
 
-        # Evaluar la misión en el orquestador
+        # PASO A: Intentar ejecutar como misión compleja
         respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
         
-        # Si el orquestador no la capturó, consulta a Ollama
+        # PASO B: Si no es una misión compleja, ENRUTAR entre Ollama y Gemini
         if respuesta_final is None:
-            respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+            es_comando_accion = any(palabra in orden_limpia for palabra in PALABRAS_CLAVE_ACCION)
+
+            if es_comando_accion:
+                print("⚡ [Enrutador]: Orden táctica detectada -> Derivando a OLLAMA LOCAL")
+                respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+            else:
+                print("✨ [Enrutador]: Conversación/Conocimiento detectado -> Derivando a GEMINI API")
+                respuesta_final = gemini_ia.generar_respuesta(orden_limpia) if gemini_ia else None
+
+                # Fallback de seguridad: Si Gemini no está configurado o falla, responde Ollama
+                if respuesta_final is None:
+                    print("⚠️ [Enrutador]: Gemini no disponible. Usando Ollama como respaldo...")
+                    respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
 
         # Actualización segura de Tkinter (Thread-safe)
         if gui and hasattr(gui, 'app'):
@@ -194,7 +261,7 @@ def procesar_ciclo_voz():
 
         # 3. ESTADO: HABLANDO (Fucsia / Rojo)
         sincronizar_estado_esfera("HABLANDO", "#ff0055") 
-        time.sleep(0.15) # Pausa crítica para forzar la actualización del color rojo en la esfera Web
+        time.sleep(0.15)
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         

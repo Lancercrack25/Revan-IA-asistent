@@ -16,9 +16,7 @@ except ImportError:
 
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 
-
 # --- DETECCIÓN DINÁMICA DE RUTA DEL ESCRITORIO ---
-
 def obtener_ruta_escritorio() -> str:
     """Detecta de forma inteligente la ruta real del Escritorio, con o sin OneDrive."""
     ruta_normal = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -31,9 +29,7 @@ def obtener_ruta_escritorio() -> str:
         return ruta_onedrive_en
     return ruta_normal
 
-
 # --- AUDITORÍA Y REGISTRO ---
-
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
@@ -60,9 +56,7 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
     finally:
         liberar_conexion(conn)
 
-
 # --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
-
 def guardar_ruta_actual(ruta_absoluta: str) -> bool:
     """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""
     conn = obtener_conexion_pool()
@@ -114,7 +108,6 @@ def obtener_ruta_actual() -> str:
 
 
 # --- ACCIONES DE AUTOMATIZACIÓN DE CARPETAS ---
-
 def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     """
     Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
@@ -194,9 +187,7 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     except Exception as e:
         return f"Error al intentar crear el directorio físico: {e}"
 
-
 # --- HERRAMIENTAS DE MANTENIMIENTO Y TELEMETRÍA ---
-
 def ejecutar_limpieza_sistema() -> str:
     """Limpia los archivos temporales de Windows para liberar caché."""
     ruta_temp = os.environ.get("TEMP")
@@ -218,7 +209,6 @@ def ejecutar_limpieza_sistema() -> str:
 
     return f"Purga de sistema completada. Se eliminaron {archivos_eliminados} elementos del directorio temporal."
 
-
 def obtener_diagnostico_hardware() -> str:
     """Extrae consumo de CPU, Memoria RAM y espacio en Disco."""
     try:
@@ -228,7 +218,6 @@ def obtener_diagnostico_hardware() -> str:
         return f"Diagnóstico físico: CPU al {uso_cpu}%, Memoria RAM al {uso_ram}% y Disco C ocupado al {uso_disco}%."
     except Exception as e:
         return f"Error al leer sensores de rendimiento: {e}"
-
 
 def analizar_entorno_vision() -> str:
     """Captura un fotograma de la webcam y lo analiza con el modelo LLaVA en Ollama."""
