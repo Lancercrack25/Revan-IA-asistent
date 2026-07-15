@@ -16,6 +16,7 @@ from src.Automation.System_commands import desplegar_monitores_windows
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
+from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 
 # Intentar importar el cliente de Gemini (Google GenAI)
 try:
@@ -216,6 +217,28 @@ def procesar_ciclo_voz():
         palabras_desconexion = ["desconectar", "desconéctate", "apagar", "apágate", "cerrar programa", "adiós revan", "desconexión"]
         if any(cmd in orden_minusculas for cmd in palabras_desconexion):
             apagar_sistema()
+            return
+
+        # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA (detección de cambios) ---
+        palabras_iniciar_vigilancia = ["vigila la camara", "vigila la cámara", "vigilancia", "mantente al pendiente de la camara"]
+        palabras_detener_vigilancia = ["deja de vigilar", "detén la vigilancia", "detente de vigilar", "para de vigilar"]
+
+        if any(cmd in orden_limpia for cmd in palabras_iniciar_vigilancia):
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            if iniciar_vigilancia(voz_ia, sincronizar_estado_esfera):
+                voz_ia.hablar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
+            else:
+                voz_ia.hablar("La vigilancia ya estaba activa, Señor.")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if any(cmd in orden_limpia for cmd in palabras_detener_vigilancia):
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            if detener_vigilancia():
+                voz_ia.hablar("Vigilancia de cámara desactivada.")
+            else:
+                voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
         # Si sólo dijo "Revan" sin comando adicional

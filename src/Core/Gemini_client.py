@@ -1,7 +1,6 @@
 import os
 from google import genai
 from google.genai import types
-# 🔑 CORREGIDO: 'cargar_credenciales' con 'e' al final
 from src.Core.Config_loader import cargar_credenciales, cargar_ajustes
 
 class GeminiClient:
@@ -41,7 +40,6 @@ class GeminiClient:
         )
 
     def generar_respuesta(self, orden: str) -> str:
-        """Envía el mensaje al chat con memoria y devuelve la respuesta continua."""
         try:
             respuesta = self.chat.send_message(orden)
             return respuesta.text

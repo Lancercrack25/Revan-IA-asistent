@@ -6,7 +6,6 @@ import time
 import psutil
 import cv2
 
-# Prevenir la generación de archivos .pyc
 sys.dont_write_bytecode = True
 
 try:
@@ -16,7 +15,6 @@ except ImportError:
 
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 
-# --- DETECCIÓN DINÁMICA DE RUTA DEL ESCRITORIO ---
 def obtener_ruta_escritorio() -> str:
     """Detecta de forma inteligente la ruta real del Escritorio, con o sin OneDrive."""
     ruta_normal = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -29,7 +27,6 @@ def obtener_ruta_escritorio() -> str:
         return ruta_onedrive_en
     return ruta_normal
 
-# --- AUDITORÍA Y REGISTRO ---
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
@@ -50,13 +47,15 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
         cur.close()
         return True
     except Exception as e:
-        print(f" Error en OS Log: {e}")
+        print(f"❌ Error en OS Log: {e}")
         conn.rollback()
         return False
     finally:
         liberar_conexion(conn)
 
+
 # --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
+
 def guardar_ruta_actual(ruta_absoluta: str) -> bool:
     """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""
     conn = obtener_conexion_pool()
@@ -77,7 +76,7 @@ def guardar_ruta_actual(ruta_absoluta: str) -> bool:
         print(f"📁 [Estado]: Contexto de ruta actualizado -> {ruta_absoluta}")
         return True
     except Exception as e:
-        print(f" Error al guardar la ruta activa en BD: {e}")
+        print(f"❌ Error al guardar la ruta activa en BD: {e}")
         conn.rollback()
         return False
     finally:
@@ -101,13 +100,11 @@ def obtener_ruta_actual() -> str:
             return resultado[0]
         return ruta_defecto
     except Exception as e:
-        print(f" Error al consultar la ruta activa: {e}")
+        print(f"❌ Error al consultar la ruta activa: {e}")
         return ruta_defecto
     finally:
         liberar_conexion(conn)
 
-
-# --- ACCIONES DE AUTOMATIZACIÓN DE CARPETAS ---
 def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     """
     Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
@@ -155,12 +152,6 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     """
     nombre_nueva_carpeta = _sanear_nombre_carpeta(nombre_nueva_carpeta)
     base = (ruta_base or "actual").lower().strip()
-
-    # OJO: antes esto era "base in ('escritorio', 'desktop')", una comparación
-    # EXACTA. Si el modelo mandaba algo como "en el escritorio" en vez de
-    # solo "escritorio", no hacía match y la carpeta terminaba anidada en una
-    # subcarpeta rara dentro del Escritorio (por el 'else' de más abajo).
-    # Ahora se busca la palabra dentro del texto, no una igualdad exacta.
     if "escritorio" in base or "desktop" in base:
         ruta_padre = obtener_ruta_escritorio()
     elif "documento" in base:
@@ -187,7 +178,9 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     except Exception as e:
         return f"Error al intentar crear el directorio físico: {e}"
 
+
 # --- HERRAMIENTAS DE MANTENIMIENTO Y TELEMETRÍA ---
+
 def ejecutar_limpieza_sistema() -> str:
     """Limpia los archivos temporales de Windows para liberar caché."""
     ruta_temp = os.environ.get("TEMP")
@@ -209,6 +202,7 @@ def ejecutar_limpieza_sistema() -> str:
 
     return f"Purga de sistema completada. Se eliminaron {archivos_eliminados} elementos del directorio temporal."
 
+
 def obtener_diagnostico_hardware() -> str:
     """Extrae consumo de CPU, Memoria RAM y espacio en Disco."""
     try:
@@ -219,27 +213,20 @@ def obtener_diagnostico_hardware() -> str:
     except Exception as e:
         return f"Error al leer sensores de rendimiento: {e}"
 
-def analizar_entorno_vision() -> str:
-    """Captura un fotograma de la webcam y lo analiza con el modelo LLaVA en Ollama."""
-    print("📷 [REVAN Vision]: Activando sensor óptico...")
-    
-    # Usar CAP_DSHOW en Windows para apertura instantánea del driver
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
 
-    ret, frame = cap.read()
-    cap.release() # Liberar el dispositivo inmediatamente
-
-    if not ret or frame is None:
-        return "Error al capturar la imagen de la cámara."
-
+def _analizar_frame_con_llava(frame) -> str:
+    """
+    Analiza un frame YA CAPTURADO (numpy array de OpenCV) con LLaVA.
+    Separado de analizar_entorno_vision() para que el módulo de vigilancia
+    (vigilancia_camara.py) pueda reutilizar esto sin tener que abrir/cerrar
+    la cámara en cada análisis (la cámara se queda abierta durante toda la
+    vigilancia, esto solo recibe el frame que ya se leyó).
+    """
     ruta_foto_temp = "temp_vision.jpg"
     cv2.imwrite(ruta_foto_temp, frame)
 
     try:
-        print("[REVAN Vision]: Procesando análisis visual con LLaVA...")
+        print("🧠 [REVAN Vision]: Procesando análisis visual con LLaVA...")
 
         t0 = time.time()
         respuesta = ollama.chat(
@@ -252,24 +239,40 @@ def analizar_entorno_vision() -> str:
         )
         t_llava = time.time() - t0
 
-        # Igual que con qwen2.5: total_duration (nanosegundos) de Ollama
-        # incluye la carga del modelo si tuvo que meterlo a VRAM/RAM. Con 4GB
-        # de VRAM, llava probablemente no cabe junto con qwen2.5:1.5b
         total_ns = respuesta.get("total_duration")
         if total_ns is not None:
-            print(f"[LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
+            print(f"⏱️ [LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
         else:
-            print(f"[LLaVA] Medido en Python: {t_llava:.2f}s")
+            print(f"⏱️ [LLaVA] Medido en Python: {t_llava:.2f}s")
 
         if os.path.exists(ruta_foto_temp):
             os.remove(ruta_foto_temp)
 
         analisis = respuesta['message']['content'].strip()
-        print(f"[Análisis]: {analisis}")
+        print(f"👁️ [Análisis]: {analisis}")
         return f"Según mi sensor óptico: {analisis}"
 
     except Exception as e:
         if os.path.exists(ruta_foto_temp):
             os.remove(ruta_foto_temp)
-        print(f" Error en el módulo de visión: {e}")
+        print(f"❌ Error en el módulo de visión: {e}")
         return "Tuve un problema al procesar la visión. Asegúrate de tener instalado el modelo 'llava' en Ollama ejecutando: ollama run llava"
+
+
+def analizar_entorno_vision() -> str:
+    """Captura un fotograma de la webcam (abre y cierra la cámara) y lo analiza con LLaVA."""
+    print("📷 [REVAN Vision]: Activando sensor óptico...")
+
+    # Usar CAP_DSHOW en Windows para apertura instantánea del driver
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)
+
+    if not cap.isOpened():
+        return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
+
+    ret, frame = cap.read()
+    cap.release()  # Liberar el dispositivo inmediatamente
+
+    if not ret or frame is None:
+        return "Error al capturar la imagen de la cámara."
+
+    return _analizar_frame_con_llava(frame)
