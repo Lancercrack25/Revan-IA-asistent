@@ -1,68 +1,96 @@
 import os
-import asyncio
+import requests
 import pygame
-import edge_tts
-import time
 
 class ElevenLabsClient:
     def __init__(self):
-        """Inicializa el motor de voz neural local compatible con Tkinter y GUI."""
-        self.voice = "es-MX-JorgeNeural"  # Voz neuronal en español mexicano
-        self.archivo_temporal = "revan_voice.mp3"
-        # Inicializamos el mezclador de pygame
+        # Puerto confirmado en su archivo settings.json y capturas de pantalla
+        self.url_api = "http://127.0.0.1:3900/v1/audio/speech"
+        self.url_voces = "http://127.0.0.1:3900/v1/audio/voices"
+
+        # ANTES: se mandaba el nombre visible ("Voice 10:25 PM — CLONE"), que
+        # es solo la etiqueta de la UI. El servidor espera el voice_id interno
+        # del perfil clonado, y al no encontrar match caía en silencio a una
+        # voz genérica (sin error) en vez de usar el clon real.
+        # Confirmado vía GET /v1/audio/voices:
+        #   {"voice_id": "4822983d", "name": "Voice 10:25 PM — CLONE", ...}
+        self.voice_id = "4822983d"
+        self.voice_name_legible = "Voice 10:25 PM — CLONE"  # solo para logs
+
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
-    def hablar(self, texto):
+    def _resolver_voice_id(self):
         """
-        Vocaliza el texto de forma SÍNCRONA. 
-        Mantiene retenida la ejecución MIENTRAS suena la voz para que la esfera 3D
-        se mantenga en rojo (#ff0055) exactamente hasta que REVAN termine de hablar.
+        Verifica que self.voice_id siga existiendo en el servidor. Si el ID
+        cambió (por ejemplo, borraste y volviste a clonar la voz), se busca
+        de nuevo por nombre y se actualiza automáticamente en vez de fallar
+        en silencio otra vez.
         """
         try:
-            # 1. Generar el archivo de audio (esto es lo que depende de tu conexión
-            #    a internet, ya que edge_tts llama a servidores de Microsoft)
-            t0 = time.time()
-            asyncio.run(self._generar_audio(texto))
-            t_generacion = time.time() - t0
-            print(f"[TTS] Descarga/generación de audio: {t_generacion:.2f}s")
+            r = requests.get(self.url_voces, timeout=5)
+            if r.status_code != 200:
+                return self.voice_id  # no se pudo verificar, se usa el que hay
 
-            # 2. Reproducir y esperar a que finalice el audio (esto es tiempo
-            #    "real" de habla, no es retraso evitable, es proporcional al texto)
-            t1 = time.time()
-            self._reproducir_audio()
-            t_reproduccion = time.time() - t1
-            print(f"[TTS] Reproducción (voz sonando): {t_reproduccion:.2f}s")
+            voces = r.json().get("voices", [])
+
+            # ¿Sigue existiendo el voice_id actual?
+            if any(v.get("voice_id") == self.voice_id for v in voces):
+                return self.voice_id
+
+            # Si no, buscar por nombre y avisar del cambio
+            for v in voces:
+                if v.get("name") == self.voice_name_legible:
+                    print(f"⚠️ [OmniVoice]: voice_id cambió de '{self.voice_id}' a '{v.get('voice_id')}', actualizando.")
+                    self.voice_id = v.get("voice_id")
+                    return self.voice_id
+
+            print(f"⚠️ [OmniVoice]: No se encontró '{self.voice_name_legible}' entre las voces disponibles. Usando el último ID conocido.")
+            return self.voice_id
         except Exception as e:
-            print(f" Error en el módulo de voz local: {e}")
+            print(f"⚠️ [OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
+            return self.voice_id
 
-    async def _generar_audio(self, texto):
-        """Limpia el texto y descarga el audio desde la API de Edge-TTS."""
-        texto_limpio = str(texto).replace("{", "").replace("}", "")
-        texto_limpio = texto_limpio.replace("[", "").replace("]", "").strip()
-        
-        if not texto_limpio:
-            texto_limpio = "Sistemas estables."
-            
-        communicate = edge_tts.Communicate(texto_limpio, self.voice, rate="-9%")
-        await communicate.save(self.archivo_temporal)
+    def hablar(self, text: str, voice: str = None):
+        """Genera y reproduce el audio asegurando la comunicación con el backend local."""
+        voz_final = voice if voice else self._resolver_voice_id()
 
-    def _reproducir_audio(self):
-        """Carga en Pygame y bloquea el hilo hasta que la reproducción termina."""
-        if os.path.exists(self.archivo_temporal):
-            pygame.mixer.music.load(self.archivo_temporal)
-            pygame.mixer.music.play()
-            
-            # Bucle de espera activo: Mantiene bloqueada la función mientras el audio suena
-            while pygame.mixer.music.get_busy():
-                time.sleep(0.05) 
-                
-            # Limpieza del reproductor y del archivo temporal
-            pygame.mixer.music.stop()
-            pygame.mixer.music.unload()
-            
-            try:
-                os.remove(self.archivo_temporal)
-            except Exception:
-                pass
-#proximamente sera remplazado por algo muy similair, genial y gratis
+        print(f"📡 [OmniVoice Request] -> {self.url_api}")
+        print(f"   Invocando clon exacto: voice_id='{voz_final}' ({self.voice_name_legible})")
+
+        payload = {
+            "model": "tts-1",
+            "input": text,
+            "voice": voz_final,
+            "response_format": "mp3"
+        }
+
+        output_filename = "output.mp3"
+
+        try:
+            respuesta = requests.post(self.url_api, json=payload, timeout=180, stream=True)
+
+            if respuesta.status_code == 200:
+                with open(output_filename, "wb") as f:
+                    for chunk in respuesta.iter_content(chunk_size=4096):
+                        if chunk:
+                            f.write(chunk)
+
+                print("🎵 [OmniVoice]: Audio generado con éxito. Reproduciendo...")
+                pygame.mixer.music.load(output_filename)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+
+                pygame.mixer.music.unload()
+                if os.path.exists(output_filename):
+                    os.remove(output_filename)
+            else:
+                print(f"❌ Error del servidor local (Código {respuesta.status_code}).")
+                print(f"   Detalles devueltos por OmniVoice: {respuesta.text}")
+
+        except Exception as e:
+            print(f"❌ Error crítico de comunicación: {str(e)}")
+
+# Instancia global requerida por el core del sistema
+client_voz = ElevenLabsClient()
