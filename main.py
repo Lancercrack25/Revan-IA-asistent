@@ -3,10 +3,10 @@ import sys
 import time
 import threading
 import subprocess
-# Prevenir la generación de archivos de caché compilados (.pyc)
+# Prevenir la generación de archivos .py
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-# Importaciones del Sistema REVAN
+
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
@@ -187,7 +187,6 @@ def procesar_ciclo_voz():
         print("\n[REVAN]: Escuchando...")
         
         orden_sucia = oidos_ia.escuchar()
-        
         # Si no capturó audio o fue ruido ambiental vacío
         if not orden_sucia or not orden_sucia.strip():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -298,7 +297,6 @@ def main():
     global oidos_ia, gui, sistema_activo, titulo
     
     print("[REVAN]: Inicializando infraestructura base...")
-    
     try:
         inicializar_base_datos()
     except Exception as e:
@@ -336,6 +334,6 @@ def main():
     # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
-#aqui se ejecuta todo
+#aqui se ejecuta toda la logica 
 if __name__ == "__main__":
     main()

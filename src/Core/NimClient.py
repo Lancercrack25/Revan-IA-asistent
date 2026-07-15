@@ -39,12 +39,6 @@ class NimClient:
     memoria de conversación, y así el costo por llamada se mantiene
     constante sin importar cuánto lleves usando REVAN en la sesión, en vez
     de ir creciendo turno a turno.
-
-    Si en algún momento SÍ quieres que recuerde contexto reciente para
-    acciones encadenadas ("crea esa carpeta" refiriéndose a algo dicho
-    antes), se puede agregar una ventana corta (últimos 2-3 turnos) en vez
-    de la ventana de 12 que usa Ollama — pero eso es un cambio a pedir
-    explícitamente, no lo puse por defecto para no gastar tokens de más.
     """
 
     PALABRAS_ACCION = [
@@ -55,11 +49,31 @@ class NimClient:
     ]
 
     def __init__(self, api_key: str = None, modelo: str = "mistralai/mistral-nemotron"):
+        # 1. Si no se pasó api_key por parámetro, intentamos leer config/credentials.json
+        if not api_key:
+            ruta_credenciales = os.path.join("config", "credentials.json")
+            if os.path.exists(ruta_credenciales):
+                try:
+                    with open(ruta_credenciales, "r", encoding="utf-8") as f:
+                        credenciales = json.load(f)
+                        # Busca la api key bajo distintos nombres comunes en tu JSON
+                        api_key = (
+                            credenciales.get("nvidia_api_key") or 
+                            credenciales.get("NVIDIA_API_KEY") or 
+                            credenciales.get("NVIDIA_NIM_API_KEY") or
+                            credenciales.get("api_key")
+                        )
+                except Exception as e:
+                    print(f"[NimClient] Error al leer {ruta_credenciales}: {e}")
+
+        # 2. Si no se encontró en el JSON, busca en las variables de entorno
         self.api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
+
+        # 3. Si sigue sin existir, lanza el error
         if not self.api_key:
             raise ValueError(
-                "Falta la API key de NVIDIA NIM. Pásala como argumento o "
-                "define la variable de entorno NVIDIA_NIM_API_KEY."
+                "Falta la API key de NVIDIA NIM. Asegúrate de configurar correctamente "
+                "el archivo 'config/credentials.json' o define la variable de entorno NVIDIA_NIM_API_KEY."
             )
 
         self.modelo = modelo
@@ -68,8 +82,7 @@ class NimClient:
             api_key=self.api_key,
         )
 
-        # Prompt recortado a lo esencial (menos tokens en CADA llamada,
-        # ya que no hay historial que "diluya" su peso relativo).
+        # Prompt recortado a lo esencial
         self.system_prompt = (
             "Eres REVAN, asistente tipo Jarvis para el sistema operativo.\n"
             "Si el usuario pide una acción física (crear/abrir carpetas, archivos, apps, cámara), "
@@ -116,11 +129,10 @@ class NimClient:
         return None
 
     def _llamar_modelo(self, mensajes, max_tokens=200):
-       #hace que gaste menos tokens a ala api de nvidia 
         respuesta = self.client.chat.completions.create(
             model=self.modelo,
             messages=mensajes,
-            temperature=0.3,   # más determinista que 0.6 -> menos variación errática en el JSON
+            temperature=0.3,
             top_p=0.7,
             max_tokens=max_tokens,
             stream=False,
@@ -128,8 +140,6 @@ class NimClient:
         return respuesta.choices[0].message.content.strip()
 
     def _forzar_json_accion(self, orden_usuario: str):
-        """Reintento aislado (mismo patrón que en Ollama_client.py) si hay
-        palabra de acción pero el modelo respondió en texto plano."""
         try:
             mensaje_forzado = [
                 {"role": "system", "content": self.system_prompt},
@@ -148,8 +158,7 @@ class NimClient:
         try:
             orden_clean = orden_usuario.lower().strip()
 
-            # Cámara: igual que Ollama_client, se resuelve local (llava),
-            # sin gastar tokens de NIM para esto.
+            # Cámara: igual que Ollama_client, se resuelve local (llava)
             if any(k in orden_clean for k in ["camara", "cámara", "que ves", "qué ves", "ver entorno"]):
                 memoria_asistente = analizar_entorno_vision()
                 registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
@@ -241,7 +250,7 @@ class NimClient:
 
 
 if __name__ == "__main__":
-    # Prueba rápida y aislada, igual que antes
+    # Prueba rápida y aislada
     cliente = NimClient()
     pruebas = [
         "crea una carpeta llamada Prueba en el escritorio",
