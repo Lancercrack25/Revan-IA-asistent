@@ -116,12 +116,7 @@ class NimClient:
         return None
 
     def _llamar_modelo(self, mensajes, max_tokens=200):
-        """
-        max_tokens=200 en vez del 4096 de ejemplo: un JSON de acción son
-        ~30-60 tokens, una respuesta conversacional corta (limitada a 25
-        palabras) son ~40 tokens. 200 deja margen de sobra sin pagar por
-        espacio que nunca se usa.
-        """
+       #hace que gaste menos tokens a ala api de nvidia 
         respuesta = self.client.chat.completions.create(
             model=self.modelo,
             messages=mensajes,
@@ -150,12 +145,6 @@ class NimClient:
             return None
 
     def generar_respuesta(self, orden_usuario: str) -> str:
-        """
-        Misma firma que OllamaClient.generar_respuesta(), para que sea un
-        reemplazo directo en main.py y en agent_orchestrator.py (que ya
-        llama a cerebro_ia.generar_respuesta(...) de forma genérica, sin
-        importar qué clase sea).
-        """
         try:
             orden_clean = orden_usuario.lower().strip()
 

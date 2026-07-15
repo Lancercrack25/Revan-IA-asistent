@@ -7,7 +7,7 @@ import subprocess
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 # Importaciones del Sistema REVAN
-from src.Core.Ollama_client import OllamaClient  
+from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes
@@ -61,7 +61,7 @@ class GeminiClient:
             return None
 
 # Instancias y Controles Globales
-cerebro_ia = None     # Ollama (Acciones del sistema)
+cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
 gemini_ia = None      # Gemini (Conversación)
 voz_ia = None
 oidos_ia = None
@@ -71,7 +71,7 @@ sistema_activo = False
 ultima_interaccion = 0  
 TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
 
-# Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para Ollama)
+# Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
@@ -135,9 +135,10 @@ def encender_sistemas():
     try:
         ajustes = cargar_ajustes() or {}
         api_key_gemini = ajustes.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+        api_key_nim = ajustes.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
 
-        # Inicialización de motores cognitivos (Doble Núcleo: Ollama + Gemini)
-        cerebro_ia = OllamaClient()
+        # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
+        cerebro_ia = NimClient(api_key=api_key_nim)
         gemini_ia = GeminiClient(api_key=api_key_gemini)
         voz_ia = ElevenLabsClient()
 
@@ -177,7 +178,7 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz con enrutamiento inteligente (Ollama vs Gemini)."""
+    """Ciclo táctico de voz con enrutamiento inteligente (NIM para acciones vs Gemini para conversación)."""
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
         # 1. ESTADO: ESCUCHANDO (Cian / Verde agua)
@@ -236,20 +237,20 @@ def procesar_ciclo_voz():
         # PASO A: Intentar ejecutar como misión compleja
         respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
         
-        # PASO B: Si no es una misión compleja, ENRUTAR entre Ollama y Gemini
+        # PASO B: Si no es una misión compleja, ENRUTAR entre NIM (acciones) y Gemini (conversación)
         if respuesta_final is None:
             es_comando_accion = any(palabra in orden_limpia for palabra in PALABRAS_CLAVE_ACCION)
 
             if es_comando_accion:
-                print("[Enrutador]: Orden táctica detectada -> Derivando a OLLAMA LOCAL")
+                print("[Enrutador]: Orden táctica detectada -> Derivando a NVIDIA NIM (acciones)")
                 respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
             else:
                 print("[Enrutador]: Conversación/Conocimiento detectado -> Derivando a GEMINI API")
                 respuesta_final = gemini_ia.generar_respuesta(orden_limpia) if gemini_ia else None
 
-                # Fallback de seguridad: Si Gemini no está configurado o falla, responde Ollama
+                # Fallback de seguridad: Si Gemini no está configurado o falla, responde NIM
                 if respuesta_final is None:
-                    print("[Enrutador]: Gemini no disponible. Usando Ollama como respaldo...")
+                    print("[Enrutador]: Gemini no disponible. Usando NIM como respaldo...")
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
 
         # Actualización segura de Tkinter (Thread-safe)
