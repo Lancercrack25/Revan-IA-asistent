@@ -11,7 +11,7 @@ sys.dont_write_bytecode = True
 try:
     import ollama
 except ImportError:
-    print("⚠️ La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
+    print("La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
 
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 
@@ -47,7 +47,7 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
         cur.close()
         return True
     except Exception as e:
-        print(f"❌ Error en OS Log: {e}")
+        print(f"Error en OS Log: {e}")
         conn.rollback()
         return False
     finally:
@@ -73,10 +73,10 @@ def guardar_ruta_actual(ruta_absoluta: str) -> bool:
         cur.execute(query, (ruta_absoluta,))
         conn.commit()
         cur.close()
-        print(f"📁 [Estado]: Contexto de ruta actualizado -> {ruta_absoluta}")
+        print(f"[Estado]: Contexto de ruta actualizado -> {ruta_absoluta}")
         return True
     except Exception as e:
-        print(f"❌ Error al guardar la ruta activa en BD: {e}")
+        print(f"Error al guardar la ruta activa en BD: {e}")
         conn.rollback()
         return False
     finally:
@@ -100,7 +100,7 @@ def obtener_ruta_actual() -> str:
             return resultado[0]
         return ruta_defecto
     except Exception as e:
-        print(f"❌ Error al consultar la ruta activa: {e}")
+        print(f"Error al consultar la ruta activa: {e}")
         return ruta_defecto
     finally:
         liberar_conexion(conn)
@@ -165,7 +165,7 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
         ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
 
     ruta_final = os.path.join(ruta_padre, nombre_nueva_carpeta)
-    print(f"📁 [CrearCarpeta] ruta recibida del modelo: {ruta_base!r} -> ruta final: {ruta_final}")
+    print(f"[CrearCarpeta] ruta recibida del modelo: {ruta_base!r} -> ruta final: {ruta_final}")
 
     try:
         os.makedirs(ruta_final, exist_ok=True)
@@ -226,7 +226,7 @@ def _analizar_frame_con_llava(frame) -> str:
     cv2.imwrite(ruta_foto_temp, frame)
 
     try:
-        print("🧠 [REVAN Vision]: Procesando análisis visual con LLaVA...")
+        print(" [REVAN Vision]: Procesando análisis visual con LLaVA...")
 
         t0 = time.time()
         respuesta = ollama.chat(
@@ -241,27 +241,27 @@ def _analizar_frame_con_llava(frame) -> str:
 
         total_ns = respuesta.get("total_duration")
         if total_ns is not None:
-            print(f"⏱️ [LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
+            print(f"[LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
         else:
-            print(f"⏱️ [LLaVA] Medido en Python: {t_llava:.2f}s")
+            print(f"[LLaVA] Medido en Python: {t_llava:.2f}s")
 
         if os.path.exists(ruta_foto_temp):
             os.remove(ruta_foto_temp)
 
         analisis = respuesta['message']['content'].strip()
-        print(f"👁️ [Análisis]: {analisis}")
+        print(f" [Análisis]: {analisis}")
         return f"Según mi sensor óptico: {analisis}"
 
     except Exception as e:
         if os.path.exists(ruta_foto_temp):
             os.remove(ruta_foto_temp)
-        print(f"❌ Error en el módulo de visión: {e}")
+        print(f" Error en el módulo de visión: {e}")
         return "Tuve un problema al procesar la visión. Asegúrate de tener instalado el modelo 'llava' en Ollama ejecutando: ollama run llava"
 
 
 def analizar_entorno_vision() -> str:
     """Captura un fotograma de la webcam (abre y cierra la cámara) y lo analiza con LLaVA."""
-    print("📷 [REVAN Vision]: Activando sensor óptico...")
+    print("[REVAN Vision]: Activando sensor óptico...")
 
     # Usar CAP_DSHOW en Windows para apertura instantánea del driver
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)

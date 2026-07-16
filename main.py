@@ -48,7 +48,7 @@ class GeminiClient:
                 self.activo = True
                 print("✨ [GeminiClient]: Motor conversacional de Gemini inicializado con éxito.")
             except Exception as e:
-                print(f"❌ Error al inicializar Gemini API: {e}")
+                print(f" Error al inicializar Gemini API: {e}")
         else:
             print("⚠️ GeminiClient desactivado (Falta API Key o librería).")
 
@@ -59,7 +59,7 @@ class GeminiClient:
             response = self.chat.send_message(orden_usuario)
             return response.text.strip()
         except Exception as e:
-            print(f"❌ Error en consulta con Gemini: {e}")
+            print(f" Error en consulta con Gemini: {e}")
             return None
 
 # Instancias y Controles Globales
@@ -77,7 +77,7 @@ TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego", "jugar", "monitores", "camara", "cámara", "mira"
+    "juego", "jugar", "monitores", "camara","mira"
 ]
 
 def hilo_servidor_web():
@@ -86,19 +86,19 @@ def hilo_servidor_web():
         servidor = iniciar_servidor_ui()
         servidor.run()
     except Exception as e:
-        print(f"❌ Error en el servidor web de la esfera: {e}")
+        print(f" Error en el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
     """Envía los estados de voz e IA al loop de la esfera 3D vía WebSocket."""
     try:
         transmitir_desde_hilo_externo(estado, color_hex)
     except Exception as e:
-        print(f"❌ Error al sincronizar esfera: {e}")
+        print(f" Error al sincronizar esfera: {e}")
 
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, gui
-    print("\n⚠️ [REVAN]: Iniciando secuencia de desconexión...")
+    print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
     
     # Notificar y despedir por voz
@@ -126,7 +126,7 @@ def encender_sistemas():
     try:
         desplegar_monitores_windows()
     except Exception as e:
-        print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
+        print(f"Aviso al desplegar monitores nativos: {e}")
 
     time.sleep(0.4) 
 
@@ -156,7 +156,7 @@ def encender_sistemas():
             )
             print("[3/3] Núcleo Web Desplegado (Esfera 3D).")
         except Exception as e:
-            print(f"❌ Error al lanzar la interfaz web: {e}")
+            print(f" Error al lanzar la interfaz web: {e}")
 
         # Vocalización de bienvenida
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
@@ -170,7 +170,7 @@ def encender_sistemas():
     except Exception as e:
         gui.actualizar_estado("ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
-        print(f"❌ Error crítico al inicializar las APIs locales: {e}")
+        print(f" Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
     """Bucle infinito de escucha fuera del hilo principal de la GUI."""
@@ -295,7 +295,7 @@ def procesar_ciclo_voz():
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:
-        print(f"❌ Error en el bucle táctico de voz: {e}")
+        print(f"Error en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
 def main():
@@ -305,7 +305,7 @@ def main():
     try:
         inicializar_base_datos()
     except Exception as e:
-        print(f"⚠️ Alerta al desplegar base de datos: {e}")
+        print(f"Alerta al desplegar base de datos: {e}")
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
@@ -324,7 +324,7 @@ def main():
                 print("¡Señal acústica validada! Inicializando REVAN...")
                 break
         except Exception as e:
-            print(f"⚠️ Aviso en escaneo pasivo: {e}")
+            print(f"Aviso en escaneo pasivo: {e}")
         time.sleep(0.1)
 
     print("Desplegando interfaz gráfica...")

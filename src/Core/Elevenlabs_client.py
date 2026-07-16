@@ -28,14 +28,14 @@ class ElevenLabsClient:
 
             for v in voces:
                 if v.get("name") == self.voice_name_legible:
-                    print(f"⚠️ [OmniVoice]: voice_id cambió de '{self.voice_id}' a '{v.get('voice_id')}', actualizando.")
+                    print(f" [OmniVoice]: voice_id cambió de '{self.voice_id}' a '{v.get('voice_id')}', actualizando.")
                     self.voice_id = v.get("voice_id")
                     return self.voice_id
 
-            print(f"⚠️ [OmniVoice]: No se encontró '{self.voice_name_legible}'. Usando el último ID conocido.")
+            print(f" [OmniVoice]: No se encontró '{self.voice_name_legible}'. Usando el último ID conocido.")
             return self.voice_id
         except Exception as e:
-            print(f"⚠️ [OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
+            print(f" [OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
             return self.voice_id
 
     def _limpiar_texto_para_tts(self, texto: str) -> str:
@@ -54,7 +54,7 @@ class ElevenLabsClient:
         
         # Evitar peticiones que rompan el motor local
         if not texto_limpio:
-            print("⚠️ [OmniVoice]: Intento de vocalizar un texto vacío. Cancelado.")
+            print(" [OmniVoice]: Intento de vocalizar un texto vacío. Cancelado.")
             return
 
         voz_final = voice if voice else self._resolver_voice_id()
@@ -93,16 +93,16 @@ class ElevenLabsClient:
                     try:
                         os.remove(output_filename)
                     except Exception as e:
-                        print(f"⚠️ No se pudo eliminar el archivo temporal: {e}")
+                        print(f" No se pudo eliminar el archivo temporal: {e}")
             else:
-                print(f"❌ Error del servidor local (Código {respuesta.status_code}).")
+                print(f" Error del servidor local (Código {respuesta.status_code}).")
                 print(f"   Detalles devueltos por OmniVoice: {respuesta.text}")
 
         except requests.exceptions.Timeout:
-            print("❌ [OmniVoice]: Error de Timeout. El servidor local tardó demasiado en responder.")
+            print(" [OmniVoice]: Error de Timeout. El servidor local tardó demasiado en responder.")
             print("👉 Consejo: Asegúrate de que el backend de OmniVoice está usando aceleración por hardware (CUDA/MPS) y no CPU pura.")
         except Exception as e:
-            print(f"❌ Error crítico de comunicación: {str(e)}")
+            print(f" Error crítico de comunicación: {str(e)}")
 
 # Instancia global requerida por el core del sistema
 client_voz = ElevenLabsClient()
