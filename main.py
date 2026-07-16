@@ -3,7 +3,7 @@ import sys
 import time
 import threading
 import subprocess
-
+from google import genai
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
@@ -18,20 +18,13 @@ from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_e
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
-
-# Intentar importar el cliente de Gemini (Google GenAI)
-try:
-    import google.generativeai as genai
-    HAS_GEMINI_LIB = True
-except ImportError:
-    HAS_GEMINI_LIB = False
-    print("⚠️ Librería 'google-generativeai' no detectada. Ejecuta: pip install google-generativeai")
+from src.Core.Gemini_client import GeminiClient
 
 # Clase de Soporte para Gemini API
 class GeminiClient:
     def __init__(self, api_key: str, modelo="gemini-1.5-flash"):
         self.activo = False
-        if HAS_GEMINI_LIB and api_key:
+        if api_key:
             try:
                 genai.configure(api_key=api_key)
                 # Configurar el modelo con la personalidad militar de REVAN
@@ -343,3 +336,4 @@ def main():
 # Ejecución de la lógica de REVAN
 if __name__ == "__main__":
     main()
+#favor de modificar el elevenlabs,config loader y el main.py para que funcione lo de la voz y la api key de gemini

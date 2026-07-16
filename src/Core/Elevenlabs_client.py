@@ -38,16 +38,6 @@ class ElevenLabsClient:
             print(f" [OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
             return self.voice_id
 
-    def _limpiar_texto_para_tts(self, texto: str) -> str:
-        """Elimina sintaxis de Markdown y caracteres que confunden al TTS local."""
-        if not texto:
-            return ""
-        # Eliminar negritas, cursivas (asteriscos, guiones bajos)
-        texto = re.sub(r'[\*_~`#]', '', texto)
-        # Reemplazar saltos de línea múltiples por espacios simples
-        texto = re.sub(r'\s+', ' ', texto)
-        return texto.strip()
-
     def hablar(self, text: str, voice: str = None):
         """Genera y reproduce el audio asegurando la comunicación con el backend local."""
         texto_limpio = self._limpiar_texto_para_tts(text)
@@ -61,11 +51,9 @@ class ElevenLabsClient:
 
         print(f"📡 [OmniVoice Request] -> {self.url_api}")
         print(f"   Invocando clon exacto: voice_id='{voz_final}' ({self.voice_name_legible})")
-        print(f"   Texto limpio a procesar: \"{texto_limpio[:60]}...\"")
 
         payload = {
             "model": "tts-1",
-            "input": texto_limpio,
             "voice": voz_final,
             "response_format": "mp3"
         }

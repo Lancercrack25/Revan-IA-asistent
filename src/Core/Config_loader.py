@@ -3,7 +3,6 @@ import json
 
 def cargar_credenciales():
     ruta_actual = os.path.dirname(os.path.abspath(__file__))
-    
     # Buscamos el archivo subiendo dos carpetas (salimos de Core, luego de src) y entrando a config
     ruta_json = os.path.abspath(os.path.join(ruta_actual, "../../config/credentials.json"))
 
@@ -19,7 +18,6 @@ def cargar_credenciales():
         print('El archivo tiene un formato json dañado favor de arreglarlo')
         return None
     
-
 def cargar_ajustes():
     """NUEVA FUNCIÓN: Lee el archivo settings.json para saber tu nombre y la voz creada en eleven labs"""
     ruta_actual = os.path.dirname(os.path.abspath(__file__))
