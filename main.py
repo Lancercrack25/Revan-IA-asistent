@@ -3,7 +3,8 @@ import sys
 import time
 import threading
 import subprocess
-# Prevenir la generación de archivos .py
+
+# Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
@@ -17,13 +18,14 @@ from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_e
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
+
 # Intentar importar el cliente de Gemini (Google GenAI)
 try:
     import google.generativeai as genai
     HAS_GEMINI_LIB = True
 except ImportError:
     HAS_GEMINI_LIB = False
-    print(" Librería 'google-generativeai' no detectada. Ejecuta: pip install google-generativeai")
+    print("⚠️ Librería 'google-generativeai' no detectada. Ejecuta: pip install google-generativeai")
 
 # Clase de Soporte para Gemini API
 class GeminiClient:
@@ -46,9 +48,9 @@ class GeminiClient:
                 self.activo = True
                 print("✨ [GeminiClient]: Motor conversacional de Gemini inicializado con éxito.")
             except Exception as e:
-                print(f" Error al inicializar Gemini API: {e}")
+                print(f"❌ Error al inicializar Gemini API: {e}")
         else:
-            print(" GeminiClient desactivado (Falta API Key o librería).")
+            print("⚠️ GeminiClient desactivado (Falta API Key o librería).")
 
     def generar_respuesta(self, orden_usuario: str) -> str:
         if not self.activo:
@@ -57,7 +59,7 @@ class GeminiClient:
             response = self.chat.send_message(orden_usuario)
             return response.text.strip()
         except Exception as e:
-            print(f"Error en consulta con Gemini: {e}")
+            print(f"❌ Error en consulta con Gemini: {e}")
             return None
 
 # Instancias y Controles Globales
@@ -84,19 +86,19 @@ def hilo_servidor_web():
         servidor = iniciar_servidor_ui()
         servidor.run()
     except Exception as e:
-        print(f" Error en el servidor web de la esfera: {e}")
+        print(f"❌ Error en el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
     """Envía los estados de voz e IA al loop de la esfera 3D vía WebSocket."""
     try:
         transmitir_desde_hilo_externo(estado, color_hex)
     except Exception as e:
-        print(f"Error al sincronizar esfera: {e}")
+        print(f"❌ Error al sincronizar esfera: {e}")
 
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, gui
-    print("\n [REVAN]: Iniciando secuencia de desconexión...")
+    print("\n⚠️ [REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
     
     # Notificar y despedir por voz
@@ -124,7 +126,7 @@ def encender_sistemas():
     try:
         desplegar_monitores_windows()
     except Exception as e:
-        print(f" Aviso al desplegar monitores nativos: {e}")
+        print(f"⚠️ Aviso al desplegar monitores nativos: {e}")
 
     time.sleep(0.4) 
 
@@ -154,7 +156,7 @@ def encender_sistemas():
             )
             print("[3/3] Núcleo Web Desplegado (Esfera 3D).")
         except Exception as e:
-            print(f"Error al lanzar la interfaz web: {e}")
+            print(f"❌ Error al lanzar la interfaz web: {e}")
 
         # Vocalización de bienvenida
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
@@ -168,7 +170,7 @@ def encender_sistemas():
     except Exception as e:
         gui.actualizar_estado("ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
-        print(f" Error crítico al inicializar las APIs locales: {e}")
+        print(f"❌ Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
     """Bucle infinito de escucha fuera del hilo principal de la GUI."""
@@ -274,6 +276,10 @@ def procesar_ciclo_voz():
                     print("[Enrutador]: Gemini no disponible. Usando NIM como respaldo...")
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
 
+        # Validación de seguridad: Asegurar que no enviamos texto nulo o vacío al TTS local
+        if not respuesta_final or not respuesta_final.strip():
+            respuesta_final = f"No he recibido datos válidos del procesador táctico, {titulo}."
+
         # Actualización segura de Tkinter (Thread-safe)
         if gui and hasattr(gui, 'app'):
             gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
@@ -285,11 +291,11 @@ def procesar_ciclo_voz():
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
-        # 4.ESTADO: ESPERA / REPOSO (Azul Estándar)
+        # 4. ESTADO: ESPERA / REPOSO (Azul Estándar)
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:
-        print(f" Error en el bucle táctico de voz: {e}")
+        print(f"❌ Error en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
 def main():
@@ -299,7 +305,7 @@ def main():
     try:
         inicializar_base_datos()
     except Exception as e:
-        print(f" Alerta al desplegar base de datos: {e}")
+        print(f"⚠️ Alerta al desplegar base de datos: {e}")
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
@@ -318,7 +324,7 @@ def main():
                 print("¡Señal acústica validada! Inicializando REVAN...")
                 break
         except Exception as e:
-            print(f"Aviso en escaneo pasivo: {e}")
+            print(f"⚠️ Aviso en escaneo pasivo: {e}")
         time.sleep(0.1)
 
     print("Desplegando interfaz gráfica...")
@@ -333,6 +339,7 @@ def main():
     # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
-#aqui se ejecuta toda la logica 
+
+# Ejecución de la lógica de REVAN
 if __name__ == "__main__":
     main()

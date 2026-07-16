@@ -1,55 +1,71 @@
 import os
+import re
 import requests
 import pygame
 
 class ElevenLabsClient:
     def __init__(self):
-        # Puerto confirmado en su archivo settings.json y capturas de pantalla
         self.url_api = "http://127.0.0.1:3900/v1/audio/speech"
         self.url_voces = "http://127.0.0.1:3900/v1/audio/voices"
 
-        # Actualizado con el voice_id y el nombre que pasaste.
         self.voice_id = "0b6fd25d"
-        self.voice_name_legible = "Voice 06:13 PM — CLONE"  # solo para logs
+        self.voice_name_legible = "Voice 06:13 PM — CLONE"
 
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
     def _resolver_voice_id(self):
         try:
-            r = requests.get(self.url_voces, timeout=5)
+            # Reducimos timeout de verificación a 3 segundos para no ralentizar el inicio
+            r = requests.get(self.url_voces, timeout=3)
             if r.status_code != 200:
-                return self.voice_id  # no se pudo verificar, se usa el que hay
+                return self.voice_id
 
             voces = r.json().get("voices", [])
 
-            # ¿Sigue existiendo el voice_id actual?
             if any(v.get("voice_id") == self.voice_id for v in voces):
                 return self.voice_id
 
-            # Si no, buscar por nombre y avisar del cambio
             for v in voces:
                 if v.get("name") == self.voice_name_legible:
                     print(f"⚠️ [OmniVoice]: voice_id cambió de '{self.voice_id}' a '{v.get('voice_id')}', actualizando.")
                     self.voice_id = v.get("voice_id")
                     return self.voice_id
 
-            print(f"⚠️ [OmniVoice]: No se encontró '{self.voice_name_legible}' entre las voces disponibles. Usando el último ID conocido.")
+            print(f"⚠️ [OmniVoice]: No se encontró '{self.voice_name_legible}'. Usando el último ID conocido.")
             return self.voice_id
         except Exception as e:
             print(f"⚠️ [OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
             return self.voice_id
 
+    def _limpiar_texto_para_tts(self, texto: str) -> str:
+        """Elimina sintaxis de Markdown y caracteres que confunden al TTS local."""
+        if not texto:
+            return ""
+        # Eliminar negritas, cursivas (asteriscos, guiones bajos)
+        texto = re.sub(r'[\*_~`#]', '', texto)
+        # Reemplazar saltos de línea múltiples por espacios simples
+        texto = re.sub(r'\s+', ' ', texto)
+        return texto.strip()
+
     def hablar(self, text: str, voice: str = None):
         """Genera y reproduce el audio asegurando la comunicación con el backend local."""
+        texto_limpio = self._limpiar_texto_para_tts(text)
+        
+        # Evitar peticiones que rompan el motor local
+        if not texto_limpio:
+            print("⚠️ [OmniVoice]: Intento de vocalizar un texto vacío. Cancelado.")
+            return
+
         voz_final = voice if voice else self._resolver_voice_id()
 
         print(f"📡 [OmniVoice Request] -> {self.url_api}")
         print(f"   Invocando clon exacto: voice_id='{voz_final}' ({self.voice_name_legible})")
+        print(f"   Texto limpio a procesar: \"{texto_limpio[:60]}...\"")
 
         payload = {
             "model": "tts-1",
-            "input": text,
+            "input": texto_limpio,
             "voice": voz_final,
             "response_format": "mp3"
         }
@@ -57,7 +73,8 @@ class ElevenLabsClient:
         output_filename = "output.mp3"
 
         try:
-            respuesta = requests.post(self.url_api, json=payload, timeout=180, stream=True)
+            # Bajamos el timeout de lectura a 30 segundos (suficiente para generación local en GPU/CPU decente)
+            respuesta = requests.post(self.url_api, json=payload, timeout=(5, 30), stream=True)
 
             if respuesta.status_code == 200:
                 with open(output_filename, "wb") as f:
@@ -73,11 +90,17 @@ class ElevenLabsClient:
 
                 pygame.mixer.music.unload()
                 if os.path.exists(output_filename):
-                    os.remove(output_filename)
+                    try:
+                        os.remove(output_filename)
+                    except Exception as e:
+                        print(f"⚠️ No se pudo eliminar el archivo temporal: {e}")
             else:
                 print(f"❌ Error del servidor local (Código {respuesta.status_code}).")
                 print(f"   Detalles devueltos por OmniVoice: {respuesta.text}")
 
+        except requests.exceptions.Timeout:
+            print("❌ [OmniVoice]: Error de Timeout. El servidor local tardó demasiado en responder.")
+            print("👉 Consejo: Asegúrate de que el backend de OmniVoice está usando aceleración por hardware (CUDA/MPS) y no CPU pura.")
         except Exception as e:
             print(f"❌ Error crítico de comunicación: {str(e)}")
 
