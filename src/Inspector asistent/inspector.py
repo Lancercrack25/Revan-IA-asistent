@@ -1,29 +1,223 @@
 #este sera el asistente que inspeccionara el proyecto y analizara los errores que hay en el mismo para asi poder dar un diagnostico de los mismos y poder corregirlos de manera eficiente y rapida
 import os
 import sys
+import ast
 
 sys.dont_write_bytecode = True
+try:
+    from pyflakes.api import check as pyflakes_check
+    from pyflakes.reporter import Reporter
+    HAS_PYFLAKES = True
+except ImportError:
+    HAS_PYFLAKES = False
 
-def inspeccionar_proyecto():
-    ruta_actual = os.path.dirname(os.path.abspath(__file__))
-    ruta_proyecto = os.path.abspath(os.path.join(ruta_actual, "../.."))  # Subimos dos niveles para llegar a la raíz del proyecto
+# Carpetas que se ignoran siempre en la inspección (no son código propio del proyecto)
+CARPETAS_IGNORADAS = {
+    ".git", "__pycache__", "venv", ".venv", "env",
+    "node_modules", "site-packages", "test", "tests",
+}
 
-    errores = []
 
+def _listar_archivos_py(ruta_proyecto):
     for root, dirs, files in os.walk(ruta_proyecto):
+        dirs[:] = [d for d in dirs if d not in CARPETAS_IGNORADAS]
         for file in files:
             if file.endswith(".py"):
-                ruta_archivo = os.path.join(root, file)
-                try:
-                    with open(ruta_archivo, "r", encoding="utf-8") as f:
-                        contenido = f.read()
-                        # Aquí podrías agregar análisis más complejos, como buscar patrones de errores comunes
-                except Exception as e:
-                    errores.append(f"Error al leer {ruta_archivo}: {str(e)}")
+                yield os.path.join(root, file)
 
-    if errores:
-        print("Se encontraron los siguientes errores durante la inspección del proyecto:")
-        for error in errores:
-            print(error)
-    else:
-        print("No se encontraron errores durante la inspección del proyecto.")
+
+def _revisar_sintaxis(ruta_archivo, contenido):
+    """Detecta errores de sintaxis (el proyecto ni siquiera podría arrancar con esto)."""
+    try:
+        ast.parse(contenido, filename=ruta_archivo)
+        return None
+    except SyntaxError as e:
+        return f"SINTAXIS: línea {e.lineno}: {e.msg}"
+
+
+def _revisar_pyflakes(ruta_archivo):
+    """
+    Detecta con pyflakes: nombres redefinidos (ej. una clase declarada dos
+    veces en el mismo archivo, como el bug de GeminiClient duplicado que
+    encontramos en main.py), imports sin usar, nombres usados pero nunca
+    definidos, y variables no usadas.
+    """
+    if not HAS_PYFLAKES:
+        return []
+
+    class _CapturaReporter(Reporter):
+        def __init__(self):
+            self.mensajes = []
+        def flake(self, message):
+            self.mensajes.append(str(message))
+        def syntaxError(self, filename, msg, lineno, offset, text):
+            pass  # ya lo capturamos aparte con ast.parse
+        def unexpectedError(self, filename, msg):
+            self.mensajes.append(f"pyflakes error interno: {msg}")
+
+    reporter = _CapturaReporter()
+    with open(ruta_archivo, "r", encoding="utf-8", errors="replace") as f:
+        codigo = f.read()
+    pyflakes_check(codigo, ruta_archivo, reporter)
+    return reporter.mensajes
+
+
+def _extraer_nombres_definidos(ruta_archivo):
+    """
+    Devuelve el conjunto de nombres definidos a nivel de módulo en un
+    archivo .py: clases, funciones, y variables asignadas directamente.
+    Se usa para verificar si un 'from src.X.Y import NOMBRE' realmente
+    existe en el archivo de destino.
+    """
+    try:
+        with open(ruta_archivo, "r", encoding="utf-8", errors="replace") as f:
+            arbol = ast.parse(f.read(), filename=ruta_archivo)
+    except SyntaxError:
+        return None  # el propio archivo ya tiene error de sintaxis, se reporta aparte
+
+    nombres = set()
+    for nodo in arbol.body:
+        if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            nombres.add(nodo.name)
+        elif isinstance(nodo, ast.Assign):
+            for target in nodo.targets:
+                if isinstance(target, ast.Name):
+                    nombres.add(target.id)
+        elif isinstance(nodo, ast.ImportFrom) or isinstance(nodo, ast.Import):
+            # Re-exportados: si el archivo importa algo y otro archivo lo
+            # vuelve a importar de aquí, también cuenta como "existe".
+            for alias in nodo.names:
+                nombres.add(alias.asname or alias.name)
+    return nombres
+
+
+def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
+    """
+    Para cada 'from src.X.Y import A, B' revisa que el archivo src/X/Y.py
+    exista de verdad y que A y B estén definidos ahí. Esto es justo el tipo
+    de bug que hemos estado cazando toda la sesión: imports que apuntan a
+    algo que ya no existe, se renombró, o quedó pisado por una redefinición.
+    """
+    problemas = []
+    try:
+        arbol = ast.parse(contenido, filename=ruta_archivo)
+    except SyntaxError:
+        return problemas  # ya se reporta en _revisar_sintaxis
+
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.ImportFrom) and nodo.module and nodo.module.startswith("src."):
+            ruta_modulo = os.path.join(ruta_proyecto, *nodo.module.split(".")) + ".py"
+
+            if not os.path.exists(ruta_modulo):
+                problemas.append(
+                    f"IMPORT ROTO: 'from {nodo.module} import ...' -> "
+                    f"no existe el archivo {os.path.relpath(ruta_modulo, ruta_proyecto)}"
+                )
+                continue
+
+            nombres_definidos = _extraer_nombres_definidos(ruta_modulo)
+            if nombres_definidos is None:
+                continue  # el módulo destino ya tiene su propio error de sintaxis reportado
+
+            for alias in nodo.names:
+                nombre_buscado = alias.name
+                if nombre_buscado != "*" and nombre_buscado not in nombres_definidos:
+                    problemas.append(
+                        f"IMPORT ROTO: 'from {nodo.module} import {nombre_buscado}' -> "
+                        f"'{nombre_buscado}' no está definido en {os.path.relpath(ruta_modulo, ruta_proyecto)}"
+                    )
+
+    return problemas
+
+
+def inspeccionar_proyecto(ruta_proyecto: str = None, verboso: bool = True) -> dict:
+    """
+    Inspecciona todos los .py del proyecto y devuelve un resumen con:
+      - archivos_revisados
+      - errores_sintaxis: [(archivo, mensaje)]
+      - imports_rotos: [(archivo, mensaje)]
+      - avisos_pyflakes: [(archivo, mensaje)]
+    """
+    if ruta_proyecto is None:
+        ruta_actual = os.path.dirname(os.path.abspath(__file__))
+        ruta_proyecto = os.path.abspath(os.path.join(ruta_actual, "..", ".."))
+
+    resultado = {
+        "archivos_revisados": 0,
+        "errores_sintaxis": [],
+        "imports_rotos": [],
+        "avisos_pyflakes": [],
+        "errores_lectura": [],
+    }
+
+    for ruta_archivo in _listar_archivos_py(ruta_proyecto):
+        resultado["archivos_revisados"] += 1
+        rel = os.path.relpath(ruta_archivo, ruta_proyecto)
+
+        try:
+            with open(ruta_archivo, "r", encoding="utf-8") as f:
+                contenido = f.read()
+        except Exception as e:
+            resultado["errores_lectura"].append((rel, str(e)))
+            continue
+
+        err_sintaxis = _revisar_sintaxis(ruta_archivo, contenido)
+        if err_sintaxis:
+            resultado["errores_sintaxis"].append((rel, err_sintaxis))
+            continue  # si hay error de sintaxis, no tiene caso seguir analizando este archivo
+
+        for problema in _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
+            resultado["imports_rotos"].append((rel, problema))
+
+        for aviso in _revisar_pyflakes(ruta_archivo):
+            resultado["avisos_pyflakes"].append((rel, aviso))
+
+    if verboso:
+        _imprimir_reporte(resultado)
+
+    return resultado
+
+
+def _imprimir_reporte(resultado: dict):
+    print(f"\n{'='*60}")
+    print(f"[Inspector]: {resultado['archivos_revisados']} archivos .py revisados")
+    print(f"{'='*60}")
+
+    total_problemas = (
+        len(resultado["errores_sintaxis"])
+        + len(resultado["imports_rotos"])
+        + len(resultado["avisos_pyflakes"])
+        + len(resultado["errores_lectura"])
+    )
+
+    if total_problemas == 0:
+        print("[Inspector]: No se encontraron problemas. Proyecto limpio.")
+        return
+
+    if resultado["errores_sintaxis"]:
+        print(f"\n🔴 ERRORES DE SINTAXIS ({len(resultado['errores_sintaxis'])}) — el proyecto NO puede arrancar con esto:")
+        for archivo, msg in resultado["errores_sintaxis"]:
+            print(f"   {archivo}: {msg}")
+
+    if resultado["imports_rotos"]:
+        print(f"\n🟠 IMPORTS ROTOS ({len(resultado['imports_rotos'])}) — van a tronar en cuanto se ejecuten:")
+        for archivo, msg in resultado["imports_rotos"]:
+            print(f"   {archivo}: {msg}")
+
+    if resultado["avisos_pyflakes"]:
+        print(f"\n🟡 AVISOS ({len(resultado['avisos_pyflakes'])}) — redefiniciones, imports sin usar, nombres indefinidos:")
+        for archivo, msg in resultado["avisos_pyflakes"]:
+            print(f"   {archivo}: {msg}")
+
+    if resultado["errores_lectura"]:
+        print(f"\n⚪ ARCHIVOS QUE NO SE PUDIERON LEER ({len(resultado['errores_lectura'])}):")
+        for archivo, msg in resultado["errores_lectura"]:
+            print(f"   {archivo}: {msg}")
+
+    print(f"\n{'='*60}")
+    print(f"[Inspector]: Total: {total_problemas} problema(s) encontrado(s).")
+    print(f"{'='*60}\n")
+
+
+if __name__ == "__main__":
+    inspeccionar_proyecto()
