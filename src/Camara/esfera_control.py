@@ -1,0 +1,1 @@
+#este archivo s eencargara de darle el funcionamineto de poder manipular la esfera del asistente con solo la vision de la camara
