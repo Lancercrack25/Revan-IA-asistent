@@ -14,14 +14,6 @@ class ElevenLabsClient:
             pygame.mixer.init()
 
     def _limpiar_texto_para_tts(self, texto: str) -> str:
-        """
-        Limpieza MÍNIMA antes de mandar el texto a OmniVoice: solo colapsa
-        espacios/saltos de línea de más y quita espacios al inicio/final.
-        No borra letras, signos de puntuación ni acentos, para no terminar
-        vaciando el texto por accidente (eso fue lo que pasaba con la
-        versión anterior, que a veces devolvía "" y hacía que 'hablar()'
-        cancelara en silencio en vez de sonar).
-        """
         if not texto:
             return ""
         return re.sub(r'\s+', ' ', texto).strip()
@@ -61,9 +53,8 @@ class ElevenLabsClient:
 
         voz_final = voice if voice else self._resolver_voice_id()
 
-        print(f"📡 [OmniVoice Request] -> {self.url_api}")
-        print(f"   Invocando clon exacto: voice_id='{voz_final}' ({self.voice_name_legible})")
-        print(f"   Texto a procesar: \"{texto_limpio[:60]}{'...' if len(texto_limpio) > 60 else ''}\"")
+        print(f"[OmniVoice Request] -> {self.url_api}")
+        print(f"Invocando clon exacto: voice_id='{voz_final}' ({self.voice_name_legible})")
 
         payload = {
             "model": "tts-1",

@@ -226,10 +226,10 @@ def procesar_ciclo_voz():
             es_comando_accion = any(palabra in orden_limpia for palabra in PALABRAS_CLAVE_ACCION)
 
             if es_comando_accion:
-                print("[Enrutador]: Orden táctica detectada -> Derivando a NVIDIA NIM (acciones)")
+                print("[Enrutador]: Orden táctica detectada")
                 respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
             else:
-                print("[Enrutador]: Conversación/Conocimiento detectado -> Derivando a GEMINI API")
+                print("[Enrutador]: Conversación/Conocimiento detectado")
                 respuesta_final = gemini_ia.generar_respuesta(orden_limpia) if gemini_ia else None
 
                 # Fallback de seguridad: Si Gemini no está configurado o falla, responde NIM
@@ -295,8 +295,7 @@ def main():
         gui.mostrar_panel()
     except AttributeError:
         if hasattr(gui, 'app'):
-            gui.app.deiconify()
-            
+            gui.app.deiconify()  
     # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()

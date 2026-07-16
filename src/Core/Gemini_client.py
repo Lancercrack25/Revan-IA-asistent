@@ -5,18 +5,18 @@ from src.Core.Config_loader import cargar_credenciales, cargar_ajustes
 
 class GeminiClient:
     def __init__(self):
-        # 1. Cargar credenciales y ajustes (Corregido aquí también)
+        #Cargar credenciales y ajustes
         credenciales = cargar_credenciales()
         ajustes = cargar_ajustes()
         # Soportamos tanto tu cargador como las variables de entorno normales
         api_key = credenciales.get("GEMINI_API_KEY") if credenciales else os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("No se encontró la GEMINI_API_KEY en las credenciales.")
-            
+
         # Inicializamos el nuevo cliente oficial de Google
         self.client = genai.Client(api_key=api_key)
-        # 2. Obtener y guardar el título del usuario
-        self.titulo = ajustes.get("USER_NAME") if ajustes else "Maestro"
+        self.titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
+
         # 3. Personalidad y contexto de REVAN
         instruccion_sistema = (
             f"Eres REVAN, un asistente advanced como Jarvis de las películas de Iron Man, pero con más personalidad. "
@@ -28,11 +28,13 @@ class GeminiClient:
             f"Si te preguntan sobre cualquier tema respinde con total seinceridad y sin rodeos, incluso si es un tema delicado o incómodo. "
             f"Devuelve respuestas que sean útiles, informativas y que aporten valor al usuario. "
         )
+
         # 4. Configurar el chat con la instrucción de sistema integrada en el SDK moderno
         config = types.GenerateContentConfig(
             system_instruction=instruccion_sistema
         )
-        #Iniciamos el chat con memoria usando el modelo nativo rápido
+
+        # 5. Iniciamos el chat con memoria usando el modelo nativo rápido
         print("[REVAN]: Memoria e historial de conversación activados (SDK Moderno).")
         self.chat = self.client.chats.create(
             model="gemini-2.5-flash",
