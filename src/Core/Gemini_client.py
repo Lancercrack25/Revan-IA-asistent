@@ -16,7 +16,7 @@ class GeminiClient:
         # Inicializamos el nuevo cliente oficial de Google
         self.client = genai.Client(api_key=api_key)
         # 2. Obtener y guardar el título del usuario
-        self.titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
+        self.titulo = ajustes.get("USER_NAME") if ajustes else "Maestro"
         # 3. Personalidad y contexto de REVAN
         instruccion_sistema = (
             f"Eres REVAN, un asistente advanced como Jarvis de las películas de Iron Man, pero con más personalidad. "
@@ -26,7 +26,7 @@ class GeminiClient:
             f"no suenes aburrido ni satures el audio. Sé directo, estratégico y leal."
             f"CRÍTICO: Responde SIEMPRE en español, sin importar si el usuario te habla en otro idioma o si recibes texto ruidoso."
             f"Si te preguntan sobre cualquier tema respinde con total seinceridad y sin rodeos, incluso si es un tema delicado o incómodo. "
-            f"Devuelve respuestas que sean útiles, informativas y que fomenten la acción."
+            f"Devuelve respuestas que sean útiles, informativas y que aporten valor al usuario. "
         )
         # 4. Configurar el chat con la instrucción de sistema integrada en el SDK moderno
         config = types.GenerateContentConfig(

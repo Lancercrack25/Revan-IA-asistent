@@ -17,7 +17,6 @@ from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_e
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
-
 # Intentar importar el cliente de Gemini (Google GenAI)
 try:
     import google.generativeai as genai

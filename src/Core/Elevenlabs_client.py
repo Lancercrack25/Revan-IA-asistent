@@ -8,25 +8,14 @@ class ElevenLabsClient:
         self.url_api = "http://127.0.0.1:3900/v1/audio/speech"
         self.url_voces = "http://127.0.0.1:3900/v1/audio/voices"
 
-        # ANTES: se mandaba el nombre visible ("Voice 10:25 PM — CLONE"), que
-        # es solo la etiqueta de la UI. El servidor espera el voice_id interno
-        # del perfil clonado, y al no encontrar match caía en silencio a una
-        # voz genérica (sin error) en vez de usar el clon real.
-        # Confirmado vía GET /v1/audio/voices:
-        #   {"voice_id": "4822983d", "name": "Voice 10:25 PM — CLONE", ...}
-        self.voice_id = "4822983d"
-        self.voice_name_legible = "Voice 10:25 PM — CLONE"  # solo para logs
+        # Actualizado con el voice_id y el nombre que pasaste.
+        self.voice_id = "0b6fd25d"
+        self.voice_name_legible = "Voice 06:13 PM — CLONE"  # solo para logs
 
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
     def _resolver_voice_id(self):
-        """
-        Verifica que self.voice_id siga existiendo en el servidor. Si el ID
-        cambió (por ejemplo, borraste y volviste a clonar la voz), se busca
-        de nuevo por nombre y se actualiza automáticamente en vez de fallar
-        en silencio otra vez.
-        """
         try:
             r = requests.get(self.url_voces, timeout=5)
             if r.status_code != 200:
