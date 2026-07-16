@@ -7,12 +7,24 @@ class ElevenLabsClient:
     def __init__(self):
         self.url_api = "http://127.0.0.1:3900/v1/audio/speech"
         self.url_voces = "http://127.0.0.1:3900/v1/audio/voices"
-
         self.voice_id = "0b6fd25d"
         self.voice_name_legible = "Voice 06:13 PM — CLONE"
 
         if not pygame.mixer.get_init():
             pygame.mixer.init()
+
+    def _limpiar_texto_para_tts(self, texto: str) -> str:
+        """
+        Limpieza MÍNIMA antes de mandar el texto a OmniVoice: solo colapsa
+        espacios/saltos de línea de más y quita espacios al inicio/final.
+        No borra letras, signos de puntuación ni acentos, para no terminar
+        vaciando el texto por accidente (eso fue lo que pasaba con la
+        versión anterior, que a veces devolvía "" y hacía que 'hablar()'
+        cancelara en silencio en vez de sonar).
+        """
+        if not texto:
+            return ""
+        return re.sub(r'\s+', ' ', texto).strip()
 
     def _resolver_voice_id(self):
         try:
@@ -41,7 +53,7 @@ class ElevenLabsClient:
     def hablar(self, text: str, voice: str = None):
         """Genera y reproduce el audio asegurando la comunicación con el backend local."""
         texto_limpio = self._limpiar_texto_para_tts(text)
-        
+
         # Evitar peticiones que rompan el motor local
         if not texto_limpio:
             print(" [OmniVoice]: Intento de vocalizar un texto vacío. Cancelado.")
@@ -51,9 +63,11 @@ class ElevenLabsClient:
 
         print(f"📡 [OmniVoice Request] -> {self.url_api}")
         print(f"   Invocando clon exacto: voice_id='{voz_final}' ({self.voice_name_legible})")
+        print(f"   Texto a procesar: \"{texto_limpio[:60]}{'...' if len(texto_limpio) > 60 else ''}\"")
 
         payload = {
             "model": "tts-1",
+            "input": texto_limpio,     # <-- FALTABA: sin esto nunca se mandaba el texto a sintetizar
             "voice": voz_final,
             "response_format": "mp3"
         }
@@ -61,8 +75,8 @@ class ElevenLabsClient:
         output_filename = "output.mp3"
 
         try:
-            # Bajamos el timeout de lectura a 30 segundos (suficiente para generación local en GPU/CPU decente)
-            respuesta = requests.post(self.url_api, json=payload, timeout=(5, 30), stream=True)
+            # Timeout de lectura amplio para dar tiempo a la síntesis local
+            respuesta = requests.post(self.url_api, json=payload, timeout=(5, 180), stream=True)
 
             if respuesta.status_code == 200:
                 with open(output_filename, "wb") as f:

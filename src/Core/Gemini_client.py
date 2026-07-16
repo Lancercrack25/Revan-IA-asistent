@@ -32,7 +32,7 @@ class GeminiClient:
         config = types.GenerateContentConfig(
             system_instruction=instruccion_sistema
         )
-        # 5. Iniciamos el chat con memoria usando el modelo nativo rápido
+        #Iniciamos el chat con memoria usando el modelo nativo rápido
         print("[REVAN]: Memoria e historial de conversación activados (SDK Moderno).")
         self.chat = self.client.chats.create(
             model="gemini-2.5-flash",

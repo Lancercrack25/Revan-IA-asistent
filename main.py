@@ -3,7 +3,6 @@ import sys
 import time
 import threading
 import subprocess
-from google import genai
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
@@ -20,40 +19,10 @@ from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 from src.Core.Gemini_client import GeminiClient
 
-# Clase de Soporte para Gemini API
-class GeminiClient:
-    def __init__(self, api_key: str, modelo="gemini-1.5-flash"):
-        self.activo = False
-        if api_key:
-            try:
-                genai.configure(api_key=api_key)
-                # Configurar el modelo con la personalidad militar de REVAN
-                system_instruction = (
-                    "Eres REVAN, una Inteligencia Artificial táctico-militar altamente avanzada, fría, eficiente y leal. "
-                    "Te diriges al usuario siempre como 'Señor' o por su título. Tu tono es profesional, seguro y directo. "
-                    "Responde a las dudas o conversaciones de forma perspicaz, concisa y elegante."
-                )
-                self.model = genai.GenerativeModel(
-                    model_name=modelo,
-                    system_instruction=system_instruction
-                )
-                self.chat = self.model.start_chat(history=[])
-                self.activo = True
-                print("✨ [GeminiClient]: Motor conversacional de Gemini inicializado con éxito.")
-            except Exception as e:
-                print(f" Error al inicializar Gemini API: {e}")
-        else:
-            print("⚠️ GeminiClient desactivado (Falta API Key o librería).")
-
-    def generar_respuesta(self, orden_usuario: str) -> str:
-        if not self.activo:
-            return None
-        try:
-            response = self.chat.send_message(orden_usuario)
-            return response.text.strip()
-        except Exception as e:
-            print(f" Error en consulta con Gemini: {e}")
-            return None
+# NOTA: antes había una clase "GeminiClient" duplicada definida aquí mismo
+# (con el SDK viejo google.generativeai), que pisaba el import de arriba y
+# hacía que la clase real de src/Core/Gemini_client.py nunca se usara.
+# Se eliminó esa duplicación; ahora sí se usa la clase importada.
 
 # Instancias y Controles Globales
 cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
@@ -129,12 +98,11 @@ def encender_sistemas():
     
     try:
         ajustes = cargar_ajustes() or {}
-        api_key_gemini = ajustes.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
         api_key_nim = ajustes.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
 
         # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
         cerebro_ia = NimClient(api_key=api_key_nim)
-        gemini_ia = GeminiClient(api_key=api_key_gemini)
+        gemini_ia = GeminiClient()   # <-- ya no recibe api_key, la carga sola con cargar_credenciales()
         voz_ia = ElevenLabsClient()
 
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
@@ -336,4 +304,3 @@ def main():
 # Ejecución de la lógica de REVAN
 if __name__ == "__main__":
     main()
-#favor de modificar el elevenlabs,config loader y el main.py para que funcione lo de la voz y la api key de gemini
