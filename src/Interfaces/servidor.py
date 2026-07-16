@@ -16,7 +16,7 @@ loop_real_servidor = None
 async def lifespan(app_fastapi: FastAPI):
     global loop_real_servidor
     loop_real_servidor = asyncio.get_running_loop()
-    print("🌐 [Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
+    print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
     yield
 
 
@@ -60,7 +60,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     conexiones_activas.add(websocket)
-    print("🔵 [WebSocket]: Esfera 3D vinculada al canal de control.")
+    print("[WebSocket]: Esfera 3D vinculada al canal de control.")
 
     try:
         while True:
@@ -69,7 +69,7 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
     finally:
         conexiones_activas.discard(websocket)
-        print("⚪ [WebSocket]: Esfera 3D desconectada.")
+        print(" [WebSocket]: Esfera 3D desconectada.")
 
 
 async def cambiar_estado_esfera(estado: str, color_hex: str):
@@ -108,7 +108,7 @@ def transmitir_desde_hilo_externo(estado: str, color_hex: str):
         )
     else:
         print(
-            f"⚠️ [WebSocket Warn]: Se intentó enviar '{estado}' antes de que el servidor FastAPI estuviera listo."
+            f"[WebSocket Warn]: Se intentó enviar '{estado}' antes de que el servidor FastAPI estuviera listo."
         )
 
 

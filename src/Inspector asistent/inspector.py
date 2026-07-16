@@ -47,3 +47,5 @@ def inspeccionar_proyecto():
         informe_errores += "\nNo se encontraron errores de importación.\n"
 
     return informe_errores
+
+informe = inspeccionar_proyecto()

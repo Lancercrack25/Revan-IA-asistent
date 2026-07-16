@@ -32,18 +32,7 @@ def _porcentaje_cambio(frame_a, frame_b) -> float:
     return (pixeles_cambiados / total_pixeles) * 100
 
 
-def _bucle_vigilancia(voz_ia, sincronizar_estado_esfera=None,
-                       intervalo_seg=1.5, sensibilidad_pct=8.0, cooldown_seg=10.0):
-    """
-    Mantiene la cámara ABIERTA durante toda la vigilancia (no la abre y
-    cierra en cada chequeo, eso sería lento e innecesario). Cada
-    `intervalo_seg` compara el frame actual contra el último frame de
-    referencia; si el cambio supera `sensibilidad_pct`, dispara el análisis
-    real con LLaVA (el único paso que sí cuesta tiempo/recursos) y habla
-    el resultado. Después de analizar, espera `cooldown_seg` antes de poder
-    volver a disparar, para no quedarse repitiendo si el cambio persiste
-    (por ejemplo, alguien se queda parado frente a la cámara).
-    """
+def _bucle_vigilancia(voz_ia, sincronizar_estado_esfera=None,intervalo_seg=1.5, sensibilidad_pct=8.0, cooldown_seg=10.0):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
         print("[Vigilancia]: No se pudo abrir la cámara para iniciar la vigilancia.")

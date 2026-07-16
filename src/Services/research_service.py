@@ -6,13 +6,8 @@ from bs4 import BeautifulSoup
 sys.dont_write_bytecode = True
 
 def buscar_y_resumir_tema(termino_busqueda: str):
-    """
-    Realiza una consulta rápida en la web, extrae el contenido de texto 
-    esencial y prepara los datos para que Ollama los sintetice.
-    """
     if not termino_busqueda.strip():
         return "No se especificó ningún término de investigación, Señor."
-
     print(f"[Research Service]: Buscando información sobre '{termino_busqueda}'...")
     
     # Usamos un motor de búsqueda libre como Wikipedia o DuckDuckGo HTML para no requerir API Keys pagadas
