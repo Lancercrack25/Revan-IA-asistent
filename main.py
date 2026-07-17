@@ -56,7 +56,7 @@ def sincronizar_estado_esfera(estado, color_hex):
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, gui
-    print("\n[REVAN]: Iniciando secuencia de desconexión...")
+    print("\n[REVAN]: Iniciando  desconexión...")
     sistema_activo = False
 
     # Apagar cualquier módulo de cámara que haya quedado activo, para no
@@ -87,7 +87,7 @@ def encender_sistemas():
     sistema_activo = True
 
     print("Inicializando secuencia de despliegue cronológico...")
-    print("🪟 [1/3] Desplegando monitores nativos...")
+    print("[1/3] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
@@ -327,6 +327,6 @@ def main():
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
-# Ejecución de la lógica de REVAN
+
 if __name__ == "__main__":
     main()

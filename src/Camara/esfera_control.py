@@ -100,6 +100,5 @@ def detener_control_esfera() -> bool:
     _hilo_control.join(timeout=5)
     return True
 
-
 def control_esfera_activo() -> bool:
     return bool(_hilo_control and _hilo_control.is_alive())

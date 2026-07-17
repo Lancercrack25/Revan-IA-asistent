@@ -31,7 +31,7 @@ function inicializarEsfera() {
         posOriginales: geometriaEsfera.attributes.position.clone()
     };
 
-    // 🎯 MEJORADO: Vinculamos el color inicial directamente a la referencia dinámica
+    // MEJORADO: Vinculamos el color inicial directamente a la referencia dinámica
     const matLineas = new THREE.MeshBasicMaterial({
         color: colorObjetivo, 
         wireframe: true,
@@ -110,7 +110,7 @@ function conectarServidorCore() {
         // llega un paquete viejo sin el campo, sigue funcionando igual)
         estadoActual = comando.estado;
         
-        // 🎯 FIX: Normalizamos el nombre del estado (Acepta tanto PENSANDO como PROCESANDO)
+        // FIX: Normalizamos el nombre del estado (Acepta tanto PENSANDO como PROCESANDO)
         if (estadoActual === "ESCUCHANDO") {
             colorObjetivo.set(comando.color || "#00ffcc"); // Cian / Azul claro
             velocidadGiro = 0.015;
