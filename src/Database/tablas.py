@@ -100,3 +100,4 @@ def crear_tablas_si_no_existen(conn):
     finally:
         if conn:
             conn.close()
+#quitar lo de pgvector
