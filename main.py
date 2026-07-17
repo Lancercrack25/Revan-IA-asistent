@@ -20,21 +20,22 @@ from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigil
 from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
 from src.Core.Gemini_client import GeminiClient
 
-cerebro_ia = None     
-gemini_ia = None      
+# Instancias y Controles Globales
+cerebro_ia = None     #  api key de NimClient (Acciones del sistema, vía NVIDIA NIM)
+gemini_ia = None      #  la api key  de Gemini  (Conversación)
 voz_ia = None
 oidos_ia = None
 gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
+TIEMPO_ATENCION = 21 
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego","monitores", "camara",
+    "juego", "jugar", "monitores", "camara","mira"
 ]
 
 def hilo_servidor_web():
@@ -204,11 +205,19 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
-        palabras_iniciar_control_esfera = ["controla la esfera", "manipula la esfera", "controla la esfera con la mano"]
-        palabras_detener_control_esfera = ["deja de controlar la esfera", "detén el control de la esfera", "suelta la esfera"]
+        raices_control = ["control", "manipul", "mueve", "mover"]
+        palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
 
-        if any(cmd in orden_limpia for cmd in palabras_iniciar_control_esfera):
+        if "esfera" in orden_limpia and any(p in orden_limpia for p in palabras_detener_intent):
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            if detener_control_esfera():
+                voz_ia.hablar("Control de esfera desactivado.")
+            else:
+                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if "esfera" in orden_limpia and any(r in orden_limpia for r in raices_control):
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if vigilancia_activa():
                 # La cámara solo la puede tener un módulo a la vez
@@ -217,15 +226,6 @@ def procesar_ciclo_voz():
                 voz_ia.hablar(f"Control de esfera por mano activado, {titulo}.")
             else:
                 voz_ia.hablar("El control de esfera ya estaba activo, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if any(cmd in orden_limpia for cmd in palabras_detener_control_esfera):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            if detener_control_esfera():
-                voz_ia.hablar("Control de esfera desactivado.")
-            else:
-                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
