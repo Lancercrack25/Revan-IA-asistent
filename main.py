@@ -16,18 +16,12 @@ from src.Automation.System_commands import desplegar_monitores_windows
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
-from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia
-from src.Camara.esfera_control import _bucle_control_esfera
+from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
+from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
 from src.Core.Gemini_client import GeminiClient
 
-# NOTA: antes había una clase "GeminiClient" duplicada definida aquí mismo
-# (con el SDK viejo google.generativeai), que pisaba el import de arriba y
-# hacía que la clase real de src/Core/Gemini_client.py nunca se usara.
-# Se eliminó esa duplicación; ahora sí se usa la clase importada.
-
-# Instancias y Controles Globales
-cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
-gemini_ia = None      # Gemini (Conversación)
+cerebro_ia = None     
+gemini_ia = None      
 voz_ia = None
 oidos_ia = None
 gui = None
@@ -40,7 +34,7 @@ TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego", "jugar", "monitores", "camara","mira"
+    "juego","monitores", "camara",
 ]
 
 def hilo_servidor_web():
@@ -63,6 +57,13 @@ def apagar_sistema():
     global sistema_activo, gui
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
+
+    # Apagar cualquier módulo de cámara que haya quedado activo, para no
+    # dejar el dispositivo "tomado" después de cerrar REVAN.
+    if vigilancia_activa():
+        detener_vigilancia()
+    if control_esfera_activo():
+        detener_control_esfera()
     
     # Notificar y despedir por voz
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
@@ -103,7 +104,7 @@ def encender_sistemas():
 
         # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
         cerebro_ia = NimClient(api_key=api_key_nim)
-        gemini_ia = GeminiClient()   # <-- ya no recibe api_key, la carga sola con cargar_credenciales()
+        gemini_ia = GeminiClient()   # ya no recibe api_key, la carga sola con cargar_credenciales()
         voz_ia = ElevenLabsClient()
 
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
@@ -200,6 +201,31 @@ def procesar_ciclo_voz():
                 voz_ia.hablar("Vigilancia de cámara desactivada.")
             else:
                 voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
+        palabras_iniciar_control_esfera = ["controla la esfera", "manipula la esfera", "controla la esfera con la mano"]
+        palabras_detener_control_esfera = ["deja de controlar la esfera", "detén el control de la esfera", "suelta la esfera"]
+
+        if any(cmd in orden_limpia for cmd in palabras_iniciar_control_esfera):
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            if vigilancia_activa():
+                # La cámara solo la puede tener un módulo a la vez
+                voz_ia.hablar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
+            elif iniciar_control_esfera():
+                voz_ia.hablar(f"Control de esfera por mano activado, {titulo}.")
+            else:
+                voz_ia.hablar("El control de esfera ya estaba activo, Señor.")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if any(cmd in orden_limpia for cmd in palabras_detener_control_esfera):
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            if detener_control_esfera():
+                voz_ia.hablar("Control de esfera desactivado.")
+            else:
+                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
