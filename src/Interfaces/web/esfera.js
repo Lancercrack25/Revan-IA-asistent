@@ -5,6 +5,20 @@ let velocidadGiro = 0.005;
 let deltaTiempo = 0;
 let amplitudOnda = 0.03;
 
+// ─── NUEVO: estado de manipulación por mano ────────────────────────────────
+// rotXObjetivo/rotYObjetivo/escalaObjetivo son los valores que manda
+// control_esfera_manos.py. manoActiva se pone en true cuando llega un
+// paquete de manipulación, y se apaga sola si no llega ninguno en
+// TIMEOUT_MANO_MS (o sea, si quitas la mano de la cámara, la esfera vuelve
+// a girar sola en vez de quedarse congelada en la última posición).
+let manoActiva = false;
+let rotXObjetivo = 0;
+let rotYObjetivo = 0;
+let escalaObjetivo = 1.0;
+let ultimaManipulacionTs = 0;
+const TIMEOUT_MANO_MS = 500;
+const SUAVIZADO_MANO = 0.15; // 0 = no se mueve, 1 = salto instantáneo sin suavizar
+
 function inicializarEsfera() {
     const contenedor = document.getElementById('canvas-container');
     
@@ -89,6 +103,22 @@ function conectarServidorCore() {
 
     socket.onmessage = function(evento) {
         const comando = JSON.parse(evento.data);
+
+        // ─── NUEVO: distinguir paquete de manipulación por mano ───────────
+        // Antes, CUALQUIER paquete pisaba estadoActual directo. Si no se
+        // filtra aquí, cada paquete de manipulación (sin campo .estado)
+        // resetearía la esfera al color de "ESPERA" 20 veces por segundo.
+        if (comando.tipo === "manipulacion") {
+            rotXObjetivo = comando.rotX;
+            rotYObjetivo = comando.rotY;
+            escalaObjetivo = comando.escala;
+            manoActiva = true;
+            ultimaManipulacionTs = Date.now();
+            return; // no tocar el estado/color, este paquete no trae eso
+        }
+
+        // Paquete de estado normal (con o sin "tipo": "estado", por si
+        // llega un paquete viejo sin el campo, sigue funcionando igual)
         estadoActual = comando.estado;
         
         // 🎯 FIX: Normalizamos el nombre del estado (Acepta tanto PENSANDO como PROCESANDO)
@@ -140,8 +170,36 @@ function bucleAnimacion() {
     nodosSinapticos.material.needsUpdate = true;
     brilloNucleo.material.needsUpdate = true;
 
-    redNeuronal.rotation.y += velocidadGiro;
-    redNeuronal.rotation.x += velocidadGiro * 0.3;
+    // ─── NUEVO: si no ha llegado un paquete de manipulación reciente,
+    // se considera que la mano ya no está frente a la cámara, y se vuelve
+    // al giro automático de siempre.
+    if (manoActiva && (Date.now() - ultimaManipulacionTs > TIMEOUT_MANO_MS)) {
+        manoActiva = false;
+    }
+
+    if (manoActiva) {
+        // Control directo: la rotación sigue tu mano en vez del giro automático
+        redNeuronal.rotation.x += (rotXObjetivo - redNeuronal.rotation.x) * SUAVIZADO_MANO;
+        redNeuronal.rotation.y += (rotYObjetivo - redNeuronal.rotation.y) * SUAVIZADO_MANO;
+
+        const escalaActual = brilloNucleo.scale.x; // referencia base para suavizar
+        const nuevaEscala = escalaActual + (escalaObjetivo - escalaActual) * SUAVIZADO_MANO;
+        redNeuronal.scale.set(nuevaEscala, nuevaEscala, nuevaEscala);
+        nodosSinapticos.scale.set(nuevaEscala, nuevaEscala, nuevaEscala);
+    } else {
+        // Comportamiento original: giro automático constante
+        redNeuronal.rotation.y += velocidadGiro;
+        redNeuronal.rotation.x += velocidadGiro * 0.3;
+
+        // Devolver la escala manual a su tamaño normal si se soltó la mano
+        const escalaActual = redNeuronal.scale.x;
+        if (Math.abs(escalaActual - 1.0) > 0.001) {
+            const nuevaEscala = escalaActual + (1.0 - escalaActual) * SUAVIZADO_MANO;
+            redNeuronal.scale.set(nuevaEscala, nuevaEscala, nuevaEscala);
+            nodosSinapticos.scale.set(nuevaEscala, nuevaEscala, nuevaEscala);
+        }
+    }
+
     nodosSinapticos.rotation.y = redNeuronal.rotation.y;
     nodosSinapticos.rotation.x = redNeuronal.rotation.x;
 

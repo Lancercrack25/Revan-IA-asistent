@@ -10,7 +10,6 @@ from fastapi.responses import HTMLResponse
 conexiones_activas: set[WebSocket] = set()
 loop_real_servidor = None
 
-
 # Manejo moderno del ciclo de vida del servidor (Lifespan)
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
@@ -18,8 +17,6 @@ async def lifespan(app_fastapi: FastAPI):
     loop_real_servidor = asyncio.get_running_loop()
     print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
     yield
-
-
 app = FastAPI(lifespan=lifespan)
 
 # Mapeo Absoluto Adaptado al Árbol de Trabajo Real
@@ -110,7 +107,6 @@ def transmitir_desde_hilo_externo(estado: str, color_hex: str):
         print(
             f"[WebSocket Warn]: Se intentó enviar '{estado}' antes de que el servidor FastAPI estuviera listo."
         )
-
 
 def iniciar_servidor_ui():
     config = uvicorn.Config(

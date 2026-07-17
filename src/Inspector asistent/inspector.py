@@ -10,13 +10,11 @@ try:
     HAS_PYFLAKES = True
 except ImportError:
     HAS_PYFLAKES = False
-
 # Carpetas que se ignoran siempre en la inspección (no son código propio del proyecto)
 CARPETAS_IGNORADAS = {
     ".git", "__pycache__", "venv", ".venv", "env",
     "node_modules", "site-packages", "test", "tests",
 }
-
 
 def _listar_archivos_py(ruta_proyecto):
     for root, dirs, files in os.walk(ruta_proyecto):
@@ -24,7 +22,6 @@ def _listar_archivos_py(ruta_proyecto):
         for file in files:
             if file.endswith(".py"):
                 yield os.path.join(root, file)
-
 
 def _revisar_sintaxis(ruta_archivo, contenido):
     """Detecta errores de sintaxis (el proyecto ni siquiera podría arrancar con esto)."""
@@ -63,12 +60,6 @@ def _revisar_pyflakes(ruta_archivo):
 
 
 def _extraer_nombres_definidos(ruta_archivo):
-    """
-    Devuelve el conjunto de nombres definidos a nivel de módulo en un
-    archivo .py: clases, funciones, y variables asignadas directamente.
-    Se usa para verificar si un 'from src.X.Y import NOMBRE' realmente
-    existe en el archivo de destino.
-    """
     try:
         with open(ruta_archivo, "r", encoding="utf-8", errors="replace") as f:
             arbol = ast.parse(f.read(), filename=ruta_archivo)
@@ -92,12 +83,6 @@ def _extraer_nombres_definidos(ruta_archivo):
 
 
 def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
-    """
-    Para cada 'from src.X.Y import A, B' revisa que el archivo src/X/Y.py
-    exista de verdad y que A y B estén definidos ahí. Esto es justo el tipo
-    de bug que hemos estado cazando toda la sesión: imports que apuntan a
-    algo que ya no existe, se renombró, o quedó pisado por una redefinición.
-    """
     problemas = []
     try:
         arbol = ast.parse(contenido, filename=ruta_archivo)
@@ -131,13 +116,6 @@ def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
 
 
 def inspeccionar_proyecto(ruta_proyecto: str = None, verboso: bool = True) -> dict:
-    """
-    Inspecciona todos los .py del proyecto y devuelve un resumen con:
-      - archivos_revisados
-      - errores_sintaxis: [(archivo, mensaje)]
-      - imports_rotos: [(archivo, mensaje)]
-      - avisos_pyflakes: [(archivo, mensaje)]
-    """
     if ruta_proyecto is None:
         ruta_actual = os.path.dirname(os.path.abspath(__file__))
         ruta_proyecto = os.path.abspath(os.path.join(ruta_actual, "..", ".."))
