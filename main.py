@@ -16,7 +16,8 @@ from src.Automation.System_commands import desplegar_monitores_windows
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
-from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
+from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia
+from src.Camara.esfera_control import _bucle_control_esfera
 from src.Core.Gemini_client import GeminiClient
 
 # NOTA: antes había una clase "GeminiClient" duplicada definida aquí mismo
