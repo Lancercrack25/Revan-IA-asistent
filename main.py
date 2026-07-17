@@ -327,6 +327,5 @@ def main():
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
-
 if __name__ == "__main__":
     main()
