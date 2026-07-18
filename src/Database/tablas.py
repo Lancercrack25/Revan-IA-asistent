@@ -47,11 +47,22 @@ def crear_tablas_si_no_existen(conn):
             actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
+        
+        query_memoria_semantica = """
+        CREATE TABLE IF NOT EXISTS memoria_semantica (
+            id SERIAL PRIMARY KEY,
+            rol VARCHAR(20) NOT NULL,
+            contenido TEXT NOT NULL,
+            embedding JSONB NOT NULL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
 
-        # Ejecutamos las consultas SQL
+        # Ejecutamos las 4 tablas
         cur.execute(query_historial)
         cur.execute(query_memoria)
         cur.execute(query_estado)
+        cur.execute(query_memoria_semantica)
 
         # INSERTAR ESTADO INICIAL (RUTA DEL ESCRITORIO POR DEFECTO)
         ruta_escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -62,34 +73,9 @@ def crear_tablas_si_no_existen(conn):
         """
         cur.execute(query_inicial_ruta, (ruta_escritorio,))
 
-        # Confirmamos ESTA transacción (las 3 tablas originales + estado
-        # inicial) ANTES de intentar pgvector. Así, si pgvector falla más
-        # abajo, su rollback solo afecta a esa parte, sin deshacer lo de
-        # aquí arriba (que ya quedó guardado en disco con este commit).
+        # Todo en una sola transacción, un solo commit al final
         conn.commit()
         print("[REVAN DB]: Tablas e infraestructura de estado inicializadas correctamente.")
-
-        # EXTENSIÓN + TABLA 4: MEMORIA SEMÁNTICA (búsqueda por significado)
-        # Requiere que pgvector esté instalado en el servidor de Postgres.
-        # Va en su propia transacción independiente, con su propio commit,
-        # para que un fallo aquí no afecte nada de lo anterior.
-        # Dimensión 1024 fija: es la que devuelve nvidia/nv-embedqa-e5-v5.
-        try:
-            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS memoria_semantica (
-                    id SERIAL PRIMARY KEY,
-                    rol VARCHAR(20) NOT NULL,
-                    contenido TEXT NOT NULL,
-                    embedding vector(1024) NOT NULL,
-                    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            conn.commit()
-            print("[REVAN DB]: Memoria semántica (pgvector) inicializada correctamente.")
-        except psycopg2.Error as e:
-            print(f"[REVAN DB]: No se pudo inicializar la memoria semántica (¿pgvector instalado?): {e}")
-            conn.rollback()
 
         cur.close()
     except psycopg2.Error as e:
@@ -100,4 +86,3 @@ def crear_tablas_si_no_existen(conn):
     finally:
         if conn:
             conn.close()
-#quitar lo de pgvector

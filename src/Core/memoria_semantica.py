@@ -1,5 +1,6 @@
-#en este archivo se gestionará la memoria semántica del asistente
 import os
+import json
+import math
 
 try:
     from openai import OpenAI
@@ -35,6 +36,13 @@ def _obtener_cliente_nim():
 
 
 def _generar_embedding(texto: str, input_type: str = "passage"):
+    """
+    Genera el vector de embedding para un texto.
+    input_type="passage" -> para el contenido que se está GUARDANDO.
+    input_type="query"   -> para el texto de BÚSQUEDA (nv-embedqa-e5-v5
+    trata estos dos casos de forma distinta internamente, ya que está
+    optimizado para retrieval asimétrico pregunta/respuesta).
+    """
     texto = (texto or "").strip()
     if not texto:
         return None
@@ -55,10 +63,17 @@ def _generar_embedding(texto: str, input_type: str = "passage"):
         return None
 
 
-def _vector_a_literal_pg(embedding: list) -> str:
-    """Convierte una lista de floats de Python al formato de texto que
-    pgvector espera para el cast '%s::vector' (ej: '[0.01,-0.02,...]')."""
-    return "[" + ",".join(str(x) for x in embedding) + "]"
+def _similitud_coseno(vec_a: list, vec_b: list) -> float:
+    """
+    Similitud coseno pura en Python (sin numpy, para no agregar otra
+    dependencia): 1.0 = idénticos, 0.0 = sin relación, -1.0 = opuestos.
+    """
+    producto_punto = sum(a * b for a, b in zip(vec_a, vec_b))
+    norma_a = math.sqrt(sum(a * a for a in vec_a))
+    norma_b = math.sqrt(sum(b * b for b in vec_b))
+    if norma_a == 0 or norma_b == 0:
+        return 0.0
+    return producto_punto / (norma_a * norma_b)
 
 
 def guardar_intercambio(rol: str, contenido: str) -> bool:
@@ -80,9 +95,9 @@ def guardar_intercambio(rol: str, contenido: str) -> bool:
         cur.execute(
             """
             INSERT INTO memoria_semantica (rol, contenido, embedding)
-            VALUES (%s, %s, %s::vector);
+            VALUES (%s, %s, %s::jsonb);
             """,
-            (rol, contenido, _vector_a_literal_pg(embedding)),
+            (rol, contenido, json.dumps(embedding)),
         )
         conn.commit()
         cur.close()
@@ -95,7 +110,21 @@ def guardar_intercambio(rol: str, contenido: str) -> bool:
         liberar_conexion(conn)
 
 
-def buscar_memoria_semantica(consulta: str, top_k: int = 3, distancia_maxima: float = 0.5):
+def buscar_memoria_semantica(consulta: str, top_k: int = 3, similitud_minima: float = 0.75):
+    """
+    Busca en la memoria pasada los 'top_k' intercambios más parecidos por
+    SIGNIFICADO a 'consulta', no por coincidencia exacta de palabras.
+
+    Trae TODOS los embeddings guardados y calcula la similitud coseno en
+    Python (nada de SQL vectorial). Para el volumen de un asistente
+    personal (cientos/pocos miles de registros) esto es rápido; si algún
+    día la tabla creciera a cientos de miles de filas, esto se volvería
+    lento y ahí sí valdría la pena migrar a pgvector.
+
+    'similitud_minima' filtra resultados poco relacionados (más alto =
+    más estricto). Devuelve una lista de dicts ordenada de más a menos
+    parecido: [{"rol": ..., "contenido": ..., "fecha": ..., "similitud": ...}, ...]
+    """
     embedding_consulta = _generar_embedding(consulta, input_type="query")
     if embedding_consulta is None:
         return []
@@ -106,24 +135,25 @@ def buscar_memoria_semantica(consulta: str, top_k: int = 3, distancia_maxima: fl
 
     try:
         cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT rol, contenido, fecha, embedding <=> %s::vector AS distancia
-            FROM memoria_semantica
-            ORDER BY distancia ASC
-            LIMIT %s;
-            """,
-            (_vector_a_literal_pg(embedding_consulta), top_k),
-        )
+        cur.execute("SELECT rol, contenido, fecha, embedding FROM memoria_semantica;")
         filas = cur.fetchall()
         cur.close()
 
-        resultados = [
-            {"rol": rol, "contenido": contenido, "fecha": fecha, "distancia": distancia}
-            for (rol, contenido, fecha, distancia) in filas
-            if distancia <= distancia_maxima
-        ]
-        return resultados
+        candidatos = []
+        for rol, contenido, fecha, embedding_guardado in filas:
+            # psycopg2 ya devuelve JSONB como lista/dict de Python directamente
+            similitud = _similitud_coseno(embedding_consulta, embedding_guardado)
+            if similitud >= similitud_minima:
+                candidatos.append({
+                    "rol": rol,
+                    "contenido": contenido,
+                    "fecha": fecha,
+                    "similitud": similitud,
+                })
+
+        candidatos.sort(key=lambda x: x["similitud"], reverse=True)
+        return candidatos[:top_k]
+
     except Exception as e:
         print(f"[MemoriaSemantica]: Error al buscar: {e}")
         return []

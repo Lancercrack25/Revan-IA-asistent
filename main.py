@@ -137,7 +137,6 @@ def encender_sistemas():
         print(f" Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
-    """Bucle infinito de escucha fuera del hilo principal de la GUI."""
     global sistema_activo
     while sistema_activo:
         procesar_ciclo_voz()
@@ -182,7 +181,6 @@ def procesar_ciclo_voz():
         if any(cmd in orden_minusculas for cmd in palabras_desconexion):
             apagar_sistema()
             return
-
         # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA (detección de cambios) ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigila la cámara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "detén la vigilancia", "detente de vigilar", "para de vigilar"]
