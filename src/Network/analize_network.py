@@ -47,4 +47,53 @@ def obtener_estadisticas_trafico():
     except Exception:
         return None
     
+def listar_interfaces_red():
+    """Lista las interfaces de red disponibles (Wi-Fi, Ethernet, etc.) y si están activas.
+    Pensado para depuración en consola, no para hablarse en voz alta (puede ser largo)."""
+    try:
+        interfaces = {}
+        direcciones = psutil.net_if_addrs()
+        estados = psutil.net_if_stats()
+        for nombre, addrs in direcciones.items():
+            activa = estados[nombre].isup if nombre in estados else None
+            ips = [a.address for a in addrs if a.family == socket.AF_INET]
+            interfaces[nombre] = {"activa": activa, "ips": ips}
+        return interfaces
+    except Exception as e:
+        print(f"[Red]: Error al listar interfaces: {e}")
+        return {}
+ 
+ 
+def analizar_red() -> str:
+    """
+    Resumen rápido y hablable del estado de la red. Pensado para responder
+    en 1-2 segundos (nada de pruebas de velocidad aquí, esas tardan más y
+    van en probar_velocidad_internet(), aparte, solo cuando se pide explícitamente).
+    """
+    if not hay_conexion_internet():
+        return "Señor, no detecto conexión a internet en este momento. Revise su router o adaptador de red."
+ 
+    ip_local = obtener_ip_local()
+    ip_publica = obtener_ip_publica()
+    trafico = obtener_estadisticas_trafico()
+ 
+    partes = ["Conexión a internet activa."]
+ 
+    if ip_local:
+        partes.append(f"Su IP local es {ip_local}.")
+ 
+    if ip_publica:
+        partes.append(f"Su IP pública es {ip_publica}.")
+ 
+    if trafico:
+        partes.append(
+            f"Ha transferido {trafico['recibidos_mb']:.0f} megabytes recibidos "
+            f"y {trafico['enviados_mb']:.0f} enviados en esta sesión del sistema."
+        )
+ 
+    return " ".join(partes)
 
+
+if __name__ == "__main__":
+    print(analizar_red())
+    print(listar_interfaces_red())
