@@ -31,7 +31,6 @@ def _revisar_sintaxis(ruta_archivo, contenido):
     except SyntaxError as e:
         return f"SINTAXIS: línea {e.lineno}: {e.msg}"
 
-
 def _revisar_pyflakes(ruta_archivo):
     if not HAS_PYFLAKES:
         return []
@@ -75,7 +74,6 @@ def _extraer_nombres_definidos(ruta_archivo):
                 nombres.add(alias.asname or alias.name)
     return nombres
 
-
 def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
     problemas = []
     try:
@@ -107,7 +105,6 @@ def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
                     )
 
     return problemas
-
 
 def inspeccionar_proyecto(ruta_proyecto: str = None, verboso: bool = True) -> dict:
     if ruta_proyecto is None:
@@ -148,7 +145,6 @@ def inspeccionar_proyecto(ruta_proyecto: str = None, verboso: bool = True) -> di
         _imprimir_reporte(resultado)
 
     return resultado
-
 
 def _imprimir_reporte(resultado: dict):
     print(f"\n{'='*60}")

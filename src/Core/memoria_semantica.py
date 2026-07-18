@@ -7,7 +7,6 @@ try:
 except ImportError:
     print("[MemoriaSemantica]: Falta la librería 'openai'. Instálala con: pip install openai")
     raise
-
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Core.Config_loader import cargar_ajustes
 
@@ -17,7 +16,6 @@ from src.Core.Config_loader import cargar_ajustes
 MAX_CARACTERES_EMBEDDING = 1800
 
 _cliente_nim = None
-
 
 def _obtener_cliente_nim():
     """Inicializa el cliente de NIM de forma perezosa (solo cuando se usa
@@ -36,13 +34,6 @@ def _obtener_cliente_nim():
 
 
 def _generar_embedding(texto: str, input_type: str = "passage"):
-    """
-    Genera el vector de embedding para un texto.
-    input_type="passage" -> para el contenido que se está GUARDANDO.
-    input_type="query"   -> para el texto de BÚSQUEDA (nv-embedqa-e5-v5
-    trata estos dos casos de forma distinta internamente, ya que está
-    optimizado para retrieval asimétrico pregunta/respuesta).
-    """
     texto = (texto or "").strip()
     if not texto:
         return None
@@ -109,22 +100,7 @@ def guardar_intercambio(rol: str, contenido: str) -> bool:
     finally:
         liberar_conexion(conn)
 
-
 def buscar_memoria_semantica(consulta: str, top_k: int = 3, similitud_minima: float = 0.75):
-    """
-    Busca en la memoria pasada los 'top_k' intercambios más parecidos por
-    SIGNIFICADO a 'consulta', no por coincidencia exacta de palabras.
-
-    Trae TODOS los embeddings guardados y calcula la similitud coseno en
-    Python (nada de SQL vectorial). Para el volumen de un asistente
-    personal (cientos/pocos miles de registros) esto es rápido; si algún
-    día la tabla creciera a cientos de miles de filas, esto se volvería
-    lento y ahí sí valdría la pena migrar a pgvector.
-
-    'similitud_minima' filtra resultados poco relacionados (más alto =
-    más estricto). Devuelve una lista de dicts ordenada de más a menos
-    parecido: [{"rol": ..., "contenido": ..., "fecha": ..., "similitud": ...}, ...]
-    """
     embedding_consulta = _generar_embedding(consulta, input_type="query")
     if embedding_consulta is None:
         return []
