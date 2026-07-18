@@ -18,18 +18,18 @@ from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
+from src.Network.analize_network import analizar_red, probar_velocidad_internet
 from src.Core.Gemini_client import GeminiClient
-
 # Instancias y Controles Globales
-cerebro_ia = None     #  api key de NimClient (Acciones del sistema, vía NVIDIA NIM)
-gemini_ia = None      #  la api key  de Gemini  (Conversación)
+cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
+gemini_ia = None      # Gemini (Conversación)
 voz_ia = None
 oidos_ia = None
 gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 21 
+TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
@@ -56,7 +56,7 @@ def sincronizar_estado_esfera(estado, color_hex):
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, gui
-    print("\n[REVAN]: Iniciando  desconexión...")
+    print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
 
     # Apagar cualquier módulo de cámara que haya quedado activo, para no
@@ -87,7 +87,7 @@ def encender_sistemas():
     sistema_activo = True
 
     print("Inicializando secuencia de despliegue cronológico...")
-    print("[1/3] Desplegando monitores nativos...")
+    print("🪟 [1/3] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
@@ -137,6 +137,7 @@ def encender_sistemas():
         print(f" Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
+    """Bucle infinito de escucha fuera del hilo principal de la GUI."""
     global sistema_activo
     while sistema_activo:
         procesar_ciclo_voz()
@@ -181,6 +182,7 @@ def procesar_ciclo_voz():
         if any(cmd in orden_minusculas for cmd in palabras_desconexion):
             apagar_sistema()
             return
+
         # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA (detección de cambios) ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigila la cámara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "detén la vigilancia", "detente de vigilar", "para de vigilar"]
@@ -203,6 +205,7 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
+        # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
         raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
 
@@ -224,6 +227,31 @@ def procesar_ciclo_voz():
                 voz_ia.hablar(f"Control de esfera por mano activado, {titulo}.")
             else:
                 voz_ia.hablar("El control de esfera ya estaba activo, Señor.")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        # --- INTERCEPTOR DE CONSULTAS DE RED ---
+        # Consulta rápida (IP, conectividad, tráfico) vs prueba de velocidad
+        # (tarda 10-30s, así que se separa para no confundir una con otra).
+        palabras_lista = orden_limpia.split()
+        es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
+        es_consulta_red = (not es_consulta_velocidad) and (
+            "red" in palabras_lista or "ip" in palabras_lista or
+            any(p in orden_limpia for p in ["internet", "conexion", "conexión"])
+        )
+
+        if es_consulta_velocidad:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            voz_ia.hablar("Un momento, Señor, estoy probando la velocidad de su conexión...")
+            resultado_red = probar_velocidad_internet()
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar(resultado_red)
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if es_consulta_red:
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar(analizar_red())
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
