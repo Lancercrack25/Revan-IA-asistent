@@ -2,7 +2,8 @@
 import socket
 import psutil
 import requests
- 
+
+
 def hay_conexion_internet(timeout: float = 3.0) -> bool:
     """
     Chequeo de conectividad con dos intentos:
@@ -17,12 +18,25 @@ def hay_conexion_internet(timeout: float = 3.0) -> bool:
         return True
     except Exception:
         pass
- 
+
     try:
         requests.head("https://www.google.com", timeout=timeout)
         return True
     except Exception:
         return False
+
+
+def obtener_ip_local():
+    """IP dentro de tu red local (la que te asigna tu router)."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
 
 def obtener_ip_publica():
     """IP con la que te ve el resto de internet. Requiere conexión real a internet."""
@@ -33,8 +47,8 @@ def obtener_ip_publica():
         return None
     except Exception:
         return None
- 
- 
+
+
 def obtener_estadisticas_trafico():
     """Bytes enviados/recibidos por todas las interfaces desde que arrancó el sistema
     (no desde que arrancó REVAN, es un contador acumulado del propio sistema operativo)."""
@@ -46,7 +60,8 @@ def obtener_estadisticas_trafico():
         }
     except Exception:
         return None
-    
+
+
 def listar_interfaces_red():
     """Lista las interfaces de red disponibles (Wi-Fi, Ethernet, etc.) y si están activas.
     Pensado para depuración en consola, no para hablarse en voz alta (puede ser largo)."""
@@ -62,8 +77,8 @@ def listar_interfaces_red():
     except Exception as e:
         print(f"[Red]: Error al listar interfaces: {e}")
         return {}
- 
- 
+
+
 def analizar_red() -> str:
     """
     Resumen rápido y hablable del estado de la red. Pensado para responder
@@ -72,26 +87,51 @@ def analizar_red() -> str:
     """
     if not hay_conexion_internet():
         return "Señor, no detecto conexión a internet en este momento. Revise su router o adaptador de red."
- 
+
     ip_local = obtener_ip_local()
     ip_publica = obtener_ip_publica()
     trafico = obtener_estadisticas_trafico()
- 
+
     partes = ["Conexión a internet activa."]
- 
+
     if ip_local:
         partes.append(f"Su IP local es {ip_local}.")
- 
+
     if ip_publica:
         partes.append(f"Su IP pública es {ip_publica}.")
- 
+
     if trafico:
         partes.append(
             f"Ha transferido {trafico['recibidos_mb']:.0f} megabytes recibidos "
             f"y {trafico['enviados_mb']:.0f} enviados en esta sesión del sistema."
         )
- 
+
     return " ".join(partes)
+
+
+def probar_velocidad_internet() -> str:
+    """
+    Prueba de velocidad REAL de descarga/subida. Tarda entre 10 y 30 segundos
+    típicamente, así que solo debe llamarse cuando el usuario lo pide de forma
+    explícita ("qué tan rápido está mi internet"), nunca como parte de un
+    chequeo rápido de rutina.
+    Requiere: pip install speedtest-cli
+    """
+    try:
+        import speedtest
+    except ImportError:
+        return ("No tengo instalada la herramienta de prueba de velocidad, Señor. "
+                "Ejecute: pip install speedtest-cli")
+
+    try:
+        st = speedtest.Speedtest()
+        st.get_best_server()
+        bajada_mbps = st.download() / 1_000_000
+        subida_mbps = st.upload() / 1_000_000
+        return (f"Su velocidad de descarga es de {bajada_mbps:.1f} megabits por segundo, "
+                f"y de subida, {subida_mbps:.1f} megabits por segundo.")
+    except Exception as e:
+        return f"No pude completar la prueba de velocidad, Señor. Detalle: {e}"
 
 
 if __name__ == "__main__":
