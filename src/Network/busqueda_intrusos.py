@@ -136,7 +136,6 @@ def detectar_intrusos() -> str:
     return (f"Atención, Señor. Detecté {len(desconocidos)} dispositivo(s) desconocido(s) "
             f"de un total de {len(encontrados)} conectados. Direcciones: {ips_desconocidos}.")
 
-
 if __name__ == "__main__":
     print("Escaneando red local...")
     dispositivos = escanear_red_local()

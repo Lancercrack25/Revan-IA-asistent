@@ -6,7 +6,7 @@ import subprocess
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
+#importaciones de modulos para ejecucion y funcionamiento.
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
@@ -32,7 +32,7 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
+TIEMPO_ATENCION = 16   # Ventana de atención activa en segundos (Modo Jarvis)
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
@@ -68,7 +68,6 @@ def apagar_sistema():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
-    
     # Notificar y despedir por voz
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
