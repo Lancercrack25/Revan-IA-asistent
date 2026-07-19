@@ -16,7 +16,7 @@ def _obtener_ip_local():
         return ip
     except Exception:
         return None
-
+#esta funcion se encarga de pinguear la ip del host paara asi despues empezar con la busqueda de intrusos 
 def _ping_host(ip: str, timeout_ms: int = 300) -> bool:
     """Ping silencioso de un solo intento, solo para saber si el host responde."""
     sistema = platform.system().lower()

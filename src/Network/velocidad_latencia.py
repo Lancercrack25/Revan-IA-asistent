@@ -3,7 +3,6 @@ import subprocess
 import platform
 import re
 
-
 def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
     sistema = platform.system().lower()
     if "windows" in sistema:
@@ -18,8 +17,7 @@ def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
         print(f"[Latencia]: Error al ejecutar ping: {e}")
         return None
 
-    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms" (Windows
-    # en inglés / Linux / macOS)
+    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms"
     tiempos = [float(m) for m in re.findall(r"(?:tiempo|time)[=<]\s*(\d+(?:\.\d+)?)\s*ms", salida, re.IGNORECASE)]
 
     if not tiempos:
