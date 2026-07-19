@@ -109,31 +109,6 @@ def analizar_red() -> str:
     return " ".join(partes)
 
 
-def probar_velocidad_internet() -> str:
-    """
-    Prueba de velocidad REAL de descarga/subida. Tarda entre 10 y 30 segundos
-    típicamente, así que solo debe llamarse cuando el usuario lo pide de forma
-    explícita ("qué tan rápido está mi internet"), nunca como parte de un
-    chequeo rápido de rutina.
-    Requiere: pip install speedtest-cli
-    """
-    try:
-        import speedtest
-    except ImportError:
-        return ("No tengo instalada la herramienta de prueba de velocidad, Señor. "
-                "Ejecute: pip install speedtest-cli")
-
-    try:
-        st = speedtest.Speedtest()
-        st.get_best_server()
-        bajada_mbps = st.download() / 1_000_000
-        subida_mbps = st.upload() / 1_000_000
-        return (f"Su velocidad de descarga es de {bajada_mbps:.1f} megabits por segundo, "
-                f"y de subida, {subida_mbps:.1f} megabits por segundo.")
-    except Exception as e:
-        return f"No pude completar la prueba de velocidad, Señor. Detalle: {e}"
-
-
 if __name__ == "__main__":
     print(analizar_red())
     print(listar_interfaces_red())
