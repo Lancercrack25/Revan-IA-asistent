@@ -3,15 +3,7 @@ import socket
 import psutil
 import requests
 
-
 def hay_conexion_internet(timeout: float = 3.0) -> bool:
-    """
-    Chequeo de conectividad con dos intentos:
-    1. Socket directo a un DNS público (rápido, barato, pero algunos
-       firewalls/redes corporativas bloquean el puerto 53 saliente).
-    2. Si eso falla, respaldo vía HTTPS normal (puerto 443, casi nunca
-       bloqueado), para no dar un falso "sin internet" en esos casos.
-    """
     try:
         socket.setdefaulttimeout(timeout)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
@@ -80,11 +72,6 @@ def listar_interfaces_red():
 
 
 def analizar_red() -> str:
-    """
-    Resumen rápido y hablable del estado de la red. Pensado para responder
-    en 1-2 segundos (nada de pruebas de velocidad aquí, esas tardan más y
-    van en probar_velocidad_internet(), aparte, solo cuando se pide explícitamente).
-    """
     if not hay_conexion_internet():
         return "Señor, no detecto conexión a internet en este momento. Revise su router o adaptador de red."
 
@@ -107,31 +94,6 @@ def analizar_red() -> str:
         )
 
     return " ".join(partes)
-
-
-def probar_velocidad_internet() -> str:
-    """
-    Prueba de velocidad REAL de descarga/subida. Tarda entre 10 y 30 segundos
-    típicamente, así que solo debe llamarse cuando el usuario lo pide de forma
-    explícita ("qué tan rápido está mi internet"), nunca como parte de un
-    chequeo rápido de rutina.
-    Requiere: pip install speedtest-cli
-    """
-    try:
-        import speedtest
-    except ImportError:
-        return ("No tengo instalada la herramienta de prueba de velocidad, Señor. "
-                "Ejecute: pip install speedtest-cli")
-
-    try:
-        st = speedtest.Speedtest()
-        st.get_best_server()
-        bajada_mbps = st.download() / 1_000_000
-        subida_mbps = st.upload() / 1_000_000
-        return (f"Su velocidad de descarga es de {bajada_mbps:.1f} megabits por segundo, "
-                f"y de subida, {subida_mbps:.1f} megabits por segundo.")
-    except Exception as e:
-        return f"No pude completar la prueba de velocidad, Señor. Detalle: {e}"
 
 
 if __name__ == "__main__":

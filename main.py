@@ -6,7 +6,7 @@ import subprocess
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
+#importaciones de modulos para ejecucion y funcionamiento.
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
@@ -18,8 +18,11 @@ from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
-from src.Network.analize_network import analizar_red, probar_velocidad_internet
+from src.Network.analize_network import analizar_red
+from src.Network.velocidad_latencia import probar_velocidad_internet, reportar_latencia
+from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
 from src.Core.Gemini_client import GeminiClient
+
 # Instancias y Controles Globales
 cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
 gemini_ia = None      # Gemini (Conversación)
@@ -29,7 +32,7 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
+TIEMPO_ATENCION = 16   # Ventana de atención activa en segundos (Modo Jarvis)
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
@@ -65,7 +68,6 @@ def apagar_sistema():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
-    
     # Notificar y despedir por voz
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
@@ -87,7 +89,7 @@ def encender_sistemas():
     sistema_activo = True
 
     print("Inicializando secuencia de despliegue cronológico...")
-    print("🪟 [1/3] Desplegando monitores nativos...")
+    print("[1/3] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
@@ -206,6 +208,11 @@ def procesar_ciclo_voz():
             return
 
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
+        # Se usa la RAÍZ de la palabra ("control", "manipul") en vez de
+        # formas verbales específicas ("controla", "controlar"), porque
+        # frases naturales como "dame el control de la esfera" usan el
+        # sustantivo, no el verbo, y "control" nunca hace match contra
+        # "controla" como substring.
         raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
 
@@ -231,13 +238,16 @@ def procesar_ciclo_voz():
             return
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
-        # Consulta rápida (IP, conectividad, tráfico) vs prueba de velocidad
-        # (tarda 10-30s, así que se separa para no confundir una con otra).
         palabras_lista = orden_limpia.split()
+
         es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
-        es_consulta_red = (not es_consulta_velocidad) and (
-            "red" in palabras_lista or "ip" in palabras_lista or
-            any(p in orden_limpia for p in ["internet", "conexion", "conexión"])
+        es_consulta_latencia = "latencia" in orden_limpia or "ping" in palabras_lista
+        es_consulta_intrusos = any(p in orden_limpia for p in ["intruso", "intrusos", "quien esta conectado", "quién está conectado", "dispositivos conectados"])
+        es_marcar_conocidos = "marca" in orden_limpia and ("conocido" in orden_limpia or "conocidos" in orden_limpia)
+        es_consulta_red = (
+            not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos)
+            and ("red" in palabras_lista or "ip" in palabras_lista or
+                 any(p in orden_limpia for p in ["internet", "conexion", "conexión"]))
         )
 
         if es_consulta_velocidad:
@@ -246,6 +256,30 @@ def procesar_ciclo_voz():
             resultado_red = probar_velocidad_internet()
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(resultado_red)
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if es_consulta_latencia:
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar(reportar_latencia())
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if es_marcar_conocidos:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            voz_ia.hablar("Un momento, Señor, estoy escaneando su red...")
+            resultado_marcado = marcar_todos_como_conocidos()
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar(resultado_marcado)
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            return
+
+        if es_consulta_intrusos:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            voz_ia.hablar("Un momento, Señor, estoy escaneando su red en busca de dispositivos desconocidos...")
+            resultado_intrusos = detectar_intrusos()
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar(resultado_intrusos)
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
@@ -353,5 +387,6 @@ def main():
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
+# Ejecución de la lógica de REVAN
 if __name__ == "__main__":
     main()
