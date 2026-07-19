@@ -59,13 +59,6 @@ def _leer_tabla_arp():
 
 
 def escanear_red_local(timeout_ms: int = 300, max_hilos: int = 60):
-    """
-    Hace un barrido de ping sobre todo el rango /24 de tu red local (ej.
-    192.168.1.1 al 192.168.1.254) para forzar que los dispositivos activos
-    aparezcan en la tabla ARP, y luego lee esa tabla para obtener sus IP y
-    MAC. Tarda unos segundos (paralelizado con hilos, no secuencial).
-    Devuelve una lista de dicts: [{"ip": ..., "mac": ...}, ...]
-    """
     ip_local = _obtener_ip_local()
     if not ip_local:
         print("[BusquedaIntrusos]: No se pudo determinar la IP local, no se puede escanear.")
@@ -110,13 +103,6 @@ def guardar_dispositivos_conocidos(dispositivos: dict):
 
 
 def marcar_todos_como_conocidos() -> str:
-    """
-    Escanea la red AHORA y guarda todo lo que encuentra como 'conocido'.
-    Pensado para correr una vez al principio (baseline), para que la
-    primera vez que uses detectar_intrusos() no te marque tu propio celular,
-    laptop, smart TV, etc. como 'intrusos' solo por ser la primera vez que
-    se ven.
-    """
     encontrados = escanear_red_local()
     if not encontrados:
         return "No se encontraron dispositivos para guardar, Señor."
@@ -130,10 +116,6 @@ def marcar_todos_como_conocidos() -> str:
 
 
 def detectar_intrusos() -> str:
-    """
-    Escanea la red y compara contra la lista de dispositivos conocidos.
-    Reporta cualquier dispositivo que NO esté en esa lista.
-    """
     conocidos = cargar_dispositivos_conocidos()
 
     if not conocidos:

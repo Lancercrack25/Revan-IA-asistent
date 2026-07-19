@@ -90,7 +90,7 @@ def encender_sistemas():
     sistema_activo = True
 
     print("Inicializando secuencia de despliegue cronológico...")
-    print("🪟 [1/3] Desplegando monitores nativos...")
+    print("[1/3] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
@@ -239,9 +239,6 @@ def procesar_ciclo_voz():
             return
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
-        # Consulta rápida (IP, conectividad, tráfico) vs prueba de velocidad
-        # (tarda 10-30s), vs latencia, vs búsqueda de intrusos (también tarda
-        # unos segundos por el barrido de ping). Se separan para no mezclarlas.
         palabras_lista = orden_limpia.split()
 
         es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])

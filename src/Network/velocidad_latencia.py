@@ -5,12 +5,6 @@ import re
 
 
 def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
-    """
-    Mide la latencia (tiempo de ida y vuelta) hacia un host, usando el
-    comando 'ping' nativo del sistema operativo (no requiere librerías
-    extra ni privilegios especiales).
-    Devuelve un dict con promedio/mínimo/máximo en ms, o None si falló.
-    """
     sistema = platform.system().lower()
     if "windows" in sistema:
         cmd = ["ping", "-n", str(intentos), host]
@@ -56,12 +50,6 @@ def reportar_latencia(host: str = "8.8.8.8") -> str:
 
 
 def probar_velocidad_internet() -> str:
-    """
-    Prueba de velocidad REAL de descarga/subida. Tarda entre 10 y 30
-    segundos típicamente, así que solo debe llamarse cuando el usuario lo
-    pide de forma explícita, nunca como parte de un chequeo rápido.
-    Requiere: pip install speedtest-cli
-    """
     try:
         import speedtest
     except ImportError:
