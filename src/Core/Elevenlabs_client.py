@@ -21,10 +21,6 @@ class ElevenLabsClient:
 
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
-
-        # Timeout CORTO para OmniVoice: si no responde en este tiempo, se
-        # asume que va a tardar demasiado y se cae directo al respaldo, en
-        # vez de dejarte esperando minutos por tu voz clonada.
         self.timeout_omnivoice = 12  # segundos
 
         if not pygame.mixer.get_init():

@@ -1,1 +1,0 @@
-# este archivo sera para poder realizar llamadas a los contactos de la agenda del telefono

@@ -47,11 +47,22 @@ def crear_tablas_si_no_existen(conn):
             actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
+        
+        query_memoria_semantica = """
+        CREATE TABLE IF NOT EXISTS memoria_semantica (
+            id SERIAL PRIMARY KEY,
+            rol VARCHAR(20) NOT NULL,
+            contenido TEXT NOT NULL,
+            embedding JSONB NOT NULL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
 
-        # Ejecutamos las consultas SQL
+        # Ejecutamos las 4 tablas
         cur.execute(query_historial)
         cur.execute(query_memoria)
         cur.execute(query_estado)
+        cur.execute(query_memoria_semantica)
 
         # INSERTAR ESTADO INICIAL (RUTA DEL ESCRITORIO POR DEFECTO)
         ruta_escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -61,10 +72,11 @@ def crear_tablas_si_no_existen(conn):
         ON CONFLICT (clave) DO NOTHING;
         """
         cur.execute(query_inicial_ruta, (ruta_escritorio,))
-        # Guardamos los cambios de forma permanente en el disco duro
+
+        # Todo en una sola transacción, un solo commit al final
         conn.commit()
         print("[REVAN DB]: Tablas e infraestructura de estado inicializadas correctamente.")
-        
+
         cur.close()
     except psycopg2.Error as e:
         print("Error de PostgreSQL al crear las tablas:", e)

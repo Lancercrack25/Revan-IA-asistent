@@ -4,13 +4,6 @@ let colorObjetivo = new THREE.Color("#0077ff"); // Variable maestra de control d
 let velocidadGiro = 0.005;
 let deltaTiempo = 0;
 let amplitudOnda = 0.03;
-
-// ─── NUEVO: estado de manipulación por mano ────────────────────────────────
-// rotXObjetivo/rotYObjetivo/escalaObjetivo son los valores que manda
-// control_esfera_manos.py. manoActiva se pone en true cuando llega un
-// paquete de manipulación, y se apaga sola si no llega ninguno en
-// TIMEOUT_MANO_MS (o sea, si quitas la mano de la cámara, la esfera vuelve
-// a girar sola en vez de quedarse congelada en la última posición).
 let manoActiva = false;
 let rotXObjetivo = 0;
 let rotYObjetivo = 0;
@@ -38,7 +31,7 @@ function inicializarEsfera() {
         posOriginales: geometriaEsfera.attributes.position.clone()
     };
 
-    // 🎯 MEJORADO: Vinculamos el color inicial directamente a la referencia dinámica
+    // MEJORADO: Vinculamos el color inicial directamente a la referencia dinámica
     const matLineas = new THREE.MeshBasicMaterial({
         color: colorObjetivo, 
         wireframe: true,
@@ -104,10 +97,6 @@ function conectarServidorCore() {
     socket.onmessage = function(evento) {
         const comando = JSON.parse(evento.data);
 
-        // ─── NUEVO: distinguir paquete de manipulación por mano ───────────
-        // Antes, CUALQUIER paquete pisaba estadoActual directo. Si no se
-        // filtra aquí, cada paquete de manipulación (sin campo .estado)
-        // resetearía la esfera al color de "ESPERA" 20 veces por segundo.
         if (comando.tipo === "manipulacion") {
             rotXObjetivo = comando.rotX;
             rotYObjetivo = comando.rotY;
@@ -121,7 +110,7 @@ function conectarServidorCore() {
         // llega un paquete viejo sin el campo, sigue funcionando igual)
         estadoActual = comando.estado;
         
-        // 🎯 FIX: Normalizamos el nombre del estado (Acepta tanto PENSANDO como PROCESANDO)
+        // FIX: Normalizamos el nombre del estado (Acepta tanto PENSANDO como PROCESANDO)
         if (estadoActual === "ESCUCHANDO") {
             colorObjetivo.set(comando.color || "#00ffcc"); // Cian / Azul claro
             velocidadGiro = 0.015;
@@ -182,7 +171,7 @@ function bucleAnimacion() {
         redNeuronal.rotation.x += (rotXObjetivo - redNeuronal.rotation.x) * SUAVIZADO_MANO;
         redNeuronal.rotation.y += (rotYObjetivo - redNeuronal.rotation.y) * SUAVIZADO_MANO;
 
-        const escalaActual = brilloNucleo.scale.x; // referencia base para suavizar
+        const escalaActual = redNeuronal.scale.x;
         const nuevaEscala = escalaActual + (escalaObjetivo - escalaActual) * SUAVIZADO_MANO;
         redNeuronal.scale.set(nuevaEscala, nuevaEscala, nuevaEscala);
         nodosSinapticos.scale.set(nuevaEscala, nuevaEscala, nuevaEscala);

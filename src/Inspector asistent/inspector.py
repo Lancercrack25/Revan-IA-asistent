@@ -31,14 +31,7 @@ def _revisar_sintaxis(ruta_archivo, contenido):
     except SyntaxError as e:
         return f"SINTAXIS: línea {e.lineno}: {e.msg}"
 
-
 def _revisar_pyflakes(ruta_archivo):
-    """
-    Detecta con pyflakes: nombres redefinidos (ej. una clase declarada dos
-    veces en el mismo archivo, como el bug de GeminiClient duplicado que
-    encontramos en main.py), imports sin usar, nombres usados pero nunca
-    definidos, y variables no usadas.
-    """
     if not HAS_PYFLAKES:
         return []
 
@@ -81,7 +74,6 @@ def _extraer_nombres_definidos(ruta_archivo):
                 nombres.add(alias.asname or alias.name)
     return nombres
 
-
 def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
     problemas = []
     try:
@@ -113,7 +105,6 @@ def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
                     )
 
     return problemas
-
 
 def inspeccionar_proyecto(ruta_proyecto: str = None, verboso: bool = True) -> dict:
     if ruta_proyecto is None:
@@ -155,7 +146,6 @@ def inspeccionar_proyecto(ruta_proyecto: str = None, verboso: bool = True) -> di
 
     return resultado
 
-
 def _imprimir_reporte(resultado: dict):
     print(f"\n{'='*60}")
     print(f"[Inspector]: {resultado['archivos_revisados']} archivos .py revisados")
@@ -173,22 +163,22 @@ def _imprimir_reporte(resultado: dict):
         return
 
     if resultado["errores_sintaxis"]:
-        print(f"\n🔴 ERRORES DE SINTAXIS ({len(resultado['errores_sintaxis'])}) — el proyecto NO puede arrancar con esto:")
+        print(f"\nERRORES DE SINTAXIS ({len(resultado['errores_sintaxis'])}) — el proyecto NO puede arrancar con esto:")
         for archivo, msg in resultado["errores_sintaxis"]:
             print(f"   {archivo}: {msg}")
 
     if resultado["imports_rotos"]:
-        print(f"\n🟠 IMPORTS ROTOS ({len(resultado['imports_rotos'])}) — van a tronar en cuanto se ejecuten:")
+        print(f"\nIMPORTS ROTOS ({len(resultado['imports_rotos'])}) — van a tronar en cuanto se ejecuten:")
         for archivo, msg in resultado["imports_rotos"]:
             print(f"   {archivo}: {msg}")
 
     if resultado["avisos_pyflakes"]:
-        print(f"\n🟡 AVISOS ({len(resultado['avisos_pyflakes'])}) — redefiniciones, imports sin usar, nombres indefinidos:")
+        print(f"\n AVISOS ({len(resultado['avisos_pyflakes'])}) — redefiniciones, imports sin usar, nombres indefinidos:")
         for archivo, msg in resultado["avisos_pyflakes"]:
             print(f"   {archivo}: {msg}")
 
     if resultado["errores_lectura"]:
-        print(f"\n⚪ ARCHIVOS QUE NO SE PUDIERON LEER ({len(resultado['errores_lectura'])}):")
+        print(f"\n ARCHIVOS QUE NO SE PUDIERON LEER ({len(resultado['errores_lectura'])}):")
         for archivo, msg in resultado["errores_lectura"]:
             print(f"   {archivo}: {msg}")
 

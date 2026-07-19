@@ -170,10 +170,6 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     try:
         os.makedirs(ruta_final, exist_ok=True)
         guardar_ruta_actual(ruta_final)
-
-        # Se devuelve la ruta completa en el mensaje (antes solo el nombre
-        # del padre inmediato) para que sepas exactamente dónde quedó sin
-        # tener que ir a buscarla a ciegas.
         return f"Hecho, Señor. Carpeta '{nombre_nueva_carpeta}' creada con éxito en: {ruta_final}"
     except Exception as e:
         return f"Error al intentar crear el directorio físico: {e}"
@@ -215,13 +211,6 @@ def obtener_diagnostico_hardware() -> str:
 
 
 def _analizar_frame_con_llava(frame) -> str:
-    """
-    Analiza un frame YA CAPTURADO (numpy array de OpenCV) con LLaVA.
-    Separado de analizar_entorno_vision() para que el módulo de vigilancia
-    (vigilancia_camara.py) pueda reutilizar esto sin tener que abrir/cerrar
-    la cámara en cada análisis (la cámara se queda abierta durante toda la
-    vigilancia, esto solo recibe el frame que ya se leyó).
-    """
     ruta_foto_temp = "temp_vision.jpg"
     cv2.imwrite(ruta_foto_temp, frame)
 

@@ -27,20 +27,6 @@ from src.Automation.System_commands import (
 
 
 class NimClient:
-    """
-    Cliente para NVIDIA NIM (mistral-nemotron), como reemplazo de OllamaClient
-    para el módulo de acciones.
-
-    DECISIÓN DE DISEÑO PARA AHORRAR TOKENS:
-    A diferencia de OllamaClient (que acumula todo el historial de la
-    conversación y lo reenvía completo en cada llamada), este cliente es
-    STATELESS: cada llamada manda solo [system, user], sin arrastrar turnos
-    anteriores. Para clasificar/ejecutar una acción física no hace falta
-    memoria de conversación, y así el costo por llamada se mantiene
-    constante sin importar cuánto lleves usando REVAN en la sesión, en vez
-    de ir creciendo turno a turno.
-    """
-
     PALABRAS_ACCION = [
         "carpeta", "word", "excel", "documento",
         "navegador", "video", "busca", "reproduce", "brave",
