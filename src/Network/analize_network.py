@@ -17,7 +17,6 @@ def hay_conexion_internet(timeout: float = 3.0) -> bool:
     except Exception:
         return False
 
-
 def obtener_ip_local():
     """IP dentro de tu red local (la que te asigna tu router)."""
     try:
@@ -29,7 +28,6 @@ def obtener_ip_local():
     except Exception:
         return None
 
-
 def obtener_ip_publica():
     """IP con la que te ve el resto de internet. Requiere conexión real a internet."""
     try:
@@ -39,7 +37,6 @@ def obtener_ip_publica():
         return None
     except Exception:
         return None
-
 
 def obtener_estadisticas_trafico():
     """Bytes enviados/recibidos por todas las interfaces desde que arrancó el sistema
@@ -94,8 +91,7 @@ def analizar_red() -> str:
         )
 
     return " ".join(partes)
-
-
+#aqui se ejecuta la logica de este modulo 
 if __name__ == "__main__":
     print(analizar_red())
     print(listar_interfaces_red())

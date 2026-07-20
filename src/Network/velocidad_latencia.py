@@ -3,6 +3,7 @@ import subprocess
 import platform
 import re
 
+
 def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
     sistema = platform.system().lower()
     if "windows" in sistema:
@@ -17,7 +18,8 @@ def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
         print(f"[Latencia]: Error al ejecutar ping: {e}")
         return None
 
-    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms"
+    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms" (Windows
+    # en inglés / Linux / macOS)
     tiempos = [float(m) for m in re.findall(r"(?:tiempo|time)[=<]\s*(\d+(?:\.\d+)?)\s*ms", salida, re.IGNORECASE)]
 
     if not tiempos:
@@ -63,6 +65,16 @@ def probar_velocidad_internet() -> str:
                 f"y de subida, {subida_mbps:.1f} megabits por segundo.")
     except Exception as e:
         return f"No pude completar la prueba de velocidad, Señor. Detalle: {e}"
+
+
+def probar_velocidad_con_navegador() -> str:
+    try:
+        import subprocess
+        subprocess.Popen('start brave https://www.speedtest.net/es', shell=True)
+    except Exception as e:
+        print(f"[VelocidadLatencia]: No se pudo abrir el navegador: {e}")
+
+    return probar_velocidad_internet()
 
 
 if __name__ == "__main__":
