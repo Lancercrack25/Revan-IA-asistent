@@ -18,5 +18,5 @@ class ILLMClient(ABC):
 
     @abstractmethod
     def limpiar_memoria(self):
-        """Borra el historial de la sesión actual cuando el programa se cierre."""
+        """Borra el historial de la sesión actual solo cuando el programa se cierre."""
         pass
