@@ -6,7 +6,7 @@ import subprocess
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
+#imprtaciones de funciones de otros modulos 
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
@@ -108,9 +108,8 @@ def encender_sistemas():
 
         # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
         cerebro_ia = NimClient(api_key=api_key_nim)
-        gemini_ia = GeminiClient()   # ya no recibe api_key, la carga sola con cargar_credenciales()
+        gemini_ia = GeminiClient() 
         voz_ia = ElevenLabsClient()
-
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
         gui.agregar_mensaje("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
         
@@ -209,12 +208,7 @@ def procesar_ciclo_voz():
             return
 
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
-        # Se usa la RAÍZ de la palabra ("control", "manipul") en vez de
-        # formas verbales específicas ("controla", "controlar"), porque
-        # frases naturales como "dame el control de la esfera" usan el
-        # sustantivo, no el verbo, y "control" nunca hace match contra
-        # "controla" como substring.
-        raices_control = ["control", "manipul", "mueve", "mover"]
+        raices_control = ["control", "manipula", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
 
         if "esfera" in orden_limpia and any(p in orden_limpia for p in palabras_detener_intent):
