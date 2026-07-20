@@ -18,7 +18,6 @@ def _obtener_ip_local():
     except Exception:
         return None
 
-
 def _ping_host(ip: str, timeout_ms: int = 300) -> bool:
     """Ping silencioso de un solo intento, solo para saber si el host responde."""
     sistema = platform.system().lower()
@@ -140,11 +139,6 @@ def _ruta_carpeta_reportes() -> str:
 
 
 def generar_reporte_seguridad(encontrados: list, desconocidos: list) -> str:
-    """
-    Genera un archivo .txt con el detalle completo del escaneo (todos los
-    dispositivos, cuáles son desconocidos, y el veredicto), y devuelve la
-    ruta del archivo generado.
-    """
     from datetime import datetime
 
     carpeta = _ruta_carpeta_reportes()
@@ -188,11 +182,6 @@ def generar_reporte_seguridad(encontrados: list, desconocidos: list) -> str:
 
 
 def detectar_intrusos() -> str:
-    """
-    Escanea la red, compara contra dispositivos conocidos, genera un
-    reporte en archivo, y da un VEREDICTO claro (segura / posiblemente
-    comprometida) además de los detalles.
-    """
     conocidos = cargar_dispositivos_conocidos()
 
     if not conocidos:

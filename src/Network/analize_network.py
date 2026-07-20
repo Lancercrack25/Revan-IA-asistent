@@ -91,8 +91,7 @@ def analizar_red() -> str:
         )
 
     return " ".join(partes)
-
-
+#aqui se ejecuta la logica de este modulo 
 if __name__ == "__main__":
     print(analizar_red())
     print(listar_interfaces_red())
