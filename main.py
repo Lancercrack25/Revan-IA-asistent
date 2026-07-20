@@ -385,7 +385,6 @@ def main():
     except AttributeError:
         if hasattr(gui, 'app'):
             gui.app.deiconify()  
-    # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
