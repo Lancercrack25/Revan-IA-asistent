@@ -3,7 +3,14 @@ import subprocess
 import platform
 import re
 
+
 def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
+    """
+    Mide la latencia (tiempo de ida y vuelta) hacia un host, usando el
+    comando 'ping' nativo del sistema operativo (no requiere librerías
+    extra ni privilegios especiales).
+    Devuelve un dict con promedio/mínimo/máximo en ms, o None si falló.
+    """
     sistema = platform.system().lower()
     if "windows" in sistema:
         cmd = ["ping", "-n", str(intentos), host]
@@ -17,7 +24,8 @@ def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
         print(f"[Latencia]: Error al ejecutar ping: {e}")
         return None
 
-    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms"
+    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms" (Windows
+    # en inglés / Linux / macOS)
     tiempos = [float(m) for m in re.findall(r"(?:tiempo|time)[=<]\s*(\d+(?:\.\d+)?)\s*ms", salida, re.IGNORECASE)]
 
     if not tiempos:
@@ -48,6 +56,12 @@ def reportar_latencia(host: str = "8.8.8.8") -> str:
 
 
 def probar_velocidad_internet() -> str:
+    """
+    Prueba de velocidad REAL de descarga/subida. Tarda entre 10 y 30
+    segundos típicamente, así que solo debe llamarse cuando el usuario lo
+    pide de forma explícita, nunca como parte de un chequeo rápido.
+    Requiere: pip install speedtest-cli
+    """
     try:
         import speedtest
     except ImportError:
@@ -63,6 +77,16 @@ def probar_velocidad_internet() -> str:
                 f"y de subida, {subida_mbps:.1f} megabits por segundo.")
     except Exception as e:
         return f"No pude completar la prueba de velocidad, Señor. Detalle: {e}"
+
+
+def probar_velocidad_con_navegador() -> str:
+    try:
+        import subprocess
+        subprocess.Popen('start brave https://www.speedtest.net/es', shell=True)
+    except Exception as e:
+        print(f"[VelocidadLatencia]: No se pudo abrir el navegador: {e}")
+
+    return probar_velocidad_internet()
 
 
 if __name__ == "__main__":
