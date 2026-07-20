@@ -6,11 +6,11 @@ import subprocess
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-#imprtaciones de funciones de otros modulos 
+
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
-from src.Core.Config_loader import cargar_ajustes
+from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Gui.Dashboard import RevanGUI
 from src.Automation.System_commands import desplegar_monitores_windows
 from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
@@ -24,15 +24,15 @@ from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_c
 from src.Core.Gemini_client import GeminiClient
 
 # Instancias y Controles Globales
-cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
-gemini_ia = None      # Gemini (Conversación)
+cerebro_ia = None  
+gemini_ia = None      
 voz_ia = None
 oidos_ia = None
 gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 21    # Ventana de atención activa en segundos (Modo Jarvis)
+TIEMPO_ATENCION = 12
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
@@ -103,13 +103,14 @@ def encender_sistemas():
     print("[2/3] Panel CustomTkinter Activo.")
     
     try:
-        ajustes = cargar_ajustes() or {}
-        api_key_nim = ajustes.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
+        credenciales = cargar_credenciales() or {}
+        api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
 
         # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
         cerebro_ia = NimClient(api_key=api_key_nim)
-        gemini_ia = GeminiClient() 
+        gemini_ia = GeminiClient()   # ya no recibe api_key, la carga sola con cargar_credenciales()
         voz_ia = ElevenLabsClient()
+
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
         gui.agregar_mensaje("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
         
@@ -206,8 +207,14 @@ def procesar_ciclo_voz():
                 voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
+
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
-        raices_control = ["control", "manipula", "mueve", "mover"]
+        # Se usa la RAÍZ de la palabra ("control", "manipul") en vez de
+        # formas verbales específicas ("controla", "controlar"), porque
+        # frases naturales como "dame el control de la esfera" usan el
+        # sustantivo, no el verbo, y "control" nunca hace match contra
+        # "controla" como substring.
+        raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
 
         if "esfera" in orden_limpia and any(p in orden_limpia for p in palabras_detener_intent):
@@ -215,7 +222,7 @@ def procesar_ciclo_voz():
             if detener_control_esfera():
                 voz_ia.hablar("Control de esfera desactivado.")
             else:
-                voz_ia.hablar("parece que hubo un malentendido no había ningún control de esfera activo.")
+                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
@@ -233,7 +240,10 @@ def procesar_ciclo_voz():
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
         # Consulta rápida (IP, conectividad, tráfico) vs prueba de velocidad
+        # (tarda 10-30s), vs latencia, vs búsqueda de intrusos (también tarda
+        # unos segundos por el barrido de ping). Se separan para no mezclarlas.
         palabras_lista = orden_limpia.split()
+
         es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
         es_consulta_latencia = "latencia" in orden_limpia or "ping" in palabras_lista
         es_consulta_intrusos = any(p in orden_limpia for p in [
@@ -355,6 +365,8 @@ def main():
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
+    
+    # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
 
@@ -379,8 +391,10 @@ def main():
     except AttributeError:
         if hasattr(gui, 'app'):
             gui.app.deiconify()  
+    # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
+# Ejecución de la lógica de REVAN
 if __name__ == "__main__":
     main()
