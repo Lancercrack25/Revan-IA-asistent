@@ -28,11 +28,6 @@ from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 
 
 # ─── DEFINICIÓN DE HERRAMIENTAS (formato estándar OpenAI-compatible) ──────
-# Esto reemplaza el enfoque anterior de "describir el JSON en el prompt y
-# parsear texto libre con regex". Ahora el modelo recibe estos schemas
-# validados y devuelve argumentos ya estructurados garantizados (tool_calls),
-# no texto que hay que adivinar cómo extraer. mistral-nemotron soporta esto
-# de forma nativa (fue elegido justo por eso).
 HERRAMIENTAS = [
     {
         "type": "function",
@@ -46,7 +41,7 @@ HERRAMIENTAS = [
                     "ruta": {
                         "type": "string",
                         "enum": ["actual", "escritorio", "documentos"],
-                        "description": "Dónde crear la carpeta. Usa 'escritorio' o 'documentos' SOLO si el usuario lo menciona explícitamente; si no, usa 'actual'.",
+                        "description": "Dónde crear la carpeta. Si el usuario NO menciona ubicación, usa 'escritorio' (es lo más predecible y fácil de encontrar). Usa 'actual' SOLO si el usuario claramente sigue trabajando en algo relacionado con una carpeta que se mencionó hace poco en esta misma conversación.",
                     },
                 },
                 "required": ["nombre"],
@@ -240,7 +235,7 @@ class NimClient:
         try:
             if nombre == "crear_carpeta":
                 nombre_c = (argumentos.get("nombre") or "Contenedor_Táctico").strip() or "Contenedor_Táctico"
-                ruta_c = argumentos.get("ruta", "actual")
+                ruta_c = argumentos.get("ruta", "escritorio")
                 resultado = crear_carpeta_sistema(nombre_c, ruta_c)
                 registrar_accion_sistema(f"crear_carpeta({nombre_c})", resultado, "CREAR_CARPETA")
                 return resultado
@@ -391,8 +386,7 @@ class NimClient:
             # No pidió más herramientas: esta es la respuesta final.
             return mensaje.content or "Listo, Señor."
 
-        return "No pude completar la tarea en el número de pasos permitido, Señor. ¿Puede intentarlo de nuevo o dividirlo en pasos más simples?"
-
+        return "No pude completar la tarea en el número de pasos permitido, Señor. ¿Puede intentarlo de nuevo o dividirlo en pasos más simples para que sea mas optimo mis procesos de ejecucion?"
 
 if __name__ == "__main__":
     cliente = NimClient()

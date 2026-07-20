@@ -32,7 +32,6 @@ def _obtener_cliente_nim():
     _cliente_nim = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
     return _cliente_nim
 
-
 def _generar_embedding(texto: str, input_type: str = "passage"):
     texto = (texto or "").strip()
     if not texto:
@@ -52,7 +51,6 @@ def _generar_embedding(texto: str, input_type: str = "passage"):
     except Exception as e:
         print(f"[MemoriaSemantica]: Error al generar embedding: {e}")
         return None
-
 
 def _similitud_coseno(vec_a: list, vec_b: list) -> float:
     """

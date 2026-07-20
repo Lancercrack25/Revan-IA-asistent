@@ -19,14 +19,23 @@ class ElevenLabsClient:
         self.voice_id = "0b6fd25d"
         self.voice_name_legible = "Voice 06:13 PM — CLONE"
 
-        # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
+        # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon).
+        # Se usa automáticamente si OmniVoice tarda demasiado o falla, para
+        # que REVAN nunca se quede en silencio o trabado esperando.
         self.voz_respaldo = "es-MX-JorgeNeural"
-        self.timeout_omnivoice = 12  # segundos
+        self.timeout_omnivoice = 12  # segundos antes de rendirse y usar el respaldo
 
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
     def _limpiar_texto_para_tts(self, texto: str) -> str:
+        """
+        Limpieza MÍNIMA antes de mandar el texto a hablar: solo colapsa
+        espacios/saltos de línea de más y quita espacios al inicio/final.
+        No borra letras, signos de puntuación ni acentos, para no terminar
+        vaciando el texto por accidente (eso hacía que 'hablar()' cancelara
+        en silencio en vez de sonar).
+        """
         if not texto:
             return ""
         return re.sub(r'\s+', ' ', texto).strip()
@@ -36,15 +45,22 @@ class ElevenLabsClient:
             r = requests.get(self.url_voces, timeout=3)
             if r.status_code != 200:
                 return self.voice_id
+
             voces = r.json().get("voices", [])
+
             if any(v.get("voice_id") == self.voice_id for v in voces):
                 return self.voice_id
+
             for v in voces:
                 if v.get("name") == self.voice_name_legible:
+                    print(f"[OmniVoice]: voice_id cambió de '{self.voice_id}' a '{v.get('voice_id')}', actualizando.")
                     self.voice_id = v.get("voice_id")
                     return self.voice_id
+
+            print(f"[OmniVoice]: No se encontró '{self.voice_name_legible}'. Usando el último ID conocido.")
             return self.voice_id
-        except Exception:
+        except Exception as e:
+            print(f"[OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
             return self.voice_id
 
     def _intentar_omnivoice(self, texto_limpio: str) -> bool:
@@ -56,7 +72,7 @@ class ElevenLabsClient:
             "model": "tts-1",
             "input": texto_limpio,
             "voice": voz_final,
-            "response_format": "mp3"
+            "response_format": "mp3",
         }
 
         output_filename = "output.mp3"
@@ -64,12 +80,12 @@ class ElevenLabsClient:
         try:
             respuesta = requests.post(
                 self.url_api, json=payload,
-                timeout=(3, self.timeout_omnivoice),
-                stream=True
+                timeout=(5, self.timeout_omnivoice),
+                stream=True,
             )
 
             if respuesta.status_code != 200:
-                print(f"[Voz]: OmniVoice devolvió error {respuesta.status_code}, usando respaldo.")
+                print(f"[Voz]: OmniVoice devolvió error {respuesta.status_code}. Detalles: {respuesta.text}")
                 return False
 
             with open(output_filename, "wb") as f:
@@ -77,6 +93,7 @@ class ElevenLabsClient:
                     if chunk:
                         f.write(chunk)
 
+            print("🎵 [OmniVoice]: Audio generado con éxito. Reproduciendo...")
             pygame.mixer.music.load(output_filename)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
@@ -86,8 +103,8 @@ class ElevenLabsClient:
             if os.path.exists(output_filename):
                 try:
                     os.remove(output_filename)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[Voz]: No se pudo eliminar el archivo temporal: {e}")
 
             return True
 
@@ -132,12 +149,12 @@ class ElevenLabsClient:
         """
         texto_limpio = self._limpiar_texto_para_tts(text)
         if not texto_limpio:
+            print("[Voz]: Intento de vocalizar un texto vacío. Cancelado.")
             return
 
         exito = self._intentar_omnivoice(texto_limpio)
         if not exito:
             self._hablar_respaldo(texto_limpio)
-
 
 # Instancia global requerida por el core del sistema
 client_voz = ElevenLabsClient()
