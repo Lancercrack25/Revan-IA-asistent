@@ -25,7 +25,8 @@ def lanzar_aplicacion_usuario(nombre_app):
             "thunderstore": "Thunderstore Mod Manager.lnk",
             "unity": "Unity Hub.lnk",
             "xbox": "Xbox.lnk",
-            "zerotier": "ZeroTier.lnk"
+            "zerotier": "ZeroTier.lnk",
+            "launcher": "Minecraft Launcher"
         }
         
         # Apps globales estándar que Windows abre directo

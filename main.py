@@ -32,13 +32,13 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 12
+TIEMPO_ATENCION = 15
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego", "jugar", "monitores", "camara","mira"
+    "juego", "jugar", "monitores", "camara","mira","ejecuta"
 ]
 
 def hilo_servidor_web():
@@ -365,11 +365,9 @@ def main():
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
-    
     # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
-
     oidos_ia = MicrophoneClient()
     
     print("REVAN en modo pasivo. Esperando señal acústica...")

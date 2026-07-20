@@ -27,19 +27,10 @@ def lanzar_videojuego(nombre_juego):
             "star wars": "STAR WARS™ Battlefront™ II.lnk",
             "battlefront": "STAR WARS™ Battlefront™ II.lnk",
             "seven deadly sins": "The Seven Deadly Sins Grand Cross.lnk",
-            "7ds": "The Seven Deadly Sins Grand Cross.lnk"
+            "7ds": "The Seven Deadly Sins Grand Cross.lnk",
+            "minecraft": "Minecraft for Windows.lnk"
         }
-        
-        if "minecraft" in juego:
-            # Control especial para Minecraft por si acaso
-            ruta_mc = os.path.join(os.path.expanduser("~"), "AppData", "Roaming", ".minecraft", "launcher.exe")
-            if os.path.exists(ruta_mc):
-                subprocess.Popen(f'"{ruta_mc}"', shell=True)
-                return "Iniciando bloques de Minecraft, Señor."
-            else:
-                subprocess.Popen("start minecraft:", shell=True)
-                return "Ejecutando protocolo base para abrir Minecraft, Señor."
-
+    
         # Buscar el juego en el mapa táctico de tu carpeta
         if juego in mapeo_juegos:
             archivo_final = os.path.join(ruta_juegos, mapeo_juegos[juego])
