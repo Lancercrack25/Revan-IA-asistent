@@ -206,7 +206,6 @@ def procesar_ciclo_voz():
                 voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
-
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
         raices_control = ["control", "manipula", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
@@ -216,7 +215,7 @@ def procesar_ciclo_voz():
             if detener_control_esfera():
                 voz_ia.hablar("Control de esfera desactivado.")
             else:
-                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
+                voz_ia.hablar("parece que hubo un malentendido no había ningún control de esfera activo.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
@@ -234,10 +233,7 @@ def procesar_ciclo_voz():
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
         # Consulta rápida (IP, conectividad, tráfico) vs prueba de velocidad
-        # (tarda 10-30s), vs latencia, vs búsqueda de intrusos (también tarda
-        # unos segundos por el barrido de ping). Se separan para no mezclarlas.
         palabras_lista = orden_limpia.split()
-
         es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
         es_consulta_latencia = "latencia" in orden_limpia or "ping" in palabras_lista
         es_consulta_intrusos = any(p in orden_limpia for p in [
@@ -359,8 +355,6 @@ def main():
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
-    
-    # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
 

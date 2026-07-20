@@ -1,6 +1,5 @@
 import os
 import json
-import re
 import time
 
 try:
@@ -9,57 +8,184 @@ except ImportError:
     print("Falta la librería 'openai'. Instálala con: pip install openai")
     raise
 
-# Mismas funciones de ejecución de acciones que usa Ollama_client.py
 from src.Services.os_service import (
     analizar_entorno_vision,
     abrir_carpeta_sistema,
     crear_carpeta_sistema,
     obtener_ruta_actual,
-    registrar_accion_sistema
+    registrar_accion_sistema,
+    ejecutar_limpieza_sistema,
+    obtener_diagnostico_hardware,
 )
 from src.Automation.System_commands import (
     desplegar_monitores_windows,
     ejecutar_aplicacion_office,
     reproducir_video_brave,
     lanzar_aplicacion_usuario,
-    lanzar_videojuego
+    lanzar_videojuego,
 )
+from src.Database.conexion import obtener_conexion_pool, liberar_conexion
+
+
+# ─── DEFINICIÓN DE HERRAMIENTAS (formato estándar OpenAI-compatible) ──────
+# Esto reemplaza el enfoque anterior de "describir el JSON en el prompt y
+# parsear texto libre con regex". Ahora el modelo recibe estos schemas
+# validados y devuelve argumentos ya estructurados garantizados (tool_calls),
+# no texto que hay que adivinar cómo extraer. mistral-nemotron soporta esto
+# de forma nativa (fue elegido justo por eso).
+HERRAMIENTAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "crear_carpeta",
+            "description": "Crea una carpeta nueva en el sistema de archivos del usuario.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre": {"type": "string", "description": "Nombre de la carpeta a crear"},
+                    "ruta": {
+                        "type": "string",
+                        "enum": ["actual", "escritorio", "documentos"],
+                        "description": "Dónde crear la carpeta. Usa 'escritorio' o 'documentos' SOLO si el usuario lo menciona explícitamente; si no, usa 'actual'.",
+                    },
+                },
+                "required": ["nombre"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_carpeta",
+            "description": "Abre una carpeta existente por nombre.",
+            "parameters": {
+                "type": "object",
+                "properties": {"nombre": {"type": "string", "description": "Nombre de la carpeta a abrir"}},
+                "required": ["nombre"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_office",
+            "description": "Abre Word o Excel, opcionalmente creando un documento nuevo con un nombre en una carpeta específica.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "app": {"type": "string", "enum": ["word", "excel"]},
+                    "nombre_archivo": {"type": "string", "description": "Nombre del archivo a crear"},
+                    "destino": {"type": "string", "description": "'actual', o el nombre de una carpeta específica"},
+                },
+                "required": ["app"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "reproducir_video",
+            "description": "Busca y reproduce un video en el navegador (Brave).",
+            "parameters": {
+                "type": "object",
+                "properties": {"busqueda": {"type": "string", "description": "Qué buscar y reproducir"}},
+                "required": ["busqueda"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_aplicacion",
+            "description": "Abre una aplicación instalada en la PC del usuario.",
+            "parameters": {
+                "type": "object",
+                "properties": {"nombre": {"type": "string", "description": "Nombre de la aplicación"}},
+                "required": ["nombre"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_videojuego",
+            "description": "Abre un videojuego instalado en la PC del usuario.",
+            "parameters": {
+                "type": "object",
+                "properties": {"nombre": {"type": "string", "description": "Nombre del videojuego"}},
+                "required": ["nombre"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "mostrar_monitor_recursos",
+            "description": "Despliega los monitores nativos de recursos del sistema de Windows (CPU, RAM, red, disco).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "diagnostico_hardware",
+            "description": "Da un reporte rápido de uso actual de CPU, RAM y disco, hablado (no abre ninguna ventana).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "limpiar_sistema",
+            "description": "Borra archivos temporales de Windows para liberar espacio. Es una acción destructiva (elimina archivos), solo debe usarse si el usuario lo pide explícitamente.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analizar_camara",
+            "description": "Enciende la cámara y describe brevemente qué hay frente a ella en este momento.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_informacion",
+            "description": "Busca información sobre un tema en fuentes confiables de internet (Wikipedia y respaldo en DuckDuckGo) y devuelve un resumen. Úsala cuando el usuario pida investigar, saber qué es algo, o quién es alguien.",
+            "parameters": {
+                "type": "object",
+                "properties": {"tema": {"type": "string", "description": "El tema a investigar"}},
+                "required": ["tema"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "guardar_nota",
+            "description": "Guarda un dato o nota en la memoria permanente de REVAN, para poder recordarlo después bajo una clave concreta.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "clave": {"type": "string", "description": "Palabra o frase corta para identificar la nota (ej. 'cumpleaños de mamá')"},
+                    "contenido": {"type": "string", "description": "El contenido a recordar"},
+                },
+                "required": ["clave", "contenido"],
+            },
+        },
+    },
+]
 
 
 class NimClient:
-    PALABRAS_ACCION = [
-        "carpeta", "word", "excel", "documento",
-        "navegador", "video", "busca", "reproduce", "brave",
-        "app", "aplicación", "aplicacion", "juego",
-        "monitor", "recursos"
-    ]
-
     def __init__(self, api_key: str = None, modelo: str = "mistralai/mistral-nemotron"):
-        # 1. Si no se pasó api_key por parámetro, intentamos leer config/credentials.json
-        if not api_key:
-            ruta_credenciales = os.path.join("config", "credentials.json")
-            if os.path.exists(ruta_credenciales):
-                try:
-                    with open(ruta_credenciales, "r", encoding="utf-8") as f:
-                        credenciales = json.load(f)
-                        # Busca la api key bajo distintos nombres comunes en tu JSON
-                        api_key = (
-                            credenciales.get("nvidia_api_key") or 
-                            credenciales.get("NVIDIA_API_KEY") or 
-                            credenciales.get("NVIDIA_NIM_API_KEY") or
-                            credenciales.get("api_key")
-                        )
-                except Exception as e:
-                    print(f"[NimClient] Error al leer {ruta_credenciales}: {e}")
-
-        # 2. Si no se encontró en el JSON, busca en las variables de entorno
         self.api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
-
-        # 3. Si sigue sin existir, lanza el error
         if not self.api_key:
             raise ValueError(
-                "Falta la API key de NVIDIA NIM. Asegúrate de configurar correctamente "
-                "el archivo 'config/credentials.json' o define la variable de entorno NVIDIA_NIM_API_KEY."
+                "Falta la API key de NVIDIA NIM. Pásala como argumento o "
+                "define la variable de entorno NVIDIA_NIM_API_KEY."
             )
 
         self.modelo = modelo
@@ -68,182 +194,212 @@ class NimClient:
             api_key=self.api_key,
         )
 
-        # Prompt recortado a lo esencial
         self.system_prompt = (
-            "Eres REVAN, asistente tipo Jarvis para el sistema operativo.\n"
-            "Si el usuario pide una acción física (crear/abrir carpetas, archivos, apps, cámara), "
-            "responde SOLO con el JSON correspondiente, sin texto ni bloques de código.\n"
-            "Si no especifica nombre para una carpeta, usa 'Contenedor_Táctico'.\n\n"
-            "JSON válidos:\n"
-            "{\"accion\":\"VISION\"}\n"
-            "{\"accion\":\"MONITOR\"}\n"
-            "{\"accion\":\"CREAR_CARPETA\",\"ruta\":\"actual\",\"nombre\":\"Proyecto\"}\n"
-            "{\"accion\":\"CREAR_CARPETA\",\"ruta\":\"escritorio\",\"nombre\":\"Fotos\"}  (solo si dice 'escritorio')\n"
-            "{\"accion\":\"CREAR_CARPETA\",\"ruta\":\"documentos\",\"nombre\":\"Tareas\"}  (solo si dice 'documentos')\n"
-            "{\"accion\":\"ABRIR_CARPETA\",\"nombre\":\"nombre\"}\n"
-            "{\"accion\":\"OFFICE\",\"app\":\"word\",\"nombre_archivo\":\"nombre\",\"destino\":\"actual\"}\n"
-            "{\"accion\":\"VIDEO\",\"busqueda\":\"query\"}\n"
-            "{\"accion\":\"APP\",\"nombre\":\"nombre_app\"}\n"
-            "{\"accion\":\"JUEGO\",\"nombre\":\"nombre_juego\"}\n\n"
-            "Si es conversación normal, responde en texto plano, máximo 25 palabras."
+            "Eres REVAN, asistente tipo Jarvis para el sistema operativo del usuario.\n"
+            "Tienes herramientas reales para ejecutar acciones físicas (crear carpetas, "
+            "abrir apps, investigar temas, guardar notas, etc.). Cuando el usuario pida "
+            "algo que corresponda a una herramienta, ÚSALA en vez de solo describir qué "
+            "harías. Puedes usar varias herramientas en secuencia si la tarea lo requiere "
+            "(por ejemplo: investigar un tema Y LUEGO guardar el resultado como nota).\n"
+            "Si es conversación ordinaria sin ninguna acción física de por medio, responde "
+            "en texto plano, máximo 1 o 2 frases cortas (menos de 25 palabras)."
         )
 
-    def _extraer_json(self, texto: str):
-        texto = texto.strip()
+    # ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────────
+
+    def _guardar_nota(self, clave: str, contenido: str) -> str:
+        if not clave or not contenido:
+            return "Necesito una clave y un contenido para guardar la nota, Señor."
+
+        conn = obtener_conexion_pool()
+        if not conn:
+            return "No pude guardar la nota, sin conexión a la base de datos."
+
         try:
-            return json.loads(texto)
-        except json.JSONDecodeError:
-            pass
-
-        sin_fences = re.sub(r'```(?:json)?', '', texto, flags=re.IGNORECASE).strip()
-        if sin_fences != texto:
-            try:
-                return json.loads(sin_fences)
-            except json.JSONDecodeError:
-                texto = sin_fences
-
-        decoder = json.JSONDecoder()
-        for i, ch in enumerate(texto):
-            if ch != "{":
-                continue
-            try:
-                objeto, _ = decoder.raw_decode(texto[i:])
-                return objeto
-            except json.JSONDecodeError:
-                continue
-
-        return None
-
-    def _llamar_modelo(self, mensajes, max_tokens=200):
-        respuesta = self.client.chat.completions.create(
-            model=self.modelo,
-            messages=mensajes,
-            temperature=0.3,
-            top_p=0.7,
-            max_tokens=max_tokens,
-            stream=False,
-        )
-        return respuesta.choices[0].message.content.strip()
-
-    def _forzar_json_accion(self, orden_usuario: str):
-        try:
-            mensaje_forzado = [
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": (
-                    f'Orden del usuario: "{orden_usuario}"\n'
-                    "Responde EXCLUSIVAMENTE con el JSON de acción correspondiente."
-                )}
-            ]
-            texto = self._llamar_modelo(mensaje_forzado, max_tokens=150)
-            return self._extraer_json(texto)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO memoria_largo_plazo (clave, valor)
+                VALUES (%s, %s)
+                ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, fecha_guardado = CURRENT_TIMESTAMP;
+                """,
+                (clave, contenido),
+            )
+            conn.commit()
+            cur.close()
+            return f"Guardado, Señor. Recordaré '{clave}'."
         except Exception as e:
-            print(f"[NimClient]: Falló el reintento forzado de JSON: {e}")
-            return None
+            conn.rollback()
+            return f"Error al guardar la nota: {e}"
+        finally:
+            liberar_conexion(conn)
 
-    def generar_respuesta(self, orden_usuario: str) -> str:
+    def _ejecutar_herramienta(self, nombre: str, argumentos: dict) -> str:
+        """Ejecuta la herramienta pedida por el modelo y devuelve el resultado
+        como texto (que se le reenvía al modelo como 'resultado de la herramienta')."""
         try:
-            orden_clean = orden_usuario.lower().strip()
+            if nombre == "crear_carpeta":
+                nombre_c = (argumentos.get("nombre") or "Contenedor_Táctico").strip() or "Contenedor_Táctico"
+                ruta_c = argumentos.get("ruta", "actual")
+                resultado = crear_carpeta_sistema(nombre_c, ruta_c)
+                registrar_accion_sistema(f"crear_carpeta({nombre_c})", resultado, "CREAR_CARPETA")
+                return resultado
 
-            # Cámara: igual que Ollama_client, se resuelve local (llava)
-            if any(k in orden_clean for k in ["camara", "cámara", "que ves", "qué ves", "ver entorno"]):
-                memoria_asistente = analizar_entorno_vision()
-                registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
-                return memoria_asistente
+            elif nombre == "abrir_carpeta":
+                resultado = abrir_carpeta_sistema(argumentos.get("nombre", ""))
+                registrar_accion_sistema(f"abrir_carpeta({argumentos.get('nombre','')})", resultado, "ABRIR_CARPETA")
+                return resultado
 
-            t0 = time.time()
-            texto_respuesta = self._llamar_modelo([
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": orden_usuario},
-            ])
-            print(f"[NIM] Tiempo: {time.time() - t0:.2f}s")
+            elif nombre == "abrir_office":
+                app_tipo = argumentos.get("app", "word")
+                nombre_doc = argumentos.get("nombre_archivo", "Documento_Táctico")
+                carpeta_destino = argumentos.get("destino", "")
 
-            memoria_asistente = texto_respuesta
-            datos = self._extraer_json(texto_respuesta)
-
-            if (not datos or "accion" not in datos) and any(p in orden_clean for p in self.PALABRAS_ACCION):
-                print("[NimClient]: Orden con palabra de acción pero sin JSON. Reintentando forzado...")
-                datos_retry = self._forzar_json_accion(orden_usuario)
-                if datos_retry and isinstance(datos_retry, dict) and "accion" in datos_retry:
-                    datos = datos_retry
-
-            if datos and isinstance(datos, dict) and "accion" in datos:
-                accion = datos.get("accion")
-                print(f"[NimClient]: Acción detectada -> {accion}")
-
-                if accion == "MONITOR":
-                    desplegar_monitores_windows()
-                    memoria_asistente = "Monitores tácticos del sistema desplegados, Señor."
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "MONITOR")
-
-                elif accion == "CREAR_CARPETA":
-                    nombre_c = datos.get("nombre", "Contenedor_Táctico")
-                    if str(nombre_c).lower() in ["usar_nombre_dictado", ""] or not nombre_c:
-                        nombre_c = "Contenedor_Táctico"
-                    ruta_c = datos.get("ruta", "actual")
-                    memoria_asistente = crear_carpeta_sistema(nombre_c, ruta_c)
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "CREAR_CARPETA")
-
-                elif accion == "ABRIR_CARPETA":
-                    nombre_target = datos.get("nombre", "")
-                    memoria_asistente = abrir_carpeta_sistema(nombre_target)
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "ABRIR_CARPETA")
-
-                elif accion == "OFFICE":
-                    app_tipo = datos.get("app", "word")
-                    nombre_doc = datos.get("nombre_archivo", "Documento_Táctico")
-                    carpeta_destino = datos.get("destino", "")
-
-                    if carpeta_destino and carpeta_destino.lower() != "actual":
-                        escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
-                        ruta_final = os.path.join(escritorio, carpeta_destino)
-                    else:
-                        ruta_final = obtener_ruta_actual()
-
-                    os.makedirs(ruta_final, exist_ok=True)
-                    ejecutar_aplicacion_office(app_tipo)
-                    nombre_directorio_actual = os.path.basename(ruta_final)
-                    memoria_asistente = f"¡Listo, Señor! Abriendo {app_tipo.capitalize()} para el documento en '{nombre_directorio_actual}'."
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "OFFICE")
-
-                elif accion == "VIDEO":
-                    reproducir_video_brave(datos.get("busqueda", ""))
-                    memoria_asistente = f"Reproduciendo contenido sobre '{datos.get('busqueda', '')}' en Brave."
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "VIDEO")
-
-                elif accion == "APP":
-                    lanzar_aplicacion_usuario(datos.get("nombre", ""))
-                    memoria_asistente = f"Ejecutando aplicación {datos.get('nombre', '')}."
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "APP")
-
-                elif accion == "JUEGO":
-                    lanzar_videojuego(datos.get("nombre", ""))
-                    memoria_asistente = f"Iniciando {datos.get('nombre', '')}, Señor."
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "JUEGO")
-
-                elif accion == "VISION":
-                    memoria_asistente = analizar_entorno_vision()
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "VISION")
-
+                if carpeta_destino and carpeta_destino.lower() != "actual":
+                    escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
+                    ruta_final = os.path.join(escritorio, carpeta_destino)
                 else:
-                    memoria_asistente = "No reconocí bien esa instrucción, Señor. ¿Puede repetirla de otra forma?"
-                    registrar_accion_sistema(orden_usuario, memoria_asistente, "ACCION_DESCONOCIDA")
+                    ruta_final = obtener_ruta_actual()
 
-            return memoria_asistente
+                os.makedirs(ruta_final, exist_ok=True)
+                ejecutar_aplicacion_office(app_tipo)
+                nombre_directorio_actual = os.path.basename(ruta_final)
+                resultado = f"¡Listo, Señor! Abriendo {app_tipo.capitalize()} para el documento en '{nombre_directorio_actual}'."
+                registrar_accion_sistema(f"abrir_office({app_tipo})", resultado, "OFFICE")
+                return resultado
+
+            elif nombre == "reproducir_video":
+                busqueda = argumentos.get("busqueda", "")
+                reproducir_video_brave(busqueda)
+                resultado = f"Reproduciendo contenido sobre '{busqueda}' en Brave."
+                registrar_accion_sistema(f"video({busqueda})", resultado, "VIDEO")
+                return resultado
+
+            elif nombre == "abrir_aplicacion":
+                app_nombre = argumentos.get("nombre", "")
+                lanzar_aplicacion_usuario(app_nombre)
+                resultado = f"Ejecutando aplicación {app_nombre}."
+                registrar_accion_sistema(f"app({app_nombre})", resultado, "APP")
+                return resultado
+
+            elif nombre == "abrir_videojuego":
+                juego_nombre = argumentos.get("nombre", "")
+                lanzar_videojuego(juego_nombre)
+                resultado = f"Iniciando {juego_nombre}, Señor."
+                registrar_accion_sistema(f"juego({juego_nombre})", resultado, "JUEGO")
+                return resultado
+
+            elif nombre == "mostrar_monitor_recursos":
+                desplegar_monitores_windows()
+                resultado = "Monitores tácticos del sistema desplegados, Señor."
+                registrar_accion_sistema("monitor", resultado, "MONITOR")
+                return resultado
+
+            elif nombre == "diagnostico_hardware":
+                resultado = obtener_diagnostico_hardware()
+                registrar_accion_sistema("diagnostico_hardware", resultado, "DIAGNOSTICO")
+                return resultado
+
+            elif nombre == "limpiar_sistema":
+                resultado = ejecutar_limpieza_sistema()
+                registrar_accion_sistema("limpiar_sistema", resultado, "LIMPIEZA")
+                return resultado
+
+            elif nombre == "analizar_camara":
+                resultado = analizar_entorno_vision()
+                registrar_accion_sistema("camara", resultado, "VISION")
+                return resultado
+
+            elif nombre == "buscar_informacion":
+                from src.Services.research_service import buscar_y_resumir_tema
+                tema = argumentos.get("tema", "")
+                resultado = buscar_y_resumir_tema(tema)
+                registrar_accion_sistema(f"investigar({tema})", resultado, "RESEARCH_TASK")
+                return resultado
+
+            elif nombre == "guardar_nota":
+                return self._guardar_nota(argumentos.get("clave", ""), argumentos.get("contenido", ""))
+
+            else:
+                return f"Herramienta '{nombre}' no reconocida."
 
         except Exception as e:
-            print(f"Error crítico en NimClient: {e}")
-            return "Error de comunicación con el núcleo cognitivo en la nube."
+            return f"Error al ejecutar '{nombre}': {e}"
+
+    # ─── LOOP AGÉNTICO ──────────────────────────────────────────────────────
+
+    def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
+        """
+        A diferencia del enfoque anterior (una sola llamada, parsear texto),
+        esto es un LOOP: si el modelo decide llamar una o más herramientas,
+        se ejecutan, se le devuelve el resultado, y se le vuelve a preguntar
+        qué hacer — hasta 'max_iteraciones' veces, o hasta que responda con
+        texto normal (sin más llamadas a herramientas) porque ya terminó.
+        Esto es lo que permite encadenar pasos (ej. investigar Y LUEGO
+        guardar la nota) sin tener que hardcodear ese caso específico en
+        otro archivo (como hacía agent_orchestrator.py antes).
+        """
+        mensajes = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": orden_usuario},
+        ]
+
+        for _ in range(max_iteraciones):
+            try:
+                t0 = time.time()
+                respuesta = self.client.chat.completions.create(
+                    model=self.modelo,
+                    messages=mensajes,
+                    tools=HERRAMIENTAS,
+                    tool_choice="auto",
+                    temperature=0.3,
+                    max_tokens=400,
+                )
+                print(f"[NIM] Tiempo: {time.time() - t0:.2f}s")
+            except Exception as e:
+                print(f"Error crítico en el Core de NIM: {e}")
+                return "Error de comunicación con mi núcleo cognitivo en la nube."
+
+            mensaje = respuesta.choices[0].message
+
+            if mensaje.tool_calls:
+                # El propio SDK espera que el mensaje del asistente con las
+                # tool_calls se agregue tal cual al historial antes de las
+                # respuestas de las herramientas.
+                mensajes.append(mensaje)
+
+                for tool_call in mensaje.tool_calls:
+                    nombre_herramienta = tool_call.function.name
+                    try:
+                        argumentos = json.loads(tool_call.function.arguments or "{}")
+                    except json.JSONDecodeError:
+                        argumentos = {}
+
+                    print(f"[NimClient]: Ejecutando herramienta -> {nombre_herramienta}({argumentos})")
+                    resultado_herramienta = self._ejecutar_herramienta(nombre_herramienta, argumentos)
+
+                    mensajes.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": resultado_herramienta,
+                    })
+
+                # Volver a llamar al modelo con los resultados, para que
+                # decida el siguiente paso (otra herramienta, o responder).
+                continue
+
+            # No pidió más herramientas: esta es la respuesta final.
+            return mensaje.content or "Listo, Señor."
+
+        return "No pude completar la tarea en el número de pasos permitido, Señor. ¿Puede intentarlo de nuevo o dividirlo en pasos más simples?"
 
 
 if __name__ == "__main__":
-    # Prueba rápida y aislada
     cliente = NimClient()
     pruebas = [
         "crea una carpeta llamada Prueba en el escritorio",
-        "crea una carpeta",
-        "puedes crear dentro de esa carpeta un archivo de word",
-        "abre una ventana en el navegador sobre minecraft",
-        "hola revan como estas",
+        "investiga sobre los agujeros negros y guárdalo en tu memoria",
+        "hola como estas",
     ]
     for p in pruebas:
         print(f"\n--- Orden: {p} ---")
