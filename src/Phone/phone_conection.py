@@ -3,7 +3,6 @@
 import subprocess
 import shutil
 
-
 def adb_disponible() -> bool:
     """Verifica que el comando 'adb' esté instalado y en el PATH del sistema."""
     return shutil.which("adb") is not None

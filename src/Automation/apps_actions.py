@@ -26,7 +26,7 @@ def lanzar_aplicacion_usuario(nombre_app):
             "unity": "Unity Hub.lnk",
             "xbox": "Xbox.lnk",
             "zerotier": "ZeroTier.lnk",
-            "launcher": "Minecraft Launcher"
+            "launcher": "Minecraft Launcher.lnk"
         }
         
         # Apps globales estándar que Windows abre directo

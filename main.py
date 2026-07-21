@@ -209,11 +209,6 @@ def procesar_ciclo_voz():
             return
 
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
-        # Se usa la RAÍZ de la palabra ("control", "manipul") en vez de
-        # formas verbales específicas ("controla", "controlar"), porque
-        # frases naturales como "dame el control de la esfera" usan el
-        # sustantivo, no el verbo, y "control" nunca hace match contra
-        # "controla" como substring.
         raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
 
@@ -395,6 +390,5 @@ def main():
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
-# Ejecución de la lógica de REVAN
 if __name__ == "__main__":
     main()

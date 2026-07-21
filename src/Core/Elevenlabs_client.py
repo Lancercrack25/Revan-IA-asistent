@@ -29,13 +29,6 @@ class ElevenLabsClient:
             pygame.mixer.init()
 
     def _limpiar_texto_para_tts(self, texto: str) -> str:
-        """
-        Limpieza MÍNIMA antes de mandar el texto a hablar: solo colapsa
-        espacios/saltos de línea de más y quita espacios al inicio/final.
-        No borra letras, signos de puntuación ni acentos, para no terminar
-        vaciando el texto por accidente (eso hacía que 'hablar()' cancelara
-        en silencio en vez de sonar).
-        """
         if not texto:
             return ""
         return re.sub(r'\s+', ' ', texto).strip()
