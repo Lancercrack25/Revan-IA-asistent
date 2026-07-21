@@ -21,17 +21,7 @@ def _resolver_numero(destinatario: str):
     nombre, numero = resultado
     return nombre, re.sub(r"[^\d]", "", numero)
 
-
 def abrir_chat_con_mensaje(destinatario: str, mensaje: str) -> str:
-    """
-    Abre WhatsApp directo en el chat del contacto, con el mensaje YA
-    ESCRITO en el campo de texto, pero SIN enviarlo — el usuario confirma
-    el envío tocando el botón en su teléfono.
-
-    Esta es la opción RECOMENDADA por defecto: es confiable (siempre
-    funciona igual, sin importar el modelo de teléfono ni la versión de
-    WhatsApp) y te deja la última palabra antes de que algo se mande.
-    """
     if not dispositivo_conectado():
         return "No detecto su teléfono conectado, Señor. Verifique el cable USB."
 
