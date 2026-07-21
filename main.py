@@ -3,6 +3,7 @@ import sys
 import time
 import threading
 import subprocess
+
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
@@ -24,8 +25,8 @@ from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_c
 from src.Core.Gemini_client import GeminiClient
 
 # Instancias y Controles Globales
-cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
-gemini_ia = None      # Gemini (Conversación)
+cerebro_ia = None     # NimClient (Motor de acciones tácticas y tools de Windows)
+gemini_ia = None      # Gemini (Respaldo de conversación/conocimiento)
 voz_ia = None
 oidos_ia = None
 gui = None
@@ -33,13 +34,6 @@ titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
 TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
-
-# Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
-PALABRAS_CLAVE_ACCION = [
-    "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
-    "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego", "jugar", "monitores", "camara","mira", "whatsapp", "mensaje"
-]
 
 def hilo_servidor_web():
     """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
@@ -62,8 +56,7 @@ def apagar_sistema():
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
 
-    # Apagar cualquier módulo de cámara que haya quedado activo, para no
-    # dejar el dispositivo "tomado" después de cerrar REVAN.
+    # Apagar cualquier módulo de cámara activo
     if vigilancia_activa():
         detener_vigilancia()
     if control_esfera_activo():
@@ -77,7 +70,7 @@ def apagar_sistema():
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
 
-    # Cerrar la interfaz Tkinter de forma segura
+    # Cerrar la interfaz Tkinter
     if gui and hasattr(gui, 'app'):
         gui.app.after(100, gui.app.destroy)
 
@@ -106,9 +99,9 @@ def encender_sistemas():
         credenciales = cargar_credenciales() or {}
         api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
 
-        # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
+        # Inicialización de motores cognitivos
         cerebro_ia = NimClient(api_key=api_key_nim)
-        gemini_ia = GeminiClient()   # ya no recibe api_key, la carga sola con cargar_credenciales()
+        gemini_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
 
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
@@ -147,15 +140,14 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz con enrutamiento inteligente (NIM para acciones vs Gemini para conversación)."""
+    """Ciclo táctico de voz con enrutamiento dinámico guiado por NimClient."""
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
-        # 1. ESTADO: ESCUCHANDO (Cian / Verde agua)
+        # 1. ESTADO: ESCUCHANDO
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") 
         print("\n[REVAN]: Escuchando...")
         
         orden_sucia = oidos_ia.escuchar()
-        # Si no capturó audio o fue ruido ambiental vacío
         if not orden_sucia or not orden_sucia.strip():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
@@ -166,7 +158,7 @@ def procesar_ciclo_voz():
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
-        # Filtrado inteligente por MODO JARVIS / Invocación
+        # Filtrado por MODO JARVIS / Invocación
         if "revan" in orden_minusculas:
             partes = orden_minusculas.split("revan", 1)
             orden_limpia = partes[1].strip() if len(partes) > 1 else ""
@@ -180,13 +172,13 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        # --- INTERCEPTOR DE APAGADO / DESCONEXIÓN ---
+        # --- INTERCEPTOR DE APAGADO ---
         palabras_desconexion = ["desconectar", "desconéctate", "apagar", "apágate", "cerrar programa", "adiós revan", "desconexión"]
         if any(cmd in orden_minusculas for cmd in palabras_desconexion):
             apagar_sistema()
             return
 
-        # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA (detección de cambios) ---
+        # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigila la cámara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "detén la vigilancia", "detente de vigilar", "para de vigilar"]
 
@@ -224,7 +216,6 @@ def procesar_ciclo_voz():
         if "esfera" in orden_limpia and any(r in orden_limpia for r in raices_control):
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if vigilancia_activa():
-                # La cámara solo la puede tener un módulo a la vez
                 voz_ia.hablar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
             elif iniciar_control_esfera():
                 voz_ia.hablar(f"Control de esfera por mano activado, {titulo}.")
@@ -234,9 +225,6 @@ def procesar_ciclo_voz():
             return
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
-        # Consulta rápida (IP, conectividad, tráfico) vs prueba de velocidad
-        # (tarda 10-30s), vs latencia, vs búsqueda de intrusos (también tarda
-        # unos segundos por el barrido de ping). Se separan para no mezclarlas.
         palabras_lista = orden_limpia.split()
 
         es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
@@ -300,7 +288,7 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        # 2. ESTADO: PROCESANDO / PENSANDO (Amarillo / Dorado)
+        # 2. ESTADO: PROCESANDO / PENSANDO
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00") 
         print("[REVAN]: Procesando inteligencia...")
 
@@ -311,23 +299,17 @@ def procesar_ciclo_voz():
         # PASO A: Intentar ejecutar como misión compleja
         respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
         
-        # PASO B: Si no es una misión compleja, ENRUTAR entre NIM (acciones) y Gemini (conversación)
+        # PASO B: ENRUTAMIENTO INTELIGENTE DIRECTO A NIMCLIENT
         if respuesta_final is None:
-            es_comando_accion = any(palabra in orden_limpia for palabra in PALABRAS_CLAVE_ACCION)
+            print("[Enrutador]: Procesando orden táctica con NimClient...")
+            respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
 
-            if es_comando_accion:
-                print("[Enrutador]: Orden táctica detectada")
-                respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
-            else:
-                print("[Enrutador]: Conversación/Conocimiento detectado")
-                respuesta_final = gemini_ia.generar_respuesta(orden_limpia) if gemini_ia else None
+            # Respaldar con Gemini solo si NimClient no devolvió respuesta
+            if (not respuesta_final or not respuesta_final.strip()) and gemini_ia:
+                print("[Enrutador]: Sin respuesta táctica. Derivando a Gemini (Conversación)...")
+                respuesta_final = gemini_ia.generar_respuesta(orden_limpia)
 
-                # Fallback de seguridad: Si Gemini no está configurado o falla, responde NIM
-                if respuesta_final is None:
-                    print("[Enrutador]: Gemini no disponible. Usando NIM como respaldo...")
-                    respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
-
-        # Validación de seguridad: Asegurar que no enviamos texto nulo o vacío al TTS local
+        # Validación de seguridad para la respuesta
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"No he recibido datos válidos del procesador táctico, {titulo}."
 
@@ -336,13 +318,13 @@ def procesar_ciclo_voz():
             gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
             gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
 
-        # 3. ESTADO: HABLANDO (Fucsia / Rojo)
+        # 3. ESTADO: HABLANDO
         sincronizar_estado_esfera("HABLANDO", "#ff0055") 
         time.sleep(0.15)
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
-        # 4. ESTADO: ESPERA / REPOSO (Azul Estándar)
+        # 4. ESTADO: ESPERA / REPOSO
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:
@@ -386,6 +368,7 @@ def main():
     except AttributeError:
         if hasattr(gui, 'app'):
             gui.app.deiconify()  
+
     # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()

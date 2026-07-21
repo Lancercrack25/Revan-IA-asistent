@@ -29,11 +29,6 @@ from src.Phone.whats import abrir_chat_con_mensaje
 
 
 # ─── DEFINICIÓN DE HERRAMIENTAS (formato estándar OpenAI-compatible) ──────
-# Esto reemplaza el enfoque anterior de "describir el JSON en el prompt y
-# parsear texto libre con regex". Ahora el modelo recibe estos schemas
-# validados y devuelve argumentos ya estructurados garantizados (tool_calls),
-# no texto que hay que adivinar cómo extraer. mistral-nemotron soporta esto
-# de forma nativa (fue elegido justo por eso).
 HERRAMIENTAS = [
     {
         "type": "function",
@@ -217,12 +212,18 @@ class NimClient:
             "algo que corresponda a una herramienta, ÚSALA en vez de solo describir qué "
             "harías. Puedes usar varias herramientas en secuencia si la tarea lo requiere "
             "(por ejemplo: investigar un tema Y LUEGO guardar el resultado como nota).\n"
-            "Si es conversación ordinaria sin ninguna acción física de por medio, responde "
-            "en texto plano, máximo 1 o 2 frases cortas (menos de 25 palabras)."
+            "INSTRUCCIÓN CRÍTICA: Tienes acceso total de ejecución mediante herramientas locales.\n"
+            "NUNCA le digas al usuario que no puedes acceder a su PC, navegador, archivos o aplicaciones.\n"
+            "Cuando el usuario pida abrir, buscar, crear, listar o ejecutar algo, OBLIGATORIAMENTE "
+            "debes seleccionar y ejecutar la herramienta (tool_call) correspondiente.\n"
         )
 
-    # ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────────
+        # HISTORIAL PERSISTENTE DE CONVERSACIÓN
+        self.historial = [
+            {"role": "system", "content": self.system_prompt}
+        ]
 
+    # ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────────
     def _guardar_nota(self, clave: str, contenido: str) -> str:
         if not clave or not contenido:
             return "Necesito una clave y un contenido para guardar la nota, Señor."
@@ -349,19 +350,21 @@ class NimClient:
         except Exception as e:
             return f"Error al ejecutar '{nombre}': {e}"
 
-    # ─── LOOP AGÉNTICO ──────────────────────────────────────────────────────
+    # ─── LOOP AGÉNTICO CON MEMORIA PERSISTENTE ─────────────────────────────
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
-        mensajes = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": orden_usuario},
-        ]
+        # Añadir la orden del usuario al historial activo
+        self.historial.append({"role": "user", "content": orden_usuario})
+
+        # Mantenemos un límite prudente de memoria (System prompt + últimos 15 mensajes)
+        if len(self.historial) > 16:
+            self.historial = [self.historial[0]] + self.historial[-15:]
 
         for _ in range(max_iteraciones):
             try:
                 t0 = time.time()
                 respuesta = self.client.chat.completions.create(
                     model=self.modelo,
-                    messages=mensajes,
+                    messages=self.historial,
                     tools=HERRAMIENTAS,
                     tool_choice="auto",
                     temperature=0.3,
@@ -375,10 +378,8 @@ class NimClient:
             mensaje = respuesta.choices[0].message
 
             if mensaje.tool_calls:
-                # El propio SDK espera que el mensaje del asistente con las
-                # tool_calls se agregue tal cual al historial antes de las
-                # respuestas de las herramientas.
-                mensajes.append(mensaje)
+                # Se guarda en la historia el llamado de herramientas
+                self.historial.append(mensaje)
 
                 for tool_call in mensaje.tool_calls:
                     nombre_herramienta = tool_call.function.name
@@ -390,17 +391,23 @@ class NimClient:
                     print(f"[NimClient]: Ejecutando herramienta -> {nombre_herramienta}({argumentos})")
                     resultado_herramienta = self._ejecutar_herramienta(nombre_herramienta, argumentos)
 
-                    mensajes.append({
+                    self.historial.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
                         "content": resultado_herramienta,
                     })
                     
                 continue
-            # No pidió más herramientas: esta es la respuesta final.
-            return mensaje.content or "Listo, Señor."
+            
+            # Si no hay más llamadas a herramientas, la respuesta es el texto del mensaje
+            respuesta_final = mensaje.content or "Listo, Señor."
+            self.historial.append({"role": "assistant", "content": respuesta_final})
+            return respuesta_final
 
-        return "No pude completar la tarea en el número de pasos permitido, Señor. ¿Puede intentarlo de nuevo o dividirlo en pasos más simples?"
+        res_limite = "No pude completar la tarea en el número de pasos permitido, Señor."
+        self.historial.append({"role": "assistant", "content": res_limite})
+        return res_limite
+
 
 if __name__ == "__main__":
     cliente = NimClient()
