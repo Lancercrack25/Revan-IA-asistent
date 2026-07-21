@@ -24,21 +24,21 @@ from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_c
 from src.Core.Gemini_client import GeminiClient
 
 # Instancias y Controles Globales
-cerebro_ia = None  
-gemini_ia = None      
+cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
+gemini_ia = None      # Gemini (Conversación)
 voz_ia = None
 oidos_ia = None
 gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 15
+TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
 
 # Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego", "jugar", "monitores", "camara","mira","ejecuta"
+    "juego", "jugar", "monitores", "camara","mira", "whatsapp", "mensaje"
 ]
 
 def hilo_servidor_web():
@@ -365,9 +365,11 @@ def main():
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
+    
     # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
+
     oidos_ia = MicrophoneClient()
     
     print("REVAN en modo pasivo. Esperando señal acústica...")

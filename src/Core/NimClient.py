@@ -25,9 +25,15 @@ from src.Automation.System_commands import (
     lanzar_videojuego,
 )
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
+from src.Phone.whats import abrir_chat_con_mensaje
 
 
 # ─── DEFINICIÓN DE HERRAMIENTAS (formato estándar OpenAI-compatible) ──────
+# Esto reemplaza el enfoque anterior de "describir el JSON en el prompt y
+# parsear texto libre con regex". Ahora el modelo recibe estos schemas
+# validados y devuelve argumentos ya estructurados garantizados (tool_calls),
+# no texto que hay que adivinar cómo extraer. mistral-nemotron soporta esto
+# de forma nativa (fue elegido justo por eso).
 HERRAMIENTAS = [
     {
         "type": "function",
@@ -168,6 +174,21 @@ HERRAMIENTAS = [
                     "contenido": {"type": "string", "description": "El contenido a recordar"},
                 },
                 "required": ["clave", "contenido"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "enviar_whatsapp",
+            "description": "Abre WhatsApp en el chat de un contacto (buscado por nombre en la agenda del teléfono, o con un número directo) con un mensaje ya escrito. NO lo envía automáticamente por seguridad: el usuario confirma el envío tocando el botón en su teléfono.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destinatario": {"type": "string", "description": "Nombre del contacto (tal como está en la agenda) o número de teléfono"},
+                    "mensaje": {"type": "string", "description": "El mensaje a escribir"},
+                },
+                "required": ["destinatario", "mensaje"],
             },
         },
     },
@@ -315,6 +336,13 @@ class NimClient:
             elif nombre == "guardar_nota":
                 return self._guardar_nota(argumentos.get("clave", ""), argumentos.get("contenido", ""))
 
+            elif nombre == "enviar_whatsapp":
+                destinatario = argumentos.get("destinatario", "")
+                mensaje = argumentos.get("mensaje", "")
+                resultado = abrir_chat_con_mensaje(destinatario, mensaje)
+                registrar_accion_sistema(f"whatsapp({destinatario})", resultado, "WHATSAPP")
+                return resultado
+
             else:
                 return f"Herramienta '{nombre}' no reconocida."
 
@@ -322,18 +350,7 @@ class NimClient:
             return f"Error al ejecutar '{nombre}': {e}"
 
     # ─── LOOP AGÉNTICO ──────────────────────────────────────────────────────
-
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
-        """
-        A diferencia del enfoque anterior (una sola llamada, parsear texto),
-        esto es un LOOP: si el modelo decide llamar una o más herramientas,
-        se ejecutan, se le devuelve el resultado, y se le vuelve a preguntar
-        qué hacer — hasta 'max_iteraciones' veces, o hasta que responda con
-        texto normal (sin más llamadas a herramientas) porque ya terminó.
-        Esto es lo que permite encadenar pasos (ej. investigar Y LUEGO
-        guardar la nota) sin tener que hardcodear ese caso específico en
-        otro archivo (como hacía agent_orchestrator.py antes).
-        """
         mensajes = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": orden_usuario},
@@ -378,15 +395,12 @@ class NimClient:
                         "tool_call_id": tool_call.id,
                         "content": resultado_herramienta,
                     })
-
-                # Volver a llamar al modelo con los resultados, para que
-                # decida el siguiente paso (otra herramienta, o responder).
+                    
                 continue
-
             # No pidió más herramientas: esta es la respuesta final.
             return mensaje.content or "Listo, Señor."
 
-        return "No pude completar la tarea en el número de pasos permitido, Señor. ¿Puede intentarlo de nuevo o dividirlo en pasos más simples para que sea mas optimo mis procesos de ejecucion?"
+        return "No pude completar la tarea en el número de pasos permitido, Señor. ¿Puede intentarlo de nuevo o dividirlo en pasos más simples?"
 
 if __name__ == "__main__":
     cliente = NimClient()
