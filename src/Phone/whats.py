@@ -5,7 +5,6 @@ import urllib.parse
 from src.Phone.phone_conection import _ejecutar_adb, dispositivo_conectado
 from src.Phone.contacts import buscar_contacto, listar_coincidencias
 
-
 def _resolver_numero(destinatario: str):
     """Devuelve (nombre_mostrar, numero) o (None, None) si no se resuelve."""
     destinatario = destinatario.strip()

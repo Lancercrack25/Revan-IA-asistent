@@ -7,7 +7,6 @@ def adb_disponible() -> bool:
     """Verifica que el comando 'adb' esté instalado y en el PATH del sistema."""
     return shutil.which("adb") is not None
 
-
 def _ejecutar_adb(*args, timeout: int = 10):
     """
     Ejecuta un comando adb y devuelve (exito: bool, salida: str).
@@ -46,7 +45,6 @@ def dispositivo_conectado() -> bool:
         if linea.strip().endswith("device"):
             return True
     return False
-
 
 def estado_conexion() -> str:
     """

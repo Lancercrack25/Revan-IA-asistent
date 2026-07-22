@@ -26,7 +26,6 @@ def _parsear_linea_contacto(linea: str):
 
     return nombre, numero
 
-
 def obtener_contactos(forzar_actualizacion: bool = False):
     """
     Lee todos los contactos con número telefónico del dispositivo conectado.
@@ -91,7 +90,6 @@ def buscar_contacto(nombre_buscado: str):
         return coincidencias[0]
 
     return None  # ninguna coincidencia, o ambigua (varias posibles)
-
 
 def listar_coincidencias(nombre_buscado: str):
     """Para cuando hay ambigüedad: devuelve todos los nombres que coinciden,
