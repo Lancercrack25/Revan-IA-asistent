@@ -134,12 +134,6 @@ class ElevenLabsClient:
             print(f"[Voz]: Falló también el respaldo: {e}")
 
     def hablar(self, text: str, voice: str = None):
-        """
-        Intenta primero la voz clonada (OmniVoice). Si tarda más de
-        self.timeout_omnivoice o falla, cae automáticamente a edge_tts
-        (rápido, confiable, sin GPU) para que REVAN siempre responda,
-        aunque a veces sea con voz genérica en vez de tu clon.
-        """
         texto_limpio = self._limpiar_texto_para_tts(text)
         if not texto_limpio:
             print("[Voz]: Intento de vocalizar un texto vacío. Cancelado.")

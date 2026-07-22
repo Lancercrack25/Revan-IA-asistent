@@ -30,7 +30,6 @@ from src.Automation.System_commands import (
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whats import abrir_chat_con_mensaje
 
-
 HERRAMIENTAS = [
     {
         "type": "function",

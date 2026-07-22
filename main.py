@@ -27,7 +27,7 @@ from src.Core.Gemini_client import GeminiClient
 
 # Instancias y Controles Globales
 cerebro_ia = None     # NimClient (Motor de acciones tácticas y tools de Windows)
-gemini_ia = None      # Gemini (Respaldo de conversación/conocimiento)
+gemini_ia = None      # Gemini (Conversación normal)
 voz_ia = None
 oidos_ia = None
 gui = None
@@ -35,6 +35,18 @@ titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
 TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
+
+# Palabras clave que identifican una ACCIÓN FÍSICA (van a NimClient primero).
+# Todo lo que NO haga match aquí se considera conversación normal y va a
+# Gemini primero. Comparado contra orden_limpia_sin_acentos, así que no
+# hace falta duplicar tildes.
+PALABRAS_CLAVE_ACCION = [
+    "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
+    "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
+    "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
+    "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
+    "corre", "prende", "enciende", "investiga", "recuerda", "guarda",
+]
 
 def quitar_acentos(texto: str) -> str:
     """Elimina acentos y tildes para evitar fallos de coincidencia por STT."""
@@ -66,7 +78,6 @@ def apagar_sistema():
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
 
-    # Apagar módulos de cámara
     if vigilancia_activa():
         detener_vigilancia()
     if control_esfera_activo():
@@ -145,7 +156,7 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz con enrutamiento dinámico guiado por NimClient."""
+    """Ciclo táctico de voz: acciones -> NimClient primero, conversación -> Gemini primero, cada uno respalda al otro."""
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
         # 1. ESTADO: ESCUCHANDO
@@ -297,7 +308,6 @@ def procesar_ciclo_voz():
             ultima_interaccion = time.time()
             return
 
-        # Si sólo dijo "Revan" sin comando adicional
         if not orden_limpia:
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             time.sleep(0.15)
@@ -313,29 +323,45 @@ def procesar_ciclo_voz():
         # Intercepción rápida para cámara
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             orden_limpia = "enciende la camara y dime que ves"
+            orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
 
-        # PASO A: Intentar ejecutar como misión compleja (atrapando cualquier excepción)
+        # PASO A: Intentar ejecutar como misión compleja (investigar/recordar)
         respuesta_final = None
         try:
             respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
         except Exception as err_mision:
             print(f"[Orquestador]: Excepción en misión compleja: {err_mision}")
 
-        # PASO B: ENRUTAMIENTO INTELIGENTE DIRECTO A NIMCLIENT
         if respuesta_final is None:
-            print("[Enrutador]: Procesando orden táctica con NimClient...")
-            try:
-                respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
-            except Exception as err_nim:
-                print(f"[Enrutador]: Error en NimClient: {err_nim}")
+            es_comando_accion = any(palabra in orden_limpia_sin_acentos for palabra in PALABRAS_CLAVE_ACCION)
 
-            # Respaldar con Gemini solo si NimClient no devolvió respuesta
-            if (not respuesta_final or not respuesta_final.strip()) and gemini_ia:
-                print("[Enrutador]: Sin respuesta táctica. Derivando a Gemini (Conversación)...")
+            if es_comando_accion:
+                print("[Enrutador]: Orden táctica detectada -> NimClient")
                 try:
-                    respuesta_final = gemini_ia.generar_respuesta(orden_limpia)
-                except Exception as err_gemini:
-                    print(f"[Enrutador]: Error en Gemini: {err_gemini}")
+                    respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+                except Exception as err_nim:
+                    print(f"[Enrutador]: Error en NimClient: {err_nim}")
+
+                if (not respuesta_final or not respuesta_final.strip()) and gemini_ia:
+                    print("[Enrutador]: NimClient sin respuesta. Respaldando con Gemini...")
+                    try:
+                        respuesta_final = gemini_ia.generar_respuesta(orden_limpia)
+                    except Exception as err_gemini:
+                        print(f"[Enrutador]: Error en Gemini: {err_gemini}")
+            else:
+                print("[Enrutador]: Conversación detectada -> Gemini")
+                if gemini_ia:
+                    try:
+                        respuesta_final = gemini_ia.generar_respuesta(orden_limpia)
+                    except Exception as err_gemini:
+                        print(f"[Enrutador]: Error en Gemini: {err_gemini}")
+
+                if not respuesta_final or not respuesta_final.strip():
+                    print("[Enrutador]: Gemini sin respuesta. Respaldando con NimClient...")
+                    try:
+                        respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+                    except Exception as err_nim:
+                        print(f"[Enrutador]: Error en NimClient: {err_nim}")
 
         # Validación de seguridad para la respuesta
         if not respuesta_final or not respuesta_final.strip():
@@ -352,7 +378,6 @@ def procesar_ciclo_voz():
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
-        # Renovar temporizador de atención
         ultima_interaccion = time.time()
 
         # 4. ESTADO: ESPERA / REPOSO
@@ -374,7 +399,6 @@ def main():
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     
-    # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
 
@@ -404,4 +428,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-#favor de modificar nimclient,system_comands gemini client si es necesario y este main porfa
+#mejorar las acciones de abrir juegos aun se nececita mas escalabilidad y eficiencia
