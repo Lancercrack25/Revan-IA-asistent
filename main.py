@@ -3,6 +3,7 @@ import sys
 import time
 import threading
 import subprocess
+import unicodedata
 
 # Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -35,6 +36,15 @@ sistema_activo = False
 ultima_interaccion = 0  
 TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
 
+def quitar_acentos(texto: str) -> str:
+    """Elimina acentos y tildes para evitar fallos de coincidencia por STT."""
+    if not texto:
+        return ""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+
 def hilo_servidor_web():
     """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
     try:
@@ -56,13 +66,12 @@ def apagar_sistema():
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
 
-    # Apagar cualquier módulo de cámara activo
+    # Apagar módulos de cámara
     if vigilancia_activa():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
     
-    # Notificar y despedir por voz
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
         voz_ia.hablar(f"Desconectando sistemas. Hasta luego, {titulo}.")
@@ -70,7 +79,6 @@ def apagar_sistema():
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
 
-    # Cerrar la interfaz Tkinter
     if gui and hasattr(gui, 'app'):
         gui.app.after(100, gui.app.destroy)
 
@@ -78,7 +86,7 @@ def apagar_sistema():
     sys.exit(0)
 
 def encender_sistemas():
-    """Secuencia de despliegue cronológico (Monitores -> CustomTkinter -> Esfera -> Hilo de Voz)."""
+    """Secuencia de despliegue cronológico."""
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
     sistema_activo = True
 
@@ -99,7 +107,6 @@ def encender_sistemas():
         credenciales = cargar_credenciales() or {}
         api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
 
-        # Inicialización de motores cognitivos
         cerebro_ia = NimClient(api_key=api_key_nim)
         gemini_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
@@ -118,12 +125,10 @@ def encender_sistemas():
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
 
-        # Vocalización de bienvenida
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
         voz_ia.hablar(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         
-        # Escucha asíncrona dedicada en segundo plano
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
         
@@ -153,13 +158,14 @@ def procesar_ciclo_voz():
             return
 
         orden_minusculas = orden_sucia.lower().strip()
+        orden_busqueda = quitar_acentos(orden_minusculas)
         print(f"[Captura]: '{orden_minusculas}'")
 
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
         # Filtrado por MODO JARVIS / Invocación
-        if "revan" in orden_minusculas:
+        if "revan" in orden_busqueda:
             partes = orden_minusculas.split("revan", 1)
             orden_limpia = partes[1].strip() if len(partes) > 1 else ""
             ultima_interaccion = tiempo_actual  
@@ -172,48 +178,53 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
+        orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
+
         # --- INTERCEPTOR DE APAGADO ---
-        palabras_desconexion = ["desconectar", "desconéctate", "apagar", "apágate", "cerrar programa", "adiós revan", "desconexión"]
-        if any(cmd in orden_minusculas for cmd in palabras_desconexion):
+        palabras_desconexion = ["desconectar", "desconectate", "apagar", "apagate", "cerrar programa", "adios revan", "desconexion"]
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
 
         # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA ---
-        palabras_iniciar_vigilancia = ["vigila la camara", "vigila la cámara", "vigilancia", "mantente al pendiente de la camara"]
-        palabras_detener_vigilancia = ["deja de vigilar", "detén la vigilancia", "detente de vigilar", "para de vigilar"]
+        palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
+        palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
-        if any(cmd in orden_limpia for cmd in palabras_iniciar_vigilancia):
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if iniciar_vigilancia(voz_ia, sincronizar_estado_esfera):
                 voz_ia.hablar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
             else:
                 voz_ia.hablar("La vigilancia ya estaba activa, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
-        if any(cmd in orden_limpia for cmd in palabras_detener_vigilancia):
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_detener_vigilancia):
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if detener_vigilancia():
                 voz_ia.hablar("Vigilancia de cámara desactivada.")
             else:
                 voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
         raices_control = ["control", "manipul", "mueve", "mover"]
-        palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
+        palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
 
-        if "esfera" in orden_limpia and any(p in orden_limpia for p in palabras_detener_intent):
+        if "esfera" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in palabras_detener_intent):
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if detener_control_esfera():
                 voz_ia.hablar("Control de esfera desactivado.")
             else:
                 voz_ia.hablar("No había ningún control de esfera activo, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
-        if "esfera" in orden_limpia and any(r in orden_limpia for r in raices_control):
+        if "esfera" in orden_limpia_sin_acentos and any(r in orden_limpia_sin_acentos for r in raices_control):
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if vigilancia_activa():
                 voz_ia.hablar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
@@ -222,23 +233,24 @@ def procesar_ciclo_voz():
             else:
                 voz_ia.hablar("El control de esfera ya estaba activo, Señor.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
-        palabras_lista = orden_limpia.split()
+        palabras_lista = orden_limpia_sin_acentos.split()
 
-        es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
-        es_consulta_latencia = "latencia" in orden_limpia or "ping" in palabras_lista
-        es_consulta_intrusos = any(p in orden_limpia for p in [
-            "intruso", "intrusos", "quien esta conectado", "quién está conectado",
+        es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
+        es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or "ping" in palabras_lista
+        es_consulta_intrusos = any(p in orden_limpia_sin_acentos for p in [
+            "intruso", "intrusos", "quien esta conectado",
             "dispositivos conectados", "estoy seguro", "es segura mi red",
             "seguridad de mi red", "mi red es segura",
         ])
-        es_marcar_conocidos = "marca" in orden_limpia and ("conocido" in orden_limpia or "conocidos" in orden_limpia)
+        es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
         es_consulta_red = (
             not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos)
             and ("red" in palabras_lista or "ip" in palabras_lista or
-                 any(p in orden_limpia for p in ["internet", "conexion", "conexión"]))
+                 any(p in orden_limpia_sin_acentos for p in ["internet", "conexion"]))
         )
 
         if es_consulta_velocidad:
@@ -248,12 +260,14 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(resultado_red)
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         if es_consulta_latencia:
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(reportar_latencia())
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         if es_marcar_conocidos:
@@ -263,6 +277,7 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(resultado_marcado)
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         if es_consulta_intrusos:
@@ -272,12 +287,14 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(resultado_intrusos)
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         if es_consulta_red:
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(analizar_red())
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         # Si sólo dijo "Revan" sin comando adicional
@@ -286,6 +303,7 @@ def procesar_ciclo_voz():
             time.sleep(0.15)
             voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
             return
 
         # 2. ESTADO: PROCESANDO / PENSANDO
@@ -293,21 +311,31 @@ def procesar_ciclo_voz():
         print("[REVAN]: Procesando inteligencia...")
 
         # Intercepción rápida para cámara
-        if any(w in orden_limpia for w in ["camara", "cámara", "que ves", "qué ves"]):
+        if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             orden_limpia = "enciende la camara y dime que ves"
 
-        # PASO A: Intentar ejecutar como misión compleja
-        respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
-        
+        # PASO A: Intentar ejecutar como misión compleja (atrapando cualquier excepción)
+        respuesta_final = None
+        try:
+            respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
+        except Exception as err_mision:
+            print(f"[Orquestador]: Excepción en misión compleja: {err_mision}")
+
         # PASO B: ENRUTAMIENTO INTELIGENTE DIRECTO A NIMCLIENT
         if respuesta_final is None:
             print("[Enrutador]: Procesando orden táctica con NimClient...")
-            respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+            try:
+                respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+            except Exception as err_nim:
+                print(f"[Enrutador]: Error en NimClient: {err_nim}")
 
             # Respaldar con Gemini solo si NimClient no devolvió respuesta
             if (not respuesta_final or not respuesta_final.strip()) and gemini_ia:
                 print("[Enrutador]: Sin respuesta táctica. Derivando a Gemini (Conversación)...")
-                respuesta_final = gemini_ia.generar_respuesta(orden_limpia)
+                try:
+                    respuesta_final = gemini_ia.generar_respuesta(orden_limpia)
+                except Exception as err_gemini:
+                    print(f"[Enrutador]: Error en Gemini: {err_gemini}")
 
         # Validación de seguridad para la respuesta
         if not respuesta_final or not respuesta_final.strip():
@@ -324,6 +352,9 @@ def procesar_ciclo_voz():
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
+        # Renovar temporizador de atención
+        ultima_interaccion = time.time()
+
         # 4. ESTADO: ESPERA / REPOSO
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
@@ -368,10 +399,9 @@ def main():
     except AttributeError:
         if hasattr(gui, 'app'):
             gui.app.deiconify()  
-
-    # Arrancar secuencia de encendido
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
 if __name__ == "__main__":
     main()
+#favor de modificar nimclient,system_comands gemini client si es necesario y este main porfa

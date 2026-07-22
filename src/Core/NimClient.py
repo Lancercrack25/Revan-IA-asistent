@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import re
 
 try:
     from openai import OpenAI
@@ -18,31 +19,104 @@ from src.Services.os_service import (
     obtener_diagnostico_hardware,
 )
 from src.Automation.System_commands import (
-    desplegar_monitores_windows,
-    ejecutar_aplicacion_office,
+    buscar_en_navegador_sistema,
     reproducir_video_brave,
     lanzar_aplicacion_usuario,
     lanzar_videojuego,
+    desplegar_monitores_windows,
+    ejecutar_aplicacion_office,
+    crear_y_abrir_documento_word,
 )
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whats import abrir_chat_con_mensaje
 
 
-# ─── DEFINICIÓN DE HERRAMIENTAS (formato estándar OpenAI-compatible) ──────
 HERRAMIENTAS = [
     {
         "type": "function",
         "function": {
-            "name": "crear_carpeta",
-            "description": "Crea una carpeta nueva en el sistema de archivos del usuario.",
+            "name": "buscar_en_navegador",
+            "description": "Abre el navegador web de Windows y busca cualquier término en Google.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "nombre": {"type": "string", "description": "Nombre de la carpeta a crear"},
+                    "consulta": {"type": "string", "description": "El término a buscar"}
+                },
+                "required": ["consulta"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "reproducir_video",
+            "description": "Abre YouTube en el navegador y reproduce el video solicitado.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "busqueda": {"type": "string", "description": "Video a buscar en YouTube"}
+                },
+                "required": ["busqueda"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "crear_documento_word",
+            "description": "Crea un archivo de Word (.docx) redactando información sobre una temática solicitada y guardándolo en la carpeta indicada.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre_archivo": {"type": "string", "description": "Nombre del archivo (ej. 'Minecraft_Info.docx')"},
+                    "contenido_o_tema": {"type": "string", "description": "Resumen, información o texto que debe ir redactado DENTRO del archivo Word."},
+                    "carpeta_destino": {"type": "string", "description": "Nombre de la carpeta donde se debe guardar (ej. 'pruebas')."}
+                },
+                "required": ["nombre_archivo", "contenido_o_tema"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_videojuego",
+            "description": "Lanza un videojuego instalado en la PC (por ejemplo Minecraft, Fortnite, etc.).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre": {"type": "string", "description": "Nombre del videojuego a ejecutar"}
+                },
+                "required": ["nombre"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_aplicacion",
+            "description": "Abre un programa instalado en Windows como la calculadora, bloc de notas, etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre": {"type": "string", "description": "Nombre del programa a abrir"}
+                },
+                "required": ["nombre"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "crear_carpeta",
+            "description": "Crea una nueva carpeta en el sistema de archivos del usuario.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre": {"type": "string", "description": "Nombre de la carpeta"},
                     "ruta": {
                         "type": "string",
                         "enum": ["actual", "escritorio", "documentos"],
-                        "description": "Dónde crear la carpeta. Si el usuario NO menciona ubicación, usa 'escritorio' (es lo más predecible y fácil de encontrar). Usa 'actual' SOLO si el usuario claramente sigue trabajando en algo relacionado con una carpeta que se mencionó hace poco en esta misma conversación.",
+                        "description": "Ubicación de creación. Por defecto 'escritorio'.",
                     },
                 },
                 "required": ["nombre"],
@@ -53,10 +127,12 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "abrir_carpeta",
-            "description": "Abre una carpeta existente por nombre.",
+            "description": "Abre una carpeta existente en el explorador de archivos.",
             "parameters": {
                 "type": "object",
-                "properties": {"nombre": {"type": "string", "description": "Nombre de la carpeta a abrir"}},
+                "properties": {
+                    "nombre": {"type": "string", "description": "Nombre de la carpeta"}
+                },
                 "required": ["nombre"],
             },
         },
@@ -65,13 +141,11 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "abrir_office",
-            "description": "Abre Word o Excel, opcionalmente creando un documento nuevo con un nombre en una carpeta específica.",
+            "description": "Abre la aplicación de Microsoft Word o Excel vacía.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "app": {"type": "string", "enum": ["word", "excel"]},
-                    "nombre_archivo": {"type": "string", "description": "Nombre del archivo a crear"},
-                    "destino": {"type": "string", "description": "'actual', o el nombre de una carpeta específica"},
+                    "app": {"type": "string", "enum": ["word", "excel"]}
                 },
                 "required": ["app"],
             },
@@ -80,44 +154,8 @@ HERRAMIENTAS = [
     {
         "type": "function",
         "function": {
-            "name": "reproducir_video",
-            "description": "Busca y reproduce un video en el navegador (Brave).",
-            "parameters": {
-                "type": "object",
-                "properties": {"busqueda": {"type": "string", "description": "Qué buscar y reproducir"}},
-                "required": ["busqueda"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "abrir_aplicacion",
-            "description": "Abre una aplicación instalada en la PC del usuario.",
-            "parameters": {
-                "type": "object",
-                "properties": {"nombre": {"type": "string", "description": "Nombre de la aplicación"}},
-                "required": ["nombre"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "abrir_videojuego",
-            "description": "Abre un videojuego instalado en la PC del usuario.",
-            "parameters": {
-                "type": "object",
-                "properties": {"nombre": {"type": "string", "description": "Nombre del videojuego"}},
-                "required": ["nombre"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "mostrar_monitor_recursos",
-            "description": "Despliega los monitores nativos de recursos del sistema de Windows (CPU, RAM, red, disco).",
+            "description": "Despliega el Administrador de tareas.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -125,7 +163,7 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "diagnostico_hardware",
-            "description": "Da un reporte rápido de uso actual de CPU, RAM y disco, hablado (no abre ninguna ventana).",
+            "description": "Obtiene métricas de CPU, RAM y disco.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -133,7 +171,7 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "limpiar_sistema",
-            "description": "Borra archivos temporales de Windows para liberar espacio. Es una acción destructiva (elimina archivos), solo debe usarse si el usuario lo pide explícitamente.",
+            "description": "Elimina archivos temporales de Windows.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -141,32 +179,20 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "analizar_camara",
-            "description": "Enciende la cámara y describe brevemente qué hay frente a ella en este momento.",
+            "description": "Activa la cámara web y describe lo que ve.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "buscar_informacion",
-            "description": "Busca información sobre un tema en fuentes confiables de internet (Wikipedia y respaldo en DuckDuckGo) y devuelve un resumen. Úsala cuando el usuario pida investigar, saber qué es algo, o quién es alguien.",
-            "parameters": {
-                "type": "object",
-                "properties": {"tema": {"type": "string", "description": "El tema a investigar"}},
-                "required": ["tema"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "guardar_nota",
-            "description": "Guarda un dato o nota en la memoria permanente de REVAN, para poder recordarlo después bajo una clave concreta.",
+            "description": "Guarda una nota en la base de datos.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "clave": {"type": "string", "description": "Palabra o frase corta para identificar la nota (ej. 'cumpleaños de mamá')"},
-                    "contenido": {"type": "string", "description": "El contenido a recordar"},
+                    "clave": {"type": "string", "description": "Clave del dato"},
+                    "contenido": {"type": "string", "description": "Contenido a almacenar"}
                 },
                 "required": ["clave", "contenido"],
             },
@@ -176,12 +202,12 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "enviar_whatsapp",
-            "description": "Abre WhatsApp en el chat de un contacto (buscado por nombre en la agenda del teléfono, o con un número directo) con un mensaje ya escrito. NO lo envía automáticamente por seguridad: el usuario confirma el envío tocando el botón en su teléfono.",
+            "description": "Abre un chat de WhatsApp Web con un mensaje preescrito.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "destinatario": {"type": "string", "description": "Nombre del contacto (tal como está en la agenda) o número de teléfono"},
-                    "mensaje": {"type": "string", "description": "El mensaje a escribir"},
+                    "destinatario": {"type": "string", "description": "Contacto o número"},
+                    "mensaje": {"type": "string", "description": "Texto del mensaje"}
                 },
                 "required": ["destinatario", "mensaje"],
             },
@@ -194,10 +220,7 @@ class NimClient:
     def __init__(self, api_key: str = None, modelo: str = "mistralai/mistral-nemotron"):
         self.api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
         if not self.api_key:
-            raise ValueError(
-                "Falta la API key de NVIDIA NIM. Pásala como argumento o "
-                "define la variable de entorno NVIDIA_NIM_API_KEY."
-            )
+            raise ValueError("Falta la API key de NVIDIA NIM.")
 
         self.modelo = modelo
         self.client = OpenAI(
@@ -206,31 +229,28 @@ class NimClient:
         )
 
         self.system_prompt = (
-            "Eres REVAN, asistente tipo Jarvis para el sistema operativo del usuario.\n"
-            "Tienes herramientas reales para ejecutar acciones físicas (crear carpetas, "
-            "abrir apps, investigar temas, guardar notas, etc.). Cuando el usuario pida "
-            "algo que corresponda a una herramienta, ÚSALA en vez de solo describir qué "
-            "harías. Puedes usar varias herramientas en secuencia si la tarea lo requiere "
-            "(por ejemplo: investigar un tema Y LUEGO guardar el resultado como nota).\n"
-            "INSTRUCCIÓN CRÍTICA: Tienes acceso total de ejecución mediante herramientas locales.\n"
-            "NUNCA le digas al usuario que no puedes acceder a su PC, navegador, archivos o aplicaciones.\n"
-            "Cuando el usuario pida abrir, buscar, crear, listar o ejecutar algo, OBLIGATORIAMENTE "
-            "debes seleccionar y ejecutar la herramienta (tool_call) correspondiente.\n"
+            "Eres REVAN, asistente de inteligencia artificial avanzado estilo JARVIS.\n"
+            "COMPORTAMIENTO:\n"
+            "1. Te diriges al usuario como 'Señor'. Responde de forma concisa (1 o 2 oraciones).\n"
+            "2. Jamás menciones rutas de archivos largas. Di 'en su escritorio' o 'en la carpeta X'.\n"
+            "3. OBLIGATORIO: Selecciona y ejecuta la herramienta adecuada para cada acción requerida."
         )
 
-        # HISTORIAL PERSISTENTE DE CONVERSACIÓN
-        self.historial = [
-            {"role": "system", "content": self.system_prompt}
-        ]
+        self.historial = [{"role": "system", "content": self.system_prompt}]
 
-    # ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────────
+    def _limpiar_para_voz(self, texto: str) -> str:
+        if not texto: return ""
+        texto = re.sub(r'[A-Za-z]:\\[^ \n]+', 'su equipo', texto)
+        texto = texto.replace("_", " ").replace("%", " por ciento")
+        return texto.strip()
+
     def _guardar_nota(self, clave: str, contenido: str) -> str:
         if not clave or not contenido:
-            return "Necesito una clave y un contenido para guardar la nota, Señor."
+            return "Se requiere una clave y un contenido para registrar la nota."
 
         conn = obtener_conexion_pool()
         if not conn:
-            return "No pude guardar la nota, sin conexión a la base de datos."
+            return "Sin acceso a la base de datos en este momento."
 
         try:
             cur = conn.cursor()
@@ -244,19 +264,49 @@ class NimClient:
             )
             conn.commit()
             cur.close()
-            return f"Guardado, Señor. Recordaré '{clave}'."
+            return f"Nota '{clave}' registrada en la base de datos."
         except Exception as e:
             conn.rollback()
-            return f"Error al guardar la nota: {e}"
+            return f"Error guardando nota: {e}"
         finally:
             liberar_conexion(conn)
 
     def _ejecutar_herramienta(self, nombre: str, argumentos: dict) -> str:
-        """Ejecuta la herramienta pedida por el modelo y devuelve el resultado
-        como texto (que se le reenvía al modelo como 'resultado de la herramienta')."""
         try:
-            if nombre == "crear_carpeta":
-                nombre_c = (argumentos.get("nombre") or "Contenedor_Táctico").strip() or "Contenedor_Táctico"
+            if nombre == "buscar_en_navegador":
+                consulta = argumentos.get("consulta", "")
+                resultado = buscar_en_navegador_sistema(consulta)
+                registrar_accion_sistema(f"buscar_navegador({consulta})", resultado, "NAV_SEARCH")
+                return resultado
+
+            elif nombre == "reproducir_video":
+                busqueda = argumentos.get("busqueda", "")
+                resultado = reproducir_video_brave(busqueda)
+                registrar_accion_sistema(f"video({busqueda})", resultado, "VIDEO")
+                return resultado
+
+            elif nombre == "crear_documento_word":
+                nombre_doc = argumentos.get("nombre_archivo", "Documento.docx")
+                tema = argumentos.get("contenido_o_tema", "Información general.")
+                carpeta = argumentos.get("carpeta_destino", "")
+                resultado = crear_y_abrir_documento_word(nombre_doc, tema, carpeta)
+                registrar_accion_sistema(f"word({nombre_doc})", resultado, "WORD")
+                return resultado
+
+            elif nombre == "abrir_videojuego":
+                juego_nombre = argumentos.get("nombre", "")
+                resultado = lanzar_videojuego(juego_nombre)
+                registrar_accion_sistema(f"juego({juego_nombre})", resultado, "JUEGO")
+                return resultado
+
+            elif nombre == "abrir_aplicacion":
+                app_nombre = argumentos.get("nombre", "")
+                resultado = lanzar_aplicacion_usuario(app_nombre)
+                registrar_accion_sistema(f"app({app_nombre})", resultado, "APP")
+                return resultado
+
+            elif nombre == "crear_carpeta":
+                nombre_c = (argumentos.get("nombre") or "Nueva_Carpeta").strip()
                 ruta_c = argumentos.get("ruta", "escritorio")
                 resultado = crear_carpeta_sistema(nombre_c, ruta_c)
                 registrar_accion_sistema(f"crear_carpeta({nombre_c})", resultado, "CREAR_CARPETA")
@@ -269,46 +319,14 @@ class NimClient:
 
             elif nombre == "abrir_office":
                 app_tipo = argumentos.get("app", "word")
-                nombre_doc = argumentos.get("nombre_archivo", "Documento_Táctico")
-                carpeta_destino = argumentos.get("destino", "")
-
-                if carpeta_destino and carpeta_destino.lower() != "actual":
-                    escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
-                    ruta_final = os.path.join(escritorio, carpeta_destino)
-                else:
-                    ruta_final = obtener_ruta_actual()
-
-                os.makedirs(ruta_final, exist_ok=True)
                 ejecutar_aplicacion_office(app_tipo)
-                nombre_directorio_actual = os.path.basename(ruta_final)
-                resultado = f"¡Listo, Señor! Abriendo {app_tipo.capitalize()} para el documento en '{nombre_directorio_actual}'."
+                resultado = f"Microsoft {app_tipo.capitalize()} abierto."
                 registrar_accion_sistema(f"abrir_office({app_tipo})", resultado, "OFFICE")
-                return resultado
-
-            elif nombre == "reproducir_video":
-                busqueda = argumentos.get("busqueda", "")
-                reproducir_video_brave(busqueda)
-                resultado = f"Reproduciendo contenido sobre '{busqueda}' en Brave."
-                registrar_accion_sistema(f"video({busqueda})", resultado, "VIDEO")
-                return resultado
-
-            elif nombre == "abrir_aplicacion":
-                app_nombre = argumentos.get("nombre", "")
-                lanzar_aplicacion_usuario(app_nombre)
-                resultado = f"Ejecutando aplicación {app_nombre}."
-                registrar_accion_sistema(f"app({app_nombre})", resultado, "APP")
-                return resultado
-
-            elif nombre == "abrir_videojuego":
-                juego_nombre = argumentos.get("nombre", "")
-                lanzar_videojuego(juego_nombre)
-                resultado = f"Iniciando {juego_nombre}, Señor."
-                registrar_accion_sistema(f"juego({juego_nombre})", resultado, "JUEGO")
                 return resultado
 
             elif nombre == "mostrar_monitor_recursos":
                 desplegar_monitores_windows()
-                resultado = "Monitores tácticos del sistema desplegados, Señor."
+                resultado = "Administrador de recursos abierto."
                 registrar_accion_sistema("monitor", resultado, "MONITOR")
                 return resultado
 
@@ -327,13 +345,6 @@ class NimClient:
                 registrar_accion_sistema("camara", resultado, "VISION")
                 return resultado
 
-            elif nombre == "buscar_informacion":
-                from src.Services.research_service import buscar_y_resumir_tema
-                tema = argumentos.get("tema", "")
-                resultado = buscar_y_resumir_tema(tema)
-                registrar_accion_sistema(f"investigar({tema})", resultado, "RESEARCH_TASK")
-                return resultado
-
             elif nombre == "guardar_nota":
                 return self._guardar_nota(argumentos.get("clave", ""), argumentos.get("contenido", ""))
 
@@ -345,17 +356,14 @@ class NimClient:
                 return resultado
 
             else:
-                return f"Herramienta '{nombre}' no reconocida."
+                return f"La herramienta '{nombre}' no está configurada."
 
         except Exception as e:
-            return f"Error al ejecutar '{nombre}': {e}"
+            return f"Error ejecutando '{nombre}': {e}"
 
-    # ─── LOOP AGÉNTICO CON MEMORIA PERSISTENTE ─────────────────────────────
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
-        # Añadir la orden del usuario al historial activo
         self.historial.append({"role": "user", "content": orden_usuario})
 
-        # Mantenemos un límite prudente de memoria (System prompt + últimos 15 mensajes)
         if len(self.historial) > 16:
             self.historial = [self.historial[0]] + self.historial[-15:]
 
@@ -367,18 +375,17 @@ class NimClient:
                     messages=self.historial,
                     tools=HERRAMIENTAS,
                     tool_choice="auto",
-                    temperature=0.3,
-                    max_tokens=400,
+                    temperature=0.2,
+                    max_tokens=300,
                 )
-                print(f"[NIM] Tiempo: {time.time() - t0:.2f}s")
+                print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
             except Exception as e:
-                print(f"Error crítico en el Core de NIM: {e}")
-                return "Error de comunicación con mi núcleo cognitivo en la nube."
+                print(f"Error crítico en el cliente NIM: {e}")
+                return "Tuve un error al procesar la orden en mi núcleo."
 
             mensaje = respuesta.choices[0].message
 
             if mensaje.tool_calls:
-                # Se guarda en la historia el llamado de herramientas
                 self.historial.append(mensaje)
 
                 for tool_call in mensaje.tool_calls:
@@ -388,34 +395,21 @@ class NimClient:
                     except json.JSONDecodeError:
                         argumentos = {}
 
-                    print(f"[NimClient]: Ejecutando herramienta -> {nombre_herramienta}({argumentos})")
-                    resultado_herramienta = self._ejecutar_herramienta(nombre_herramienta, argumentos)
+                    print(f"[NimClient] Ejecutando Herramienta -> {nombre_herramienta}({argumentos})")
+                    resultado = self._ejecutar_herramienta(nombre_herramienta, argumentos)
 
                     self.historial.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
-                        "content": resultado_herramienta,
+                        "content": resultado,
                     })
-                    
+
                 continue
-            
-            # Si no hay más llamadas a herramientas, la respuesta es el texto del mensaje
-            respuesta_final = mensaje.content or "Listo, Señor."
+
+            respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
             self.historial.append({"role": "assistant", "content": respuesta_final})
             return respuesta_final
 
-        res_limite = "No pude completar la tarea en el número de pasos permitido, Señor."
+        res_limite = "He completado la solicitud, Señor."
         self.historial.append({"role": "assistant", "content": res_limite})
         return res_limite
-
-
-if __name__ == "__main__":
-    cliente = NimClient()
-    pruebas = [
-        "crea una carpeta llamada Prueba en el escritorio",
-        "investiga sobre los agujeros negros y guárdalo en tu memoria",
-        "hola como estas",
-    ]
-    for p in pruebas:
-        print(f"\n--- Orden: {p} ---")
-        print(cliente.generar_respuesta(p))

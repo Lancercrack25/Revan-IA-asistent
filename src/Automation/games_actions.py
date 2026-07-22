@@ -40,7 +40,7 @@ def lanzar_videojuego(nombre_juego):
             else:
                 return f"Señor, no localicé el archivo de acceso para {nombre_juego} en la carpeta Juegos."
                 
-        return f"Señor, el juego '{nombre_juego}' no está registrado en mis archivos tácticos."
+        return f"Señor, el juego '{nombre_juego}' no está registrado en mis archivos"
         
     except Exception as e:
         return f"Fallo crítico al intentar abrir el juego: {str(e)}"
