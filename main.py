@@ -35,7 +35,6 @@ titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
 TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
-
 # Palabras clave que identifican una ACCIÓN FÍSICA (van a NimClient primero).
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
