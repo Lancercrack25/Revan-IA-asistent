@@ -10,6 +10,7 @@ try:
     HAS_PYFLAKES = True
 except ImportError:
     HAS_PYFLAKES = False
+
 # Carpetas que se ignoran siempre en la inspección (no son código propio del proyecto)
 CARPETAS_IGNORADAS = {
     ".git", "__pycache__", "venv", ".venv", "env",
@@ -41,7 +42,7 @@ def _revisar_pyflakes(ruta_archivo):
         def flake(self, message):
             self.mensajes.append(str(message))
         def syntaxError(self, filename, msg, lineno, offset, text):
-            pass  # ya lo capturamos aparte con ast.parse
+            pass 
         def unexpectedError(self, filename, msg):
             self.mensajes.append(f"pyflakes error interno: {msg}")
 
@@ -94,7 +95,7 @@ def _revisar_imports_locales(ruta_archivo, contenido, ruta_proyecto):
 
             nombres_definidos = _extraer_nombres_definidos(ruta_modulo)
             if nombres_definidos is None:
-                continue  # el módulo destino ya tiene su propio error de sintaxis reportado
+                continue 
 
             for alias in nodo.names:
                 nombre_buscado = alias.name

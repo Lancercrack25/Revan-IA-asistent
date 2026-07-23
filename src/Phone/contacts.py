@@ -93,7 +93,6 @@ def listar_coincidencias(nombre_buscado: str):
     contactos = obtener_contactos()
     return [nombre for nombre, _ in contactos if nombre_buscado in nombre.lower()]
 
-
 if __name__ == "__main__":
     contactos = obtener_contactos()
     print(f"Contactos encontrados: {len(contactos)}")
