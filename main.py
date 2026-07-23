@@ -26,8 +26,8 @@ from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_c
 from src.Core.Gemini_client import GeminiClient
 
 # Instancias y Controles Globales
-cerebro_ia = None     # NimClient (Motor de acciones tácticas y tools de Windows)
-gemini_ia = None      # Gemini (Conversación normal)
+cerebro_ia = None    
+gemini_ia = None      
 voz_ia = None
 oidos_ia = None
 gui = None
