@@ -15,7 +15,7 @@ def lanzar_videojuego(nombre_juego):
             "among us": "Among Us.lnk",
             "among": "Among Us.lnk",
             "devil may cry": "Devil May Cry 5.lnk",
-            "dmc": "Devil May Cry 5.lnk",
+            "dmc5": "Devil May Cry 5.lnk",
             "fortnite": "Fortnite.lnk",
             "little nightmares": "Little Nightmares II.lnk",
             "marvel rivals": "Marvel Rivals.lnk",

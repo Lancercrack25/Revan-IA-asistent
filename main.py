@@ -37,9 +37,6 @@ ultima_interaccion = 0
 TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
 
 # Palabras clave que identifican una ACCIÓN FÍSICA (van a NimClient primero).
-# Todo lo que NO haga match aquí se considera conversación normal y va a
-# Gemini primero. Comparado contra orden_limpia_sin_acentos, así que no
-# hace falta duplicar tildes.
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
@@ -428,4 +425,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-#mejorar las acciones de abrir juegos aun se nececita mas escalabilidad y eficiencia
