@@ -57,9 +57,6 @@ def obtener_contactos(forzar_actualizacion: bool = False):
         resultado = _parsear_linea_contacto(linea)
         if resultado:
             contactos.append(resultado)
-
-    # Quitar duplicados (un contacto puede tener varios números registrados
-    # bajo el mismo nombre; nos quedamos con el primero que aparezca)
     vistos = set()
     contactos_unicos = []
     for nombre, numero in contactos:
@@ -92,8 +89,6 @@ def buscar_contacto(nombre_buscado: str):
     return None  # ninguna coincidencia, o ambigua (varias posibles)
 
 def listar_coincidencias(nombre_buscado: str):
-    """Para cuando hay ambigüedad: devuelve todos los nombres que coinciden,
-    para que REVAN pueda preguntar 'te refieres a X o a Y'."""
     nombre_buscado = nombre_buscado.lower().strip()
     contactos = obtener_contactos()
     return [nombre for nombre, _ in contactos if nombre_buscado in nombre.lower()]

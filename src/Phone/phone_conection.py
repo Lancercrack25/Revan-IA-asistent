@@ -15,7 +15,6 @@ def _ejecutar_adb(*args, timeout: int = 10):
     """
     if not adb_disponible():
         return False, "ADB no está instalado o no está en el PATH del sistema."
-
     try:
         resultado = subprocess.run(
             ["adb"] + list(args),
@@ -47,10 +46,6 @@ def dispositivo_conectado() -> bool:
     return False
 
 def estado_conexion() -> str:
-    """
-    Versión hablable del estado de conexión, con diagnóstico específico
-    de qué falta (para no dejar al usuario adivinando por qué no funciona).
-    """
     if not adb_disponible():
         return ("No tengo ADB instalado, Señor. Necesita instalar Android "
                 "Platform Tools y agregarlo al PATH del sistema.")
@@ -68,15 +63,14 @@ def estado_conexion() -> str:
 
     for linea in lineas:
         if linea.endswith("unauthorized"):
-            return ("Su teléfono está conectado pero no autorizado, Señor. "
+            return ("Su teléfono está conectado pero aun no  esta autorizado, Señor. "
                     "Revise la pantalla del celular y acepte la solicitud de depuración USB.")
         if linea.endswith("offline"):
             return "Su teléfono aparece como desconectado, Señor. Intente reconectar el cable USB."
         if linea.endswith("device"):
             return "Teléfono conectado y listo, Señor."
 
-    return "Estado de conexión del teléfono no reconocido, Señor."
-
+    return "Estado de conexión del teléfono Fallida, Señor."
 
 if __name__ == "__main__":
     print(estado_conexion())
