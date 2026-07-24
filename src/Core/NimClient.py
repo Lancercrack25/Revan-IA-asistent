@@ -63,19 +63,18 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "crear_documento_word",
-            "description": "Crea un archivo de Word (.docx) redactando información sobre una temática solicitada y guardándolo en la carpeta indicada.",
+            "description": "Crea un archivo de Word (.docx) redactando información sobre una temática solicitada.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "nombre_archivo": {"type": "string", "description": "Nombre del archivo (ej. 'Minecraft_Info.docx')"},
-                    "contenido_o_tema": {"type": "string", "description": "Resumen, información o texto que debe ir redactado DENTRO del archivo Word."},
-                    "carpeta_destino": {"type": "string", "description": "Nombre de la carpeta donde se debe guardar (ej. 'pruebas')."}
+                    "nombre_archivo": {"type": "string", "description": "Nombre del archivo"},
+                    "contenido_o_tema": {"type": "string", "description": "Texto o tema dentro del archivo Word."},
+                    "carpeta_destino": {"type": "string", "description": "Carpeta destino."}
                 },
                 "required": ["nombre_archivo", "contenido_o_tema"],
             },
         },
     },
-
     {
         "type": "function",
         "function": {
@@ -93,12 +92,11 @@ HERRAMIENTAS = [
             },
         },
     },
-
     {
         "type": "function",
         "function": {
             "name": "abrir_aplicacion",
-            "description": "Abre un programa instalado en Windows como la calculadora, bloc de notas, etc.",
+            "description": "Abre un programa instalado en Windows.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -120,7 +118,7 @@ HERRAMIENTAS = [
                     "ruta": {
                         "type": "string",
                         "enum": ["actual", "escritorio", "documentos"],
-                        "description": "Ubicación de creación. Por defecto 'escritorio'.",
+                        "description": "Ubicación. Por defecto 'escritorio'.",
                     },
                 },
                 "required": ["nombre"],
@@ -145,7 +143,7 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "abrir_office",
-            "description": "Abre la aplicación de Microsoft Word o Excel vacía.",
+            "description": "Abre la aplicación de Microsoft Word o Excel.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -206,7 +204,7 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "enviar_whatsapp",
-            "description": "Abre un chat de WhatsApp Web con un mensaje preescrito.",
+            "description": "Abre un chat de WhatsApp Web con un mensaje.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -221,7 +219,8 @@ HERRAMIENTAS = [
 
 
 class NimClient:
-    def __init__(self, api_key: str = None, modelo: str = "mistralai/mistral-nemotron"):
+    # Cambiado a 'meta/llama-3.1-8b-instruct' para velocidad de respuesta ultrarrápida (< 0.5s)
+    def __init__(self, api_key: str = None, modelo: str = "meta/llama-3.1-8b-instruct"):
         self.api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
         if not self.api_key:
             raise ValueError("Falta la API key de NVIDIA NIM.")
@@ -242,7 +241,6 @@ class NimClient:
             "- Cuando el usuario te pida abrir, lanzar o ejecutar un juego o aplicación (ej. 'Abre Minecraft', 'Abre Discord'), NUNCA le des instrucciones de cómo hacerlo él mismo.\n"
             "- DEBES invocar inmediatamente la herramienta correspondiente (lanzar_videojuego o lanzar_aplicacion_usuario por ejemplo).\n"
         )
-        
 
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
@@ -301,8 +299,9 @@ class NimClient:
                 registrar_accion_sistema(f"word({nombre_doc})", resultado, "WORD")
                 return resultado
 
-            elif nombre == "abrir_videojuego":
-                juego_nombre = argumentos.get("nombre", "")
+            # CORREGIDO: Mismo nombre que en HERRAMIENTAS
+            elif nombre == "lanzar_videojuego":
+                juego_nombre = argumentos.get("nombre_juego", argumentos.get("nombre", ""))
                 resultado = lanzar_videojuego(juego_nombre)
                 registrar_accion_sistema(f"juego({juego_nombre})", resultado, "JUEGO")
                 return resultado
@@ -375,49 +374,47 @@ class NimClient:
         if len(self.historial) > 16:
             self.historial = [self.historial[0]] + self.historial[-15:]
 
-        for _ in range(max_iteraciones):
-            try:
-                t0 = time.time()
-                respuesta = self.client.chat.completions.create(
-                    model=self.modelo,
-                    messages=self.historial,
-                    tools=HERRAMIENTAS,
-                    tool_choice="auto",
-                    temperature=0.2,
-                    max_tokens=300,
-                )
-                print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
-            except Exception as e:
-                print(f"Error crítico en el cliente NIM: {e}")
-                return "Tuve un error al procesar la orden en mi núcleo."
+        try:
+            t0 = time.time()
+            respuesta = self.client.chat.completions.create(
+                model=self.modelo,
+                messages=self.historial,
+                tools=HERRAMIENTAS,
+                tool_choice="auto",
+                temperature=0.1,
+                max_tokens=250,
+            )
+            print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
+        except Exception as e:
+            print(f"Error crítico en el cliente NIM: {e}")
+            return "Tuve un error al procesar la orden en mi núcleo."
 
-            mensaje = respuesta.choices[0].message
+        mensaje = respuesta.choices[0].message
 
-            if mensaje.tool_calls:
-                self.historial.append(mensaje)
+        # Si la IA seleccionó una herramienta (función)
+        if mensaje.tool_calls:
+            self.historial.append(mensaje)
 
-                for tool_call in mensaje.tool_calls:
-                    nombre_herramienta = tool_call.function.name
-                    try:
-                        argumentos = json.loads(tool_call.function.arguments or "{}")
-                    except json.JSONDecodeError:
-                        argumentos = {}
+            resultados = []
+            for tool_call in mensaje.tool_calls:
+                nombre_herramienta = tool_call.function.name
+                try:
+                    argumentos = json.loads(tool_call.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    argumentos = {}
 
-                    print(f"[NimClient] Ejecutando Herramienta -> {nombre_herramienta}({argumentos})")
-                    resultado = self._ejecutar_herramienta(nombre_herramienta, argumentos)
+                print(f"[NimClient] Ejecutando Herramienta -> {nombre_herramienta}({argumentos})")
+                
+                # Ejecutar la acción localmente inmediatamente
+                res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
+                resultados.append(res)
 
-                    self.historial.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": resultado,
-                    })
+            # RESPUESTA DIRECTA: Devuelve la respuesta sin volver a consultar a la API para evitar demoras
+            respuesta_directa = self._limpiar_para_voz(resultados[0])
+            self.historial.append({"role": "assistant", "content": respuesta_directa})
+            return respuesta_directa
 
-                continue
-
-            respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
-            self.historial.append({"role": "assistant", "content": respuesta_final})
-            return respuesta_final
-
-        res_limite = "He completado la solicitud, Señor."
-        self.historial.append({"role": "assistant", "content": res_limite})
-        return res_limite
+        # Si fue solo conversación de texto
+        respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
+        self.historial.append({"role": "assistant", "content": respuesta_final})
+        return respuesta_final

@@ -312,16 +312,12 @@ def procesar_ciclo_voz():
             ultima_interaccion = time.time()
             return
 
-        # 2. ESTADO: PROCESANDO / PENSANDO
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00") 
         print("[REVAN]: Procesando inteligencia...")
 
-        # Intercepción rápida para cámara
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             orden_limpia = "enciende la camara y dime que ves"
             orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
-
-        # PASO A: Intentar ejecutar como misión compleja (investigar/recordar)
         respuesta_final = None
         try:
             respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
