@@ -289,7 +289,7 @@ def procesar_ciclo_voz():
 
         if es_consulta_intrusos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy escaneando su red en busca de dispositivos desconocidos...")
+            voz_ia.hablar("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
             resultado_intrusos = detectar_intrusos()
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             voz_ia.hablar(resultado_intrusos)
@@ -359,7 +359,6 @@ def procesar_ciclo_voz():
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"No he recibido datos válidos del procesador táctico, {titulo}."
 
-        # Actualización segura de Tkinter (Thread-safe)
         if gui and hasattr(gui, 'app'):
             gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
             gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
@@ -420,4 +419,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-#se modifico games,apps y nimclient

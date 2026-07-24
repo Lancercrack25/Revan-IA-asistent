@@ -10,8 +10,11 @@ APPS_PROTOCOLO_ESPECIAL = {
     "discord": "start discord:",
     "whatsapp": "start whatsapp:",
     "anydesk": "start anydesk",
+    "unity": "start unity hub",
+    "steam": "start steam",
+    "xbox": "start xbox",
+    "curse": "start curseforge"
 }
-
 
 def lanzar_aplicacion_usuario(nombre_app) -> str:
     """

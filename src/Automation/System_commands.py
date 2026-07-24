@@ -97,9 +97,7 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
     except Exception as e:
         return f"Error al lanzar la aplicación {nombre_app}: {e}"
 
-
 def lanzar_videojuego(nombre_juego: str) -> str:
-    """Lanza el juego de Minecraft u otros usando el protocolo nativo de Windows o el launcher."""
     nombre = nombre_juego.lower().strip()
     try:
         if "minecraft" in nombre:
@@ -110,7 +108,6 @@ def lanzar_videojuego(nombre_juego: str) -> str:
             return f"Iniciando {nombre_juego}."
     except Exception as e:
         return f"Error al intentar abrir el juego: {e}"
-
 
 def ejecutar_aplicacion_office(app: str) -> str:
     """Abre aplicaciones de la suite Microsoft Office."""
