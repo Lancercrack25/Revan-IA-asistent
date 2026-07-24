@@ -5,7 +5,6 @@ import threading
 import subprocess
 import unicodedata
 
-# Prevenir la generación de archivos .pyc
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
@@ -98,7 +97,7 @@ def encender_sistemas():
     sistema_activo = True
 
     print("Inicializando secuencia de despliegue cronológico...")
-    print("🪟 [1/3] Desplegando monitores nativos...")
+    print("[1/3] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
@@ -145,14 +144,12 @@ def encender_sistemas():
         print(f" Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
-    """Bucle infinito de escucha fuera del hilo principal de la GUI."""
     global sistema_activo
     while sistema_activo:
         procesar_ciclo_voz()
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz: acciones -> NimClient primero, conversación -> Gemini primero, cada uno respalda al otro."""
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
     try:
         # 1. ESTADO: ESCUCHANDO
@@ -245,7 +242,6 @@ def procesar_ciclo_voz():
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
         palabras_lista = orden_limpia_sin_acentos.split()
-
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or "ping" in palabras_lista
         es_consulta_intrusos = any(p in orden_limpia_sin_acentos for p in [
@@ -363,15 +359,12 @@ def procesar_ciclo_voz():
             gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
             gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
 
-        # 3. ESTADO: HABLANDO
         sincronizar_estado_esfera("HABLANDO", "#ff0055") 
         time.sleep(0.15)
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
         
         ultima_interaccion = time.time()
-
-        # 4. ESTADO: ESPERA / REPOSO
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
     except Exception as e:

@@ -35,10 +35,6 @@ def dispositivo_conectado() -> bool:
     if not exito:
         return False
 
-    # La salida de 'adb devices' es algo como:
-    #   List of devices attached
-    #   ABC123XYZ    device
-    # Buscamos alguna línea que termine en "device" (no "unauthorized" ni "offline")
     lineas = salida.splitlines()[1:]  # saltar el encabezado
     for linea in lineas:
         if linea.strip().endswith("device"):
@@ -71,6 +67,35 @@ def estado_conexion() -> str:
             return "Teléfono conectado y listo, Señor."
 
     return "Estado de conexión del teléfono Fallida, Señor."
+
+
+# ─── ACCIÓN PENDIENTE DE CONFIRMACIÓN ──────────────────────────────────────
+# Almacén compartido para cualquier acción "sensible" del teléfono (por
+# ahora, WhatsApp) que necesite un paso de confirmación separado antes de
+# ejecutarse de verdad. La idea: una orden por voz PREPARA la acción y la
+# deja aquí guardada, pero no la ejecuta. Solo se ejecuta cuando el usuario
+# dice "confirma" en un turno APARTE. Esto corta cualquier cadena donde una
+# sola orden (o contenido externo manipulado que el modelo haya leído,
+# como una página web con instrucciones escondidas) intente disparar un
+# envío sin que el usuario lo apruebe explícitamente por su cuenta.
+_accion_pendiente = None
+
+
+def guardar_accion_pendiente(tipo: str, datos: dict):
+    global _accion_pendiente
+    _accion_pendiente = {"tipo": tipo, "datos": datos}
+
+
+def obtener_accion_pendiente():
+    return _accion_pendiente
+
+
+def limpiar_accion_pendiente():
+    global _accion_pendiente
+    _accion_pendiente = None
+
+def hay_accion_pendiente() -> bool:
+    return _accion_pendiente is not None
 
 if __name__ == "__main__":
     print(estado_conexion())
