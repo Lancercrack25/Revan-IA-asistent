@@ -34,14 +34,14 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 16    # Ventana de atención activa en segundos (Modo Jarvis)
+TIEMPO_ATENCION = 18    # Ventana de atención activa en segundos (Modo Jarvis)
 # Palabras clave que identifican una ACCIÓN FÍSICA (van a NimClient primero).
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
     "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
-    "corre", "prende", "enciende", "investiga", "recuerda", "guarda",
+    "corre", "prende", "enciende", "investiga", "recuerda", "guarda","analiza",
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -424,3 +424,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+#se modifico games,apps y nimclient

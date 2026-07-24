@@ -75,20 +75,25 @@ HERRAMIENTAS = [
             },
         },
     },
+
     {
         "type": "function",
         "function": {
-            "name": "abrir_videojuego",
-            "description": "Lanza un videojuego instalado en la PC (por ejemplo Minecraft, Fortnite, etc.).",
+            "name": "lanzar_videojuego",
+            "description": "Lanza un videojuego o ejecutable desde la carpeta Juegos del usuario.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "nombre": {"type": "string", "description": "Nombre del videojuego a ejecutar"}
+                    "nombre_juego": {
+                        "type": "string",
+                        "description": "Nombre del videojuego a ejecutar (ej: Minecraft, GTA V)"
+                    }
                 },
-                "required": ["nombre"],
+                "required": ["nombre_juego"]
             },
         },
     },
+
     {
         "type": "function",
         "function": {
@@ -226,14 +231,18 @@ class NimClient:
             base_url="https://integrate.api.nvidia.com/v1",
             api_key=self.api_key,
         )
-
         self.system_prompt = (
             "Eres REVAN, asistente de inteligencia artificial avanzado estilo JARVIS.\n"
             "COMPORTAMIENTO:\n"
             "1. Te diriges al usuario como 'Señor'. Responde de forma concisa (1 o 2 oraciones).\n"
             "2. Jamás menciones rutas de archivos largas. Di 'en su escritorio' o 'en la carpeta X'.\n"
-            "3. OBLIGATORIO: Selecciona y ejecuta la herramienta adecuada para cada acción requerida."
+            "3. OBLIGATORIO: Selecciona y ejecuta la herramienta adecuada para cada acción requerida.\n\n"
+            "INSTRUCCIÓN CRÍTICA DE EJECUCIÓN:\n"
+            "- Tienes herramientas (functions/tools) integradas para controlar la PC.\n"
+            "- Cuando el usuario te pida abrir, lanzar o ejecutar un juego o aplicación (ej. 'Abre Minecraft', 'Abre Discord'), NUNCA le des instrucciones de cómo hacerlo él mismo.\n"
+            "- DEBES invocar inmediatamente la herramienta correspondiente (lanzar_videojuego o lanzar_aplicacion_usuario por ejemplo).\n"
         )
+        
 
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
