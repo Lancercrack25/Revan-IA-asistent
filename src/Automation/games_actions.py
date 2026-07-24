@@ -13,6 +13,9 @@ ALIAS_JUEGOS = {
     "dmc": "devil may cry",
     "7ds": "seven deadly sins",
     "minecraft": "minecraft for windows",
+    "over": "Overwatch",
+    "rivals": "Marvel Rivals",
+    "repo": "R.E.P.O",
 }
 
 
