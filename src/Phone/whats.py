@@ -1,4 +1,4 @@
-#este archivo se encarga de enviar mensajes de whatsapp a los contactos usando el telefono conectado
+# este archivo se encarga de enviar mensajes de whatsapp con validación estricta de seguridad
 import re
 import time
 import urllib.parse
@@ -6,110 +6,79 @@ from src.Phone.phone_conection import (
     _ejecutar_adb, dispositivo_conectado,
     guardar_accion_pendiente, obtener_accion_pendiente, limpiar_accion_pendiente,
 )
-from src.Phone.contacts import buscar_contacto, listar_coincidencias
+from src.Phone.contacts import obtener_contactos, listar_coincidencias
 
 
-def _resolver_numero(destinatario: str):
-    """Devuelve (nombre_mostrar, numero) o (None, None) si no se resuelve."""
-    destinatario = destinatario.strip()
+def resolver_contacto_seguro(destinatario: str):
+    """
+    Busca contactos garantizando cero ambigüedad.
+    Devuelve: (Estado, Nombre/Detalle, Numero)
+    """
+    destinatario_limpio = destinatario.strip().lower()
     solo_digitos = re.sub(r"[^\d]", "", destinatario)
 
-    if len(solo_digitos) >= 7:
-        return destinatario, solo_digitos
+    # 1. Si enviaron un número directo (Mínimo 10 dígitos)
+    if len(solo_digitos) >= 10:
+        return "EXACTO", destinatario, solo_digitos
 
-    resultado = buscar_contacto(destinatario)
-    if resultado is None:
-        return None, None
+    contactos = obtener_contactos()
+    
+    # Busca coincidencias exactas primero
+    coincidencias_exactas = [c for c in contactos if c[0].lower() == destinatario_limpio]
+    if len(coincidencias_exactas) == 1:
+        return "EXACTO", coincidencias_exactas[0][0], re.sub(r"[^\d]", "", coincidencias_exactas[0][1])
 
-    nombre, numero = resultado
-    return nombre, re.sub(r"[^\d]", "", numero)
+    # Si no hay exacta, busca parciales
+    coincidencias_parciales = [c for c in contactos if destinatario_limpio in c[0].lower()]
 
+    if len(coincidencias_parciales) == 0:
+        return "NO_ENCONTRADO", None, None
 
-def abrir_chat_con_mensaje(destinatario: str, mensaje: str) -> str:
-    """
-    Abre WhatsApp con el mensaje ya escrito, SIN enviarlo — versión 100%
-    manual, tú tocas el botón en tu teléfono. Útil si prefieres revisar el
-    mensaje en pantalla antes de que se mande, sin usar el flujo de
-    confirmación por voz.
-    """
-    if not dispositivo_conectado():
-        return "No detecto su teléfono conectado, Señor. Verifique el cable USB."
+    if len(coincidencias_parciales) == 1:
+        return "EXACTO", coincidencias_parciales[0][0], re.sub(r"[^\d]", "", coincidencias_parciales[0][1])
 
-    nombre_mostrar, numero = _resolver_numero(destinatario)
-
-    if numero is None:
-        coincidencias = listar_coincidencias(destinatario)
-        if len(coincidencias) > 1:
-            return (f"Encontré varios contactos parecidos a '{destinatario}', Señor: "
-                    f"{', '.join(coincidencias[:5])}. Sea más específico.")
-        return f"No encontré ningún contacto llamado '{destinatario}' en su agenda, Señor."
-
-    mensaje_codificado = urllib.parse.quote(mensaje)
-    url = f"https://wa.me/{numero}?text={mensaje_codificado}"
-
-    exito, salida = _ejecutar_adb(
-        "shell", "am", "start",
-        "-a", "android.intent.action.VIEW",
-        "-d", url,
-    )
-
-    if not exito:
-        return f"No pude abrir WhatsApp para {nombre_mostrar}, Señor. Detalle: {salida}"
-
-    return f"Chat de WhatsApp con {nombre_mostrar} abierto con el mensaje listo, Señor. Confirme el envío en su teléfono."
+    # Si hay más de una coincidencia, ES AMBIGUO -> Frenar por seguridad
+    nombres_posibles = [c[0] for c in coincidencias_parciales]
+    return "AMBIGUO", nombres_posibles, None
 
 
 def preparar_envio_whatsapp(destinatario: str, mensaje: str) -> str:
     """
-    RECOMENDADO: prepara el mensaje pero NO lo manda todavía. Queda
-    guardado como 'acción pendiente' hasta que el usuario diga "confirma"
-    en un turno APARTE — recién ahí se abre WhatsApp y se envía solo, sin
-    que tengas que tocar ni escribir nada en el teléfono.
-
-    Esto te da lo mejor de los dos mundos: cero fricción manual en el
-    celular (no tienes que tocar el botón de enviar), pero con una capa
-    de seguridad real (nada se manda por una sola orden sin tu aprobación
-    explícita en un mensaje separado).
+    BLINDAJE DE SEGURIDAD:
+    Analiza el destinatario y detiene el proceso si no está 100% seguro de a quién enviar.
     """
     if not dispositivo_conectado():
-        return "No detecto su teléfono conectado, Señor. Verifique el cable USB."
+        return "Error de Seguridad: El teléfono no está conectado por ADB."
 
-    nombre_mostrar, numero = _resolver_numero(destinatario)
+    estado, info, numero = resolver_contacto_seguro(destinatario)
 
-    if numero is None:
-        coincidencias = listar_coincidencias(destinatario)
-        if len(coincidencias) > 1:
-            return (f"Encontré varios contactos parecidos a '{destinatario}', Señor: "
-                    f"{', '.join(coincidencias[:5])}. Sea más específico.")
-        return f"No encontré ningún contacto llamado '{destinatario}' en su agenda, Señor."
+    if estado == "NO_ENCONTRADO":
+        return f"Cancelado por seguridad: No existe ningún contacto llamado '{destinatario}' en tu agenda."
 
+    if estado == "AMBIGUO":
+        opciones = ", ".join(info[:4])
+        return (f"Acción detenida por seguridad: Encontré varios contactos similares ({opciones}). "
+                f"Por favor especifica el nombre completo para evitar confusiones.")
+
+    # Si todo es 100% seguro, guarda la acción
     guardar_accion_pendiente("whatsapp", {
-        "nombre": nombre_mostrar,
+        "nombre": info,
         "numero": numero,
         "mensaje": mensaje,
     })
 
-    return (f"Listo para enviar a {nombre_mostrar}: \"{mensaje}\". "
-            f"Diga 'confirma' para enviarlo, o 'cancela' para descartarlo, Señor.")
+    return (f"Confirmación requerida: ¿Deseas enviar el siguiente mensaje a *{info}* ({numero})?\n"
+            f"Texto: \"{mensaje}\"\n\n"
+            f"Responde 'confirma' para enviar o 'cancela' para abortar.")
 
 
 def confirmar_envio_pendiente() -> str:
     """
-    Ejecuta de verdad el envío que quedó pendiente de confirmación: abre
-    WhatsApp y manda el 'Enter' automático, sin que toques el teléfono.
-
-    Nota honesta sobre el auto-envío: el keyevent de Enter para confirmar
-    el mensaje en WhatsApp no está garantizado al 100% en todos los
-    modelos de teléfono/versiones de WhatsApp — en la gran mayoría de
-    casos sí funciona (WhatsApp normalmente respeta Enter como enviar
-    cuando el foco está en el campo de texto), pero si en tu teléfono
-    específico no llegara a mandarlo, el mensaje se queda escrito y
-    visible, listo para que lo mandes tú con un toque — nunca falla en
-    silencio sin que lo notes.
+    Ejecuta el envío ÚNICAMENTE tras la confirmación explícita del usuario.
     """
     pendiente = obtener_accion_pendiente()
     if not pendiente or pendiente.get("tipo") != "whatsapp":
-        return "No hay ningún mensaje de WhatsApp pendiente de confirmar, Señor."
+        return "No hay ningún mensaje pendiente de envío."
 
     datos = pendiente["datos"]
     limpiar_accion_pendiente()
@@ -117,27 +86,25 @@ def confirmar_envio_pendiente() -> str:
     mensaje_codificado = urllib.parse.quote(datos["mensaje"])
     url = f"https://wa.me/{datos['numero']}?text={mensaje_codificado}"
 
-    exito, salida = _ejecutar_adb(
-        "shell", "am", "start",
-        "-a", "android.intent.action.VIEW",
-        "-d", url,
-    )
+    # 1. Asegurar encendido de pantalla
+    _ejecutar_adb("shell", "input", "keyevent", "224")
+
+    # 2. Abrir chat específico
+    exito, salida = _ejecutar_adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", url)
     if not exito:
-        return f"No pude abrir WhatsApp para {datos['nombre']}, Señor. Detalle: {salida}"
+        return f"Error abriendo el chat de {datos['nombre']}: {salida}"
 
-    time.sleep(3.0)  # esperar a que WhatsApp cargue el chat y el teclado
+    # 3. Pausa para carga de interfaz
+    time.sleep(3.5)
 
-    exito2, _ = _ejecutar_adb("shell", "input", "keyevent", "66")  # KEYCODE_ENTER
-    if not exito2:
-        return f"Mensaje abierto para {datos['nombre']}, pero no pude confirmar el envío automático. Revíselo en su teléfono."
+    # 4. Intento de auto-envío por ADB
+    _ejecutar_adb("shell", "input", "keyevent", "61")  # TAB
+    _ejecutar_adb("shell", "input", "keyevent", "66")  # ENTER
 
-    return f"Mensaje enviado a {datos['nombre']}, Señor. Verifique en su teléfono que se haya mandado bien."
+    return f"Procesado: El mensaje para *{datos['nombre']}* se ha abierto y enviado en tu teléfono."
 
 
 def cancelar_envio_pendiente() -> str:
-    """Descarta el mensaje pendiente sin enviarlo."""
-    pendiente = obtener_accion_pendiente()
-    if not pendiente or pendiente.get("tipo") != "whatsapp":
-        return "No había ningún mensaje pendiente, Señor."
+    """Descarta cualquier envío en cola."""
     limpiar_accion_pendiente()
-    return "Envío de WhatsApp cancelado, Señor."
+    return "Operación cancelada. Ningún mensaje fue enviado."

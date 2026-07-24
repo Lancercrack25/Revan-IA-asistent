@@ -1,17 +1,12 @@
-#este archivo se encarga de leer y buscar contactos de la agenda del telefono via ADB
+# este archivo se encarga de leer y buscar contactos de la agenda del telefono via ADB
 import re
 from src.Phone.phone_conection import _ejecutar_adb, dispositivo_conectado
 
-_cache_contactos = None  # se llena en el primer uso, para no consultar el teléfono cada vez
+_cache_contactos = None  # Cache en memoria para evitar lecturas lentas recurrentes
 
 
 def _parsear_linea_contacto(linea: str):
-    """
-    Parsea una línea de salida de 'content query' sobre contactos, con
-    formato tipo:
-      Row: 0 display_name=Juan Perez, number=5512345678
-    Devuelve (nombre, numero) o None si la línea no trae ambos datos.
-    """
+    """Extrae el nombre y el número telefónico de las líneas devueltas por ADB."""
     match_nombre = re.search(r"display_name=([^,]+)", linea)
     match_numero = re.search(r"number=([^,]+)", linea)
 
@@ -19,19 +14,17 @@ def _parsear_linea_contacto(linea: str):
         return None
 
     nombre = match_nombre.group(1).strip()
-    numero = re.sub(r"[^\d+]", "", match_numero.group(1).strip())  # solo dígitos y '+'
+    numero = re.sub(r"[^\d+]", "", match_numero.group(1).strip())
 
     if not nombre or not numero:
         return None
 
     return nombre, numero
 
+
 def obtener_contactos(forzar_actualizacion: bool = False):
     """
-    Lee todos los contactos con número telefónico del dispositivo conectado.
-    Los cachea en memoria (dura mientras REVAN esté corriendo) para no
-    tener que volver a consultar el teléfono en cada búsqueda.
-    Devuelve una lista de tuplas (nombre, numero).
+    Lee todos los contactos del teléfono.
     """
     global _cache_contactos
 
@@ -57,6 +50,8 @@ def obtener_contactos(forzar_actualizacion: bool = False):
         resultado = _parsear_linea_contacto(linea)
         if resultado:
             contactos.append(resultado)
+
+    # Eliminar duplicados por nombre
     vistos = set()
     contactos_unicos = []
     for nombre, numero in contactos:
@@ -71,9 +66,8 @@ def obtener_contactos(forzar_actualizacion: bool = False):
 
 def buscar_contacto(nombre_buscado: str):
     """
-    Busca un contacto por nombre (coincidencia parcial, sin importar
-    mayúsculas/acentos exactos). Devuelve (nombre_real, numero) o None si
-    no se encuentra o hay más de una coincidencia ambigua.
+    Busca un contacto por nombre parcial.
+    Devuelve (nombre_real, numero) o None si no hay coincidencias únicas.
     """
     nombre_buscado = nombre_buscado.lower().strip()
     contactos = obtener_contactos()
@@ -86,12 +80,15 @@ def buscar_contacto(nombre_buscado: str):
     if len(coincidencias) == 1:
         return coincidencias[0]
 
-    return None  # ninguna coincidencia, o ambigua (varias posibles)
+    return None
+
 
 def listar_coincidencias(nombre_buscado: str):
+    """Devuelve la lista de nombres que coinciden parcialmente con la búsqueda."""
     nombre_buscado = nombre_buscado.lower().strip()
     contactos = obtener_contactos()
     return [nombre for nombre, _ in contactos if nombre_buscado in nombre.lower()]
+
 
 if __name__ == "__main__":
     contactos = obtener_contactos()
