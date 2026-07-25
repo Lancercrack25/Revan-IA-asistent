@@ -16,7 +16,6 @@ from src.Phone.PC.whats_pc import enviar_mensaje_pc
 
 
 def _resolver_destinatario(destinatario: str):
-    """Resuelve el contacto usando la agenda de Android o el número directo."""
     destinatario_limpio = destinatario.strip()
     solo_digitos = re.sub(r"[^\d]", "", destinatario_limpio)
 
@@ -45,12 +44,11 @@ def enviar_mensaje_whatsapp(destinatario: str, mensaje: str) -> str:
             return f"Encontré varias coincidencias: {', '.join(coincidencias[:4])}. Especifica el nombre exacto."
         return f"No se encontró al contacto '{destinatario}'."
 
-    # DECISIÓN AUTOMÁTICA DE VÍA
+    # aqui el programa o script detecta si hay un cable usb en caso de que si manda al cel el mensaje pero si  no desde la pc 
     if dispositivo_conectado():
         # Vía 1: Teléfono Android conectado por USB
         return abrir_chat_con_mensaje(numero, mensaje)
     else:
-        # Vía 2: WhatsApp App de Escritorio en PC
         print("[WhatsApp Service]: Teléfono no detectado por USB. Conmutando a App de PC...")
         return enviar_mensaje_pc(numero, mensaje)
 
