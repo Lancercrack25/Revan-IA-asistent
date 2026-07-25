@@ -8,7 +8,8 @@ from src.Automation.games_actions import _normalizar, _listar_accesos, _buscar_m
 # No poner nombres de accesos directos (.lnk) aquí; esos los escanea la carpeta Plataformas.
 APPS_PROTOCOLO_ESPECIAL = {
     "discord": "start discord:",
-    "whatsapp": "start whatsapp:",
+    "whatsapp": "start whatsapp:",      # <--- Agrega esta línea
+    "whatsapp desktop": "start whatsapp:",
     "anydesk": "start anydesk",
     "unity": "start unity hub",
     "steam": "start steam",

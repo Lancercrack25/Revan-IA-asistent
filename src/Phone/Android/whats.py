@@ -2,12 +2,11 @@
 import re
 import time
 import urllib.parse
-from src.Phone.phone_conection import (
+from src.Phone.Android.contacts import obtener_contactos, listar_coincidencias
+from src.Phone.Android.phone_conection import (
     _ejecutar_adb, dispositivo_conectado,
     guardar_accion_pendiente, obtener_accion_pendiente, limpiar_accion_pendiente,
 )
-from src.Phone.contacts import obtener_contactos, listar_coincidencias
-
 
 def resolver_contacto_seguro(destinatario: str):
     """

@@ -1,18 +1,18 @@
 # este archivo decide automáticamente si enviar el mensaje por Android (USB) o por la PC
-from src.Phone.Android.phone_conection import dispositivo_conectado
-from src.Phone.Android.whats import (
-    preparar_envio_whatsapp as preparar_android,
-    confirmar_envio_pendiente as confirmar_android,
-    cancelar_envio_pendiente as cancelar_android,
-)
+import re
+
 from src.Phone.Android.phone_conection import (
+    dispositivo_conectado,
     guardar_accion_pendiente,
     obtener_accion_pendiente,
     limpiar_accion_pendiente,
 )
+from src.Phone.Android.whats import (
+    confirmar_envio_pendiente as confirmar_android,
+    preparar_envio_whatsapp as abrir_chat_con_mensaje, 
+)
 from src.Phone.Android.contacts import buscar_contacto, listar_coincidencias
 from src.Phone.PC.whats_pc import enviar_mensaje_pc
-import re
 
 
 def _resolver_destinatario(destinatario: str):
@@ -48,7 +48,6 @@ def enviar_mensaje_whatsapp(destinatario: str, mensaje: str) -> str:
     # DECISIÓN AUTOMÁTICA DE VÍA
     if dispositivo_conectado():
         # Vía 1: Teléfono Android conectado por USB
-        from src.Phone.Android.whats import abrir_chat_con_mensaje
         return abrir_chat_con_mensaje(numero, mensaje)
     else:
         # Vía 2: WhatsApp App de Escritorio en PC
@@ -94,3 +93,12 @@ def confirmar_envio_inteligente() -> str:
     else:
         # Si era para PC o si se desconectó el USB entre la preparación y la confirmación
         return enviar_mensaje_pc(datos["numero"], datos["mensaje"])
+
+def cancelar_envio_pendiente() -> str:
+    """Cancela y limpia cualquier acción de WhatsApp guardada en memoria."""
+    pendiente = obtener_accion_pendiente()
+    if not pendiente:
+        return "No hay ninguna acción o mensaje pendiente por cancelar, Señor."
+    
+    limpiar_accion_pendiente()
+    return "Envío de mensaje cancelado exitosamente, Señor."

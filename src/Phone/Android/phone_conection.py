@@ -1,10 +1,8 @@
 # este archivo se encarga de establecer y verificar la conexion con el telefono via ADB
 import subprocess
 import shutil
-
 # Guardado en memoria para confirmación de acciones sensibles
 _accion_pendiente = None
-
 
 def adb_disponible() -> bool:
     """Verifica que el comando 'adb' esté instalado y en el PATH del sistema."""

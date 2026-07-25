@@ -23,6 +23,7 @@ from src.Network.analize_network import analizar_red
 from src.Network.velocidad_latencia import probar_velocidad_con_navegador, reportar_latencia
 from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
 from src.Core.Gemini_client import GeminiClient
+from src.Phone.whatsapp_service import preparar_envio_inteligente,confirmar_envio_inteligente, cancelar_envio_pendiente
 
 # Instancias y Controles Globales
 cerebro_ia = None    
@@ -33,14 +34,15 @@ gui = None
 titulo = "Señor"
 sistema_activo = False
 ultima_interaccion = 0  
-TIEMPO_ATENCION = 18    # Ventana de atención activa en segundos (Modo Jarvis)
-# Palabras clave que identifican una ACCIÓN FÍSICA (van a NimClient primero).
+TIEMPO_ATENCION = 18 
+
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
     "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
     "corre", "prende", "enciende", "investiga", "recuerda", "guarda","analiza",
+    "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -189,6 +191,47 @@ def procesar_ciclo_voz():
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
+
+        # --- INTERCEPTOR MÓDULO TELÉFONO / WHATSAPP ---
+        palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
+        es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
+        es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
+
+        if es_confirmacion:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            resultado = confirmar_envio_inteligente()
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            voz_ia.hablar(resultado)
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
+            return
+
+        if es_cancelacion:
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            resultado = cancelar_envio_pendiente()
+            voz_ia.hablar(resultado)
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
+            return
+
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_whatsapp):
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            # Extraer destinatario y mensaje simple
+            try:
+                partes_a = orden_limpia.split(" a ", 1)
+                if len(partes_a) > 1:
+                    partes_diga = partes_a[1].split(" que diga ", 1)
+                    destinatario = partes_diga[0].strip()
+                    mensaje_texto = partes_diga[1].strip() if len(partes_diga) > 1 else "Hola"
+                    
+                    respuesta_prep = preparar_envio_inteligente(destinatario, mensaje_texto)
+                    sincronizar_estado_esfera("HABLANDO", "#ff0055")
+                    voz_ia.hablar(respuesta_prep)
+                    sincronizar_estado_esfera("ESPERA", "#0077ff")
+                    ultima_interaccion = time.time()
+                    return
+            except Exception as err_wa:
+                print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
         # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
@@ -363,7 +406,6 @@ def procesar_ciclo_voz():
         time.sleep(0.15)
         voz_ia.hablar(respuesta_final)
         time.sleep(0.2)
-        
         ultima_interaccion = time.time()
         sincronizar_estado_esfera("ESPERA", "#0077ff") 
 
@@ -382,10 +424,8 @@ def main():
         
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
-    
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
-
     oidos_ia = MicrophoneClient()
     
     print("REVAN en modo pasivo. Esperando señal acústica...")

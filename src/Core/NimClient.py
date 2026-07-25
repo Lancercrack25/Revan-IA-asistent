@@ -28,7 +28,7 @@ from src.Automation.System_commands import (
     crear_y_abrir_documento_word,
 )
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
-from src.Phone.whats import abrir_chat_con_mensaje
+from src.Phone.whatsapp_service import preparar_envio_inteligente
 
 HERRAMIENTAS = [
     {
@@ -215,8 +215,28 @@ HERRAMIENTAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "enviar_whatsapp",
+            "description": "Prepara o envía un mensaje de WhatsApp a un contacto usando el teléfono o la PC.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destinatario": {
+                        "type": "string",
+                        "description": "El nombre del contacto (ej. 'Juan', 'Mamá') o el número telefónico.",
+                    },
+                    "mensaje": {
+                        "type": "string",
+                        "description": "El contenido del mensaje que se va a enviar.",
+                    },
+                },
+                "required": ["destinatario", "mensaje"],
+            },
+        },
+    }
 ]
-
 
 class NimClient:
     # Cambiado a 'meta/llama-3.1-8b-instruct' para velocidad de respuesta ultrarrápida (< 0.5s)
@@ -358,7 +378,7 @@ class NimClient:
             elif nombre == "enviar_whatsapp":
                 destinatario = argumentos.get("destinatario", "")
                 mensaje = argumentos.get("mensaje", "")
-                resultado = abrir_chat_con_mensaje(destinatario, mensaje)
+                resultado = preparar_envio_inteligente(destinatario, mensaje)
                 registrar_accion_sistema(f"whatsapp({destinatario})", resultado, "WHATSAPP")
                 return resultado
 
@@ -408,12 +428,10 @@ class NimClient:
                 # Ejecutar la acción localmente inmediatamente
                 res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
                 resultados.append(res)
-
             # RESPUESTA DIRECTA: Devuelve la respuesta sin volver a consultar a la API para evitar demoras
             respuesta_directa = self._limpiar_para_voz(resultados[0])
             self.historial.append({"role": "assistant", "content": respuesta_directa})
             return respuesta_directa
-
         # Si fue solo conversación de texto
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
         self.historial.append({"role": "assistant", "content": respuesta_final})

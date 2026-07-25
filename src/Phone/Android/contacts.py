@@ -1,9 +1,8 @@
 # este archivo se encarga de leer y buscar contactos de la agenda del telefono via ADB
 import re
-from src.Phone.phone_conection import _ejecutar_adb, dispositivo_conectado
+from src.Phone.Android.phone_conection import _ejecutar_adb, dispositivo_conectado
 
 _cache_contactos = None  # Cache en memoria para evitar lecturas lentas recurrentes
-
 
 def _parsear_linea_contacto(linea: str):
     """Extrae el nombre y el número telefónico de las líneas devueltas por ADB."""
