@@ -115,6 +115,21 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
             subprocess.Popen("start steam:", shell=True)
             return "Iniciando Steam, Señor."
 
+        elif "xbox" in nombre_clean:
+            subprocess.Popen("start xbox:", shell=True)
+            return "Iniciando xbox, Señor."
+
+        elif "curseforge" in nombre_clean:
+            subprocess.Popen("start curseforge:", shell=True)
+            return "Iniciando curseforge, Señor."
+
+        elif "unity" in nombre_clean:
+            subprocess.Popen("start unity hub:", shell=True )
+            return "iniciando unity para trabajar señor"
+        
+        
+        
+
         # 2. Búsqueda automática de accesos directos (.lnk) en el Menú Inicio de Windows
         rutas_menu_inicio = [
             os.path.expanduser("~\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs"),
