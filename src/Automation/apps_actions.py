@@ -3,12 +3,11 @@ import subprocess
 from src.Services.os_service import obtener_ruta_escritorio
 from src.Automation.games_actions import _normalizar, _listar_accesos, _buscar_mejor_coincidencia
 
-
 # Protocolos o comandos nativos directos de Windows (UWP / URIs)
 # No poner nombres de accesos directos (.lnk) aquí; esos los escanea la carpeta Plataformas.
 APPS_PROTOCOLO_ESPECIAL = {
-    "discord": "start discord:",
-    "whatsapp": "start whatsapp:",      # <--- Agrega esta línea
+    "discord": r'start "" "%LocalAppData%\Discord\Update.exe" --processStart Discord.exe',
+    "whatsapp": "start whatsapp:",      
     "whatsapp desktop": "start whatsapp:",
     "anydesk": "start anydesk",
     "unity": "start unity hub",
@@ -18,10 +17,6 @@ APPS_PROTOCOLO_ESPECIAL = {
 }
 
 def lanzar_aplicacion_usuario(nombre_app) -> str:
-    """
-    Escanea Escritorio/Plataformas/ en tiempo real y lanza la aplicación.
-    Admite cadenas de texto normales o diccionarios JSON provenientes del LLM.
-    """
     # 1. Desempaquetar si la IA envía un dict/JSON
     if isinstance(nombre_app, dict):
         nombre_real = str(nombre_app.get("nombre", nombre_app.get("app", nombre_app.get("aplicacion", ""))))

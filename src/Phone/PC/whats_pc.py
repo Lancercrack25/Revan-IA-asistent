@@ -4,7 +4,6 @@ import time
 import urllib.parse
 import pyautogui
 
-
 def enviar_mensaje_pc(numero: str, mensaje: str) -> str:
     """
     Abre WhatsApp Desktop en Windows con el chat del número indicado y presiona Enter.

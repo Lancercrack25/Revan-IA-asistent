@@ -96,7 +96,7 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "abrir_aplicacion",
-            "description": "Abre un programa instalado en Windows.",
+            "description": "Abre un programa o aplicación instalada en Windows (ej. Discord, WhatsApp, Spotify).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -204,21 +204,6 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "enviar_whatsapp",
-            "description": "Abre un chat de WhatsApp Web con un mensaje.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "destinatario": {"type": "string", "description": "Contacto o número"},
-                    "mensaje": {"type": "string", "description": "Texto del mensaje"}
-                },
-                "required": ["destinatario", "mensaje"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "enviar_whatsapp",
             "description": "Prepara o envía un mensaje de WhatsApp a un contacto usando el teléfono o la PC.",
             "parameters": {
                 "type": "object",
@@ -239,7 +224,6 @@ HERRAMIENTAS = [
 ]
 
 class NimClient:
-    # Cambiado a 'meta/llama-3.1-8b-instruct' para velocidad de respuesta ultrarrápida (< 0.5s)
     def __init__(self, api_key: str = None, modelo: str = "meta/llama-3.1-8b-instruct"):
         self.api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
         if not self.api_key:
@@ -259,7 +243,7 @@ class NimClient:
             "INSTRUCCIÓN CRÍTICA DE EJECUCIÓN:\n"
             "- Tienes herramientas (functions/tools) integradas para controlar la PC.\n"
             "- Cuando el usuario te pida abrir, lanzar o ejecutar un juego o aplicación (ej. 'Abre Minecraft', 'Abre Discord'), NUNCA le des instrucciones de cómo hacerlo él mismo.\n"
-            "- DEBES invocar inmediatamente la herramienta correspondiente (lanzar_videojuego o lanzar_aplicacion_usuario por ejemplo).\n"
+            "- DEBES invocar inmediatamente la herramienta correspondiente (lanzar_videojuego o abrir_aplicacion por ejemplo).\n"
         )
 
         self.historial = [{"role": "system", "content": self.system_prompt}]
@@ -319,15 +303,15 @@ class NimClient:
                 registrar_accion_sistema(f"word({nombre_doc})", resultado, "WORD")
                 return resultado
 
-            # CORREGIDO: Mismo nombre que en HERRAMIENTAS
             elif nombre == "lanzar_videojuego":
                 juego_nombre = argumentos.get("nombre_juego", argumentos.get("nombre", ""))
                 resultado = lanzar_videojuego(juego_nombre)
                 registrar_accion_sistema(f"juego({juego_nombre})", resultado, "JUEGO")
                 return resultado
 
-            elif nombre == "abrir_aplicacion":
-                app_nombre = argumentos.get("nombre", "")
+            # EXTRAE CUALQUIER VARIANTE DE PARÁMETRO QUE MANDE LA IA (nombre, app, nombre_app, etc.)
+            elif nombre in ["abrir_aplicacion", "lanzar_aplicacion_usuario"]:
+                app_nombre = argumentos.get("nombre") or argumentos.get("nombre_app") or argumentos.get("app") or ""
                 resultado = lanzar_aplicacion_usuario(app_nombre)
                 registrar_accion_sistema(f"app({app_nombre})", resultado, "APP")
                 return resultado
@@ -428,10 +412,12 @@ class NimClient:
                 # Ejecutar la acción localmente inmediatamente
                 res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
                 resultados.append(res)
+            
             # RESPUESTA DIRECTA: Devuelve la respuesta sin volver a consultar a la API para evitar demoras
             respuesta_directa = self._limpiar_para_voz(resultados[0])
             self.historial.append({"role": "assistant", "content": respuesta_directa})
             return respuesta_directa
+
         # Si fue solo conversación de texto
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
         self.historial.append({"role": "assistant", "content": respuesta_final})
