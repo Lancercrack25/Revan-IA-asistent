@@ -9,7 +9,7 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
 from src.Core.NimClient import NimClient
-from src.Core.Elevenlabs_client import ElevenLabsClient
+from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Gui.Dashboard import RevanGUI
@@ -92,7 +92,7 @@ def apagar_sistema():
 
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
-        voz_ia.hablar(f"Desconectando sistemas. Hasta luego, {titulo}.")
+        hablar_en_hilo_seguro(f"Desconectando sistemas. Hasta luego, {titulo}.")
 
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
@@ -143,13 +143,11 @@ def encender_sistemas():
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
 
-        # Registrar el manejador de comandos de texto que llegan desde el
-        # dashboard web, para que servidor.py pueda invocarlo cuando el
-        # WebSocket reciba un mensaje de tipo "comando_texto".
+        # Registrar el manejador de comandos de texto
         registrar_manejador_comando_texto(procesar_comando_texto)
 
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
-        voz_ia.hablar(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
+        hablar_en_hilo_seguro(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
@@ -167,8 +165,7 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Captura audio, aplica el filtro de palabra de activación ('Revan' /
-    ventana de atención), y delega la orden ya limpia a ejecutar_orden()."""
+    """Captura audio, aplica el filtro de palabra de activación y delega la orden."""
     global oidos_ia, ultima_interaccion
     try:
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
@@ -202,7 +199,7 @@ def procesar_ciclo_voz():
         if not orden_limpia:
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             time.sleep(0.15)
-            voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
+            hablar_en_hilo_seguro(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             ultima_interaccion = time.time()
             return
@@ -214,13 +211,20 @@ def procesar_ciclo_voz():
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
 def procesar_comando_texto(texto: str):
+    """Procesa mensajes que entran directamente desde el dashboard web sin congelar FastAPI."""
     global ultima_interaccion
     if not texto or not texto.strip():
         return
 
-    print(f"[Modo Texto]: '{texto.strip()}'")
-    ultima_interaccion = time.time()  # también extiende la ventana de atención por voz
-    ejecutar_orden(texto.strip(), orden_mostrar=texto.strip())
+    print(f"[Modo Texto Recibido]: '{texto.strip()}'")
+    ultima_interaccion = time.time()
+    
+    # Se ejecuta en un hilo separado para no bloquear la llamada del WebSocket
+    threading.Thread(
+        target=ejecutar_orden,
+        args=(texto.strip(), texto.strip()),
+        daemon=True
+    ).start()
 
 def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     global cerebro_ia, gemini_ia, voz_ia, gui, ultima_interaccion
@@ -229,14 +233,20 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
 
     def _hablar_y_mostrar(texto_respuesta: str):
-        """Habla la respuesta Y la refleja en ambos chats (escritorio + dashboard web)."""
+        """Refleja la respuesta INMEDIATAMENTE en la interfaz y lanza el audio en segundo plano."""
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
+        
+        # 1. Enviar a las UIs sin esperar el audio
         if gui and hasattr(gui, 'app'):
             gui.app.after(0, lambda u=orden_mostrar: gui.agregar_mensaje("user", u))
             gui.app.after(0, lambda b=texto_respuesta: gui.agregar_mensaje("revan", b))
+        
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
-        voz_ia.hablar(texto_respuesta)
+        
+        # 2. Sintetizar la voz de forma asíncrona/no-bloqueante
+        hablar_en_hilo_seguro(texto_respuesta)
+        
         sincronizar_estado_esfera("ESPERA", "#0077ff")
         ultima_interaccion = time.time()
 
@@ -246,6 +256,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
+
         # --- INTERCEPTOR MÓDULO TELÉFONO / WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
@@ -333,7 +344,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if es_consulta_velocidad:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
+            hablar_en_hilo_seguro("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
             resultado_red = probar_velocidad_con_navegador()
             _hablar_y_mostrar(resultado_red)
             return
@@ -344,14 +355,14 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if es_marcar_conocidos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy escaneando su red...")
+            hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red...")
             resultado_marcado = marcar_todos_como_conocidos()
             _hablar_y_mostrar(resultado_marcado)
             return
 
         if es_consulta_intrusos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
+            hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
             resultado_intrusos = detectar_intrusos()
             _hablar_y_mostrar(resultado_intrusos)
             return

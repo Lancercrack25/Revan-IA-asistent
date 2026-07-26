@@ -1,6 +1,7 @@
 import os
 import re
 import asyncio
+import threading
 import requests
 import pygame
 
@@ -19,11 +20,9 @@ class ElevenLabsClient:
         self.voice_id = "0b6fd25d"
         self.voice_name_legible = "Voice 06:13 PM — CLONE"
 
-        # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon).
-        # Se usa automáticamente si OmniVoice tarda demasiado o falla, para
-        # que REVAN nunca se quede en silencio o trabado esperando.
+        # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
-        self.timeout_omnivoice = 12  # segundos antes de rendirse y usar el respaldo
+        self.timeout_omnivoice = 12  # segundos antes de rendirse y usar respaldo
 
         if not pygame.mixer.get_init():
             pygame.mixer.init()
@@ -35,7 +34,7 @@ class ElevenLabsClient:
 
     def _resolver_voice_id(self):
         try:
-            r = requests.get(self.url_voces, timeout=3)
+            r = requests.get(self.url_voces, timeout=2)
             if r.status_code != 200:
                 return self.voice_id
 
@@ -53,12 +52,11 @@ class ElevenLabsClient:
             print(f"[OmniVoice]: No se encontró '{self.voice_name_legible}'. Usando el último ID conocido.")
             return self.voice_id
         except Exception as e:
-            print(f"[OmniVoice]: No se pudo verificar el voice_id ({e}). Usando el último conocido.")
+            # Silencioso cuando OmniVoice no está abierto para no saturar consola
             return self.voice_id
 
     def _intentar_omnivoice(self, texto_limpio: str) -> bool:
-        """Intenta generar y reproducir con la voz clonada. Devuelve True si
-        tuvo éxito, False si falló o tardó demasiado (para caer al respaldo)."""
+        """Intenta generar y reproducir con la voz clonada. Devuelve True si tuvo éxito."""
         voz_final = self._resolver_voice_id()
 
         payload = {
@@ -71,14 +69,15 @@ class ElevenLabsClient:
         output_filename = "output.mp3"
 
         try:
+            # Timeout de conexión muy reducido (1.5s) si OmniVoice no está corriendo
             respuesta = requests.post(
                 self.url_api, json=payload,
-                timeout=(5, self.timeout_omnivoice),
+                timeout=(1.5, self.timeout_omnivoice),
                 stream=True,
             )
 
             if respuesta.status_code != 200:
-                print(f"[Voz]: OmniVoice devolvió error {respuesta.status_code}. Detalles: {respuesta.text}")
+                print(f"[Voz]: OmniVoice devolvió error {respuesta.status_code}.")
                 return False
 
             with open(output_filename, "wb") as f:
@@ -102,10 +101,10 @@ class ElevenLabsClient:
             return True
 
         except requests.exceptions.Timeout:
-            print(f"[Voz]: OmniVoice tardó más de {self.timeout_omnivoice}s, usando respaldo rápido.")
+            print(f"[Voz]: OmniVoice tardó demasiado, cambiando a respaldo rápido...")
             return False
-        except Exception as e:
-            print(f"[Voz]: OmniVoice no disponible ({e}), usando respaldo rápido.")
+        except Exception:
+            # OmniVoice fuera de línea -> saltar suavemente al respaldo
             return False
 
     async def _generar_audio_respaldo(self, texto: str, ruta_salida: str):
@@ -113,15 +112,30 @@ class ElevenLabsClient:
         await comunicador.save(ruta_salida)
 
     def _hablar_respaldo(self, texto_limpio: str):
-        """Respaldo rápido con edge_tts (Microsoft), sin GPU, sin clon."""
+        """Respaldo rápido con edge_tts (Microsoft) con gestión asíncrona segura."""
         if not HAS_EDGE_TTS:
             print("[Voz]: No hay respaldo disponible (falta edge_tts). No se pudo hablar.")
             return
 
         output_filename = "output_respaldo.mp3"
         try:
-            asyncio.run(self._generar_audio_respaldo(texto_limpio, output_filename))
+            # Comprobar si hay un loop asíncrono en ejecución (FastAPI / WebSockets)
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
 
+            if loop and loop.is_running():
+                # Enviar la tarea al loop existente sin bloquear el hilo principal
+                future = asyncio.run_coroutine_threadsafe(
+                    self._generar_audio_respaldo(texto_limpio, output_filename), loop
+                )
+                future.result(timeout=8)
+            else:
+                # Si no hay loop corriendo en este hilo
+                asyncio.run(self._generar_audio_respaldo(texto_limpio, output_filename))
+
+            # Reproducción de audio con pygame
             pygame.mixer.music.load(output_filename)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
@@ -130,8 +144,9 @@ class ElevenLabsClient:
 
             if os.path.exists(output_filename):
                 os.remove(output_filename)
+
         except Exception as e:
-            print(f"[Voz]: Falló también el respaldo: {e}")
+            print(f"[Voz Error]: Falló también la voz de respaldo: {e}")
 
     def hablar(self, text: str, voice: str = None):
         texto_limpio = self._limpiar_texto_para_tts(text)
@@ -143,5 +158,17 @@ class ElevenLabsClient:
         if not exito:
             self._hablar_respaldo(texto_limpio)
 
-# Instancia global requerida por el core del sistema
+
+# --- INSTANCIAS Y FUNCIONES DE COMPATIBILIDAD CON MAIN.PY ---
 client_voz = ElevenLabsClient()
+
+def hablar_en_hilo_seguro(texto: str):
+    """
+    Despacha la reproducción de voz a un hilo demonio independiente.
+    Garantiza que el envío de respuestas por WebSocket y UI sea instantáneo.
+    """
+    threading.Thread(
+        target=client_voz.hablar,
+        args=(texto,),
+        daemon=True
+    ).start()
