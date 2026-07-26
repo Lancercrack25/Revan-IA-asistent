@@ -14,7 +14,10 @@ from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Gui.Dashboard import RevanGUI
 from src.Automation.System_commands import desplegar_monitores_windows
-from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
+from src.Interfaces.servidor import (
+    iniciar_servidor_ui, transmitir_desde_hilo_externo,
+    transmitir_chat_desde_hilo_externo, registrar_manejador_comando_texto,
+)
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
@@ -26,22 +29,22 @@ from src.Core.Gemini_client import GeminiClient
 from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_envio_inteligente, cancelar_envio_pendiente
 
 # Instancias y Controles Globales
-cerebro_ia = None    
-gemini_ia = None      
+cerebro_ia = None
+gemini_ia = None
 voz_ia = None
 oidos_ia = None
 gui = None
 titulo = "Señor"
 sistema_activo = False
-ultima_interaccion = 0  
-TIEMPO_ATENCION = 18 
+ultima_interaccion = 0
+TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
     "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
-    "corre", "prende", "enciende", "investiga", "recuerda", "guarda","analiza",
+    "corre", "prende", "enciende", "investiga", "recuerda", "guarda", "analiza",
     "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar"
 ]
 
@@ -55,7 +58,7 @@ def quitar_acentos(texto: str) -> str:
     )
 
 def hilo_servidor_web():
-    """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
+    """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D y el dashboard en un hilo dedicado."""
     try:
         servidor = iniciar_servidor_ui()
         servidor.run()
@@ -69,6 +72,13 @@ def sincronizar_estado_esfera(estado, color_hex):
     except Exception as e:
         print(f" Error al sincronizar esfera: {e}")
 
+def sincronizar_chat_dashboard(rol: str, texto: str):
+    """Envía un mensaje de chat al dashboard web (además del chat de escritorio)."""
+    try:
+        transmitir_chat_desde_hilo_externo(rol, texto)
+    except Exception as e:
+        print(f" Error al sincronizar chat del dashboard: {e}")
+
 def apagar_sistema():
     """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, gui
@@ -79,11 +89,11 @@ def apagar_sistema():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
-    
+
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
         voz_ia.hablar(f"Desconectando sistemas. Hasta luego, {titulo}.")
-    
+
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
 
@@ -105,12 +115,12 @@ def encender_sistemas():
     except Exception as e:
         print(f"Aviso al desplegar monitores nativos: {e}")
 
-    time.sleep(0.4) 
+    time.sleep(0.4)
 
     gui.actualizar_estado("CONECTANDO COGNICIÓN...", "#7ef1ff")
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
     print("[2/3] Panel CustomTkinter Activo.")
-    
+
     try:
         credenciales = cargar_credenciales() or {}
         api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
@@ -121,7 +131,7 @@ def encender_sistemas():
 
         gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
         gui.agregar_mensaje("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
-        
+
         time.sleep(0.2)
 
         try:
@@ -129,17 +139,22 @@ def encender_sistemas():
                 'start brave --app=http://127.0.0.1:8000 --window-size=670,670',
                 shell=True
             )
-            print("[3/3] Núcleo Web Desplegado (Esfera 3D).")
+            print("[3/3] Núcleo Web Desplegado (Esfera 3D + Dashboard).")
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
+
+        # Registrar el manejador de comandos de texto que llegan desde el
+        # dashboard web, para que servidor.py pueda invocarlo cuando el
+        # WebSocket reciba un mensaje de tipo "comando_texto".
+        registrar_manejador_comando_texto(procesar_comando_texto)
 
         sincronizar_estado_esfera("HABLANDO", "#ff0055")
         voz_ia.hablar(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
-        
+
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
-        
+
     except Exception as e:
         gui.actualizar_estado("ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
@@ -152,12 +167,13 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
+    """Captura audio, aplica el filtro de palabra de activación ('Revan' /
+    ventana de atención), y delega la orden ya limpia a ejecutar_orden()."""
+    global oidos_ia, ultima_interaccion
     try:
-        # 1. ESTADO: ESCUCHANDO
-        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") 
+        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         print("\n[REVAN]: Escuchando...")
-        
+
         orden_sucia = oidos_ia.escuchar()
         if not orden_sucia or not orden_sucia.strip():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -170,22 +186,77 @@ def procesar_ciclo_voz():
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
-        # Filtrado por MODO JARVIS / Invocación
         if "revan" in orden_busqueda:
             partes = orden_minusculas.split("revan", 1)
             orden_limpia = partes[1].strip() if len(partes) > 1 else ""
-            ultima_interaccion = tiempo_actual  
+            ultima_interaccion = tiempo_actual
         elif en_ventana_atencion:
             print("[MODO JARVIS]: Canal abierto. Procesando orden directa...")
             orden_limpia = orden_minusculas
-            ultima_interaccion = tiempo_actual  
+            ultima_interaccion = tiempo_actual
         else:
             print("[REVAN]: Ruido de fondo o conversación ajena ignorada.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
+        if not orden_limpia:
+            sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            time.sleep(0.15)
+            voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            ultima_interaccion = time.time()
+            return
 
+        ejecutar_orden(orden_limpia, orden_mostrar=orden_sucia)
+
+    except Exception as e:
+        print(f"Error en el bucle táctico de voz: {e}")
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+
+def procesar_comando_texto(texto: str):
+    """
+    Punto de entrada para el MODO TEXTO (dashboard web). A diferencia de
+    la voz, no necesita el filtro de palabra de activación "Revan" ni la
+    ventana de atención — escribir algo ya es una acción deliberada, no
+    hay ambigüedad de "¿esto era para REVAN o ruido de fondo?".
+    """
+    global ultima_interaccion
+    if not texto or not texto.strip():
+        return
+
+    print(f"[Modo Texto]: '{texto.strip()}'")
+    ultima_interaccion = time.time()  # también extiende la ventana de atención por voz
+    ejecutar_orden(texto.strip(), orden_mostrar=texto.strip())
+
+def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
+    """
+    Lógica común de enrutamiento y ejecución de una orden YA LIMPIA (sin
+    'Revan' al inicio, ya decidida como dirigida a REVAN). La usan tanto
+    procesar_ciclo_voz() como procesar_comando_texto(), para no duplicar
+    todos los interceptores y el enrutamiento en dos lugares distintos.
+
+    'orden_mostrar' es el texto tal cual se le muestra al usuario en el
+    chat (para voz, la transcripción cruda; para texto, lo mismo que
+    escribió). Si no se da, se usa orden_limpia.
+    """
+    global cerebro_ia, gemini_ia, voz_ia, gui, ultima_interaccion
+
+    orden_mostrar = orden_mostrar if orden_mostrar is not None else orden_limpia
+    orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
+
+    def _hablar_y_mostrar(texto_respuesta: str):
+        """Habla la respuesta Y la refleja en ambos chats (escritorio + dashboard web)."""
+        sincronizar_estado_esfera("HABLANDO", "#ff0055")
+        if gui and hasattr(gui, 'app'):
+            gui.app.after(0, lambda u=orden_mostrar: gui.agregar_mensaje("user", u))
+            gui.app.after(0, lambda b=texto_respuesta: gui.agregar_mensaje("revan", b))
+        sincronizar_chat_dashboard("usuario", orden_mostrar)
+        sincronizar_chat_dashboard("revan", texto_respuesta)
+        voz_ia.hablar(texto_respuesta)
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+        ultima_interaccion = time.time()
+
+    try:
         # --- INTERCEPTOR DE APAGADO ---
         palabras_desconexion = ["desconectar", "desconectate", "apagar", "apagate", "cerrar programa", "adios revan", "desconexion"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
@@ -200,35 +271,25 @@ def procesar_ciclo_voz():
         if es_confirmacion:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             resultado = confirmar_envio_inteligente()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(resultado)
             return
 
         if es_cancelacion:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             resultado = cancelar_envio_pendiente()
-            voz_ia.hablar(resultado)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(resultado)
             return
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_whatsapp):
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            # Extraer destinatario y mensaje simple
             try:
                 partes_a = orden_limpia.split(" a ", 1)
                 if len(partes_a) > 1:
                     partes_diga = partes_a[1].split(" que diga ", 1)
                     destinatario = partes_diga[0].strip()
                     mensaje_texto = partes_diga[1].strip() if len(partes_diga) > 1 else "Hola"
-                    
+
                     respuesta_prep = preparar_envio_inteligente(destinatario, mensaje_texto)
-                    sincronizar_estado_esfera("HABLANDO", "#ff0055")
-                    voz_ia.hablar(respuesta_prep)
-                    sincronizar_estado_esfera("ESPERA", "#0077ff")
-                    ultima_interaccion = time.time()
+                    _hablar_y_mostrar(respuesta_prep)
                     return
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
@@ -238,23 +299,17 @@ def procesar_ciclo_voz():
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if iniciar_vigilancia(voz_ia, sincronizar_estado_esfera):
-                voz_ia.hablar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
+                _hablar_y_mostrar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
             else:
-                voz_ia.hablar("La vigilancia ya estaba activa, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+                _hablar_y_mostrar("La vigilancia ya estaba activa, Señor.")
             return
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_detener_vigilancia):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if detener_vigilancia():
-                voz_ia.hablar("Vigilancia de cámara desactivada.")
+                _hablar_y_mostrar("Vigilancia de cámara desactivada.")
             else:
-                voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+                _hablar_y_mostrar("No había ninguna vigilancia activa, Señor.")
             return
 
         # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
@@ -262,25 +317,19 @@ def procesar_ciclo_voz():
         palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
 
         if "esfera" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in palabras_detener_intent):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if detener_control_esfera():
-                voz_ia.hablar("Control de esfera desactivado.")
+                _hablar_y_mostrar("Control de esfera desactivado.")
             else:
-                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+                _hablar_y_mostrar("No había ningún control de esfera activo, Señor.")
             return
 
         if "esfera" in orden_limpia_sin_acentos and any(r in orden_limpia_sin_acentos for r in raices_control):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if vigilancia_activa():
-                voz_ia.hablar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
+                _hablar_y_mostrar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
             elif iniciar_control_esfera():
-                voz_ia.hablar(f"Control de esfera por mano activado, {titulo}.")
+                _hablar_y_mostrar(f"Control de esfera por mano activado, {titulo}.")
             else:
-                voz_ia.hablar("El control de esfera ya estaba activo, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+                _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
 
         # --- INTERCEPTOR DE CONSULTAS DE RED ---
@@ -303,60 +352,38 @@ def procesar_ciclo_voz():
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             voz_ia.hablar("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
             resultado_red = probar_velocidad_con_navegador()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado_red)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(resultado_red)
             return
 
         if es_consulta_latencia:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(reportar_latencia())
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(reportar_latencia())
             return
 
         if es_marcar_conocidos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             voz_ia.hablar("Un momento, Señor, estoy escaneando su red...")
             resultado_marcado = marcar_todos_como_conocidos()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado_marcado)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(resultado_marcado)
             return
 
         if es_consulta_intrusos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             voz_ia.hablar("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
             resultado_intrusos = detectar_intrusos()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado_intrusos)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(resultado_intrusos)
             return
 
         if es_consulta_red:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(analizar_red())
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
+            _hablar_y_mostrar(analizar_red())
             return
 
-        if not orden_limpia:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            time.sleep(0.15)
-            voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            ultima_interaccion = time.time()
-            return
-
-        sincronizar_estado_esfera("PROCESANDO", "#ffaa00") 
+        sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
         print("[REVAN]: Procesando inteligencia...")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             orden_limpia = "enciende la camara y dime que ves"
             orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
+
         respuesta_final = None
         try:
             respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
@@ -394,40 +421,30 @@ def procesar_ciclo_voz():
                     except Exception as err_nim:
                         print(f"[Enrutador]: Error en NimClient: {err_nim}")
 
-        # Validación de seguridad para la respuesta
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"No he recibido datos válidos del procesador táctico, {titulo}."
 
-        if gui and hasattr(gui, 'app'):
-            gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
-            gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
-
-        sincronizar_estado_esfera("HABLANDO", "#ff0055") 
-        time.sleep(0.15)
-        voz_ia.hablar(respuesta_final)
-        time.sleep(0.2)
-        ultima_interaccion = time.time()
-        sincronizar_estado_esfera("ESPERA", "#0077ff") 
+        _hablar_y_mostrar(respuesta_final)
 
     except Exception as e:
-        print(f"Error en el bucle táctico de voz: {e}")
+        print(f"Error al ejecutar la orden: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
 def main():
     global oidos_ia, gui, sistema_activo, titulo
-    
+
     print("[REVAN]: Inicializando infraestructura base...")
     try:
         inicializar_base_datos()
     except Exception as e:
         print(f"Alerta al desplegar base de datos: {e}")
-        
+
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
     oidos_ia = MicrophoneClient()
-    
+
     print("REVAN en modo pasivo. Esperando señal acústica...")
     while True:
         try:
@@ -446,7 +463,7 @@ def main():
         gui.mostrar_panel()
     except AttributeError:
         if hasattr(gui, 'app'):
-            gui.app.deiconify()  
+            gui.app.deiconify()
     gui.app.after(250, encender_sistemas)
     gui.app.mainloop()
 
