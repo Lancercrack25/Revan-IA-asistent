@@ -214,12 +214,6 @@ def procesar_ciclo_voz():
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
 def procesar_comando_texto(texto: str):
-    """
-    Punto de entrada para el MODO TEXTO (dashboard web). A diferencia de
-    la voz, no necesita el filtro de palabra de activación "Revan" ni la
-    ventana de atención — escribir algo ya es una acción deliberada, no
-    hay ambigüedad de "¿esto era para REVAN o ruido de fondo?".
-    """
     global ultima_interaccion
     if not texto or not texto.strip():
         return
@@ -229,16 +223,6 @@ def procesar_comando_texto(texto: str):
     ejecutar_orden(texto.strip(), orden_mostrar=texto.strip())
 
 def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
-    """
-    Lógica común de enrutamiento y ejecución de una orden YA LIMPIA (sin
-    'Revan' al inicio, ya decidida como dirigida a REVAN). La usan tanto
-    procesar_ciclo_voz() como procesar_comando_texto(), para no duplicar
-    todos los interceptores y el enrutamiento en dos lugares distintos.
-
-    'orden_mostrar' es el texto tal cual se le muestra al usuario en el
-    chat (para voz, la transcripción cruda; para texto, lo mismo que
-    escribió). Si no se da, se usa orden_limpia.
-    """
     global cerebro_ia, gemini_ia, voz_ia, gui, ultima_interaccion
 
     orden_mostrar = orden_mostrar if orden_mostrar is not None else orden_limpia

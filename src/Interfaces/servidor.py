@@ -10,7 +10,6 @@ from fastapi.responses import HTMLResponse
 conexiones_activas: set[WebSocket] = set()
 loop_real_servidor = None
 
-
 # Manejo moderno del ciclo de vida del servidor (Lifespan)
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
@@ -18,7 +17,6 @@ async def lifespan(app_fastapi: FastAPI):
     loop_real_servidor = asyncio.get_running_loop()
     print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
     yield
-
 
 app = FastAPI(lifespan=lifespan)
 
@@ -35,8 +33,23 @@ if os.path.exists(CARPETA_STYLES):
     app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
 
 
+# --- RUTAS DE NAVEGACIÓN ---
+
 @app.get("/")
+async def obtener_dashboard():
+    """Ruta Principal: Carga el Dashboard Táctico (Command Center)"""
+    ruta_dashboard = os.path.join(CARPETA_WEB, "dashboard.html")
+    if os.path.exists(ruta_dashboard):
+        with open(ruta_dashboard, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(
+        content="<h1> Error: dashboard.html no encontrado en src/Interfaces/web</h1>",
+        status_code=404,
+    )
+
+@app.get("/esfera")
 async def obtener_index():
+    """Ruta secundaria: Carga la esfera 3D dentro del iframe del Dashboard"""
     ruta_index = os.path.join(CARPETA_WEB, "index.html")
     if os.path.exists(ruta_index):
         with open(ruta_index, "r", encoding="utf-8") as f:
@@ -47,11 +60,12 @@ async def obtener_index():
     )
 
 
+# --- WEBSOCKET UNIFICADO ---
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global loop_real_servidor
 
-    # Garantizar la captura del loop en el primer cliente que se conecta
     if loop_real_servidor is None:
         try:
             loop_real_servidor = asyncio.get_running_loop()
@@ -60,26 +74,43 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     conexiones_activas.add(websocket)
-    print("[WebSocket]: Esfera 3D vinculada al canal de control.")
+    print("[WebSocket]: Cliente (Dashboard/Esfera) conectado al canal de control.")
 
     try:
         while True:
-            await websocket.receive_text()
+            # Recibir comandos enviados desde el frontend (Voz o Texto)
+            data_raw = await websocket.receive_text()
+            try:
+                data = json.loads(data_raw)
+                
+                # Procesar comando de texto enviado desde el input del Dashboard
+                if data.get("type") == "text_command":
+                    prompt = data.get("content")
+                    print(f"[WebSocket Text]: Orden recibida desde UI -> '{prompt}'")
+                    
+                    # AQUÍ CONECTAS CON TU FUNCIÓN DE EJECUCIÓN/ORQUESTADOR
+                    # De momento responde confirmación en vivo al frontend
+                    await websocket.send_text(json.dumps({
+                        "tipo": "respuesta_texto",
+                        "mensaje": f"Procesando orden: '{prompt}'"
+                    }))
+
+            except json.JSONDecodeError:
+                pass
+
     except (WebSocketDisconnect, Exception):
         pass
     finally:
         conexiones_activas.discard(websocket)
-        print(" [WebSocket]: Esfera 3D desconectada.")
+        print("[WebSocket]: Cliente desconectado.")
 
+
+# --- TRANSMISIONES BROADCAST (SIN CAMBIOS) ---
 
 async def cambiar_estado_esfera(estado: str, color_hex: str):
-    """Transmite el paquete JSON a todas las conexiones WebSocket vivas."""
     if not conexiones_activas:
         return
 
-    # Se agregó "tipo": "estado" para que el frontend pueda distinguir este
-    # paquete del nuevo canal de manipulación, sin romper lo que ya lee
-    # (estado/color siguen presentes exactamente igual que antes).
     paquete = json.dumps({"tipo": "estado", "estado": estado, "color": color_hex})
     desconectados = set()
 
@@ -89,17 +120,11 @@ async def cambiar_estado_esfera(estado: str, color_hex: str):
         except Exception:
             desconectados.add(conexion)
 
-    # Limpieza de sockets muertos
     for ws in desconectados:
         conexiones_activas.discard(ws)
 
 
 async def actualizar_manipulacion_esfera(rot_x: float, rot_y: float, escala: float):
-    """
-    Transmite rotación/escala calculadas a partir del tracking de mano
-    (ver src/Camara/control_esfera_manos.py). Va en un paquete separado del
-    de estado/color, distinguible por 'tipo': 'manipulacion'.
-    """
     if not conexiones_activas:
         return
 
@@ -117,10 +142,8 @@ async def actualizar_manipulacion_esfera(rot_x: float, rot_y: float, escala: flo
 
 
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
-    """Puente ultra-seguro para inyectar estados desde cualquier hilo externo."""
     global loop_real_servidor
 
-    # Reintento táctico de captura de loop si la llamada ocurrió muy temprano
     if loop_real_servidor is None:
         try:
             loop_real_servidor = asyncio.get_event_loop()
@@ -138,7 +161,6 @@ def transmitir_desde_hilo_externo(estado: str, color_hex: str):
 
 
 def transmitir_manipulacion_desde_hilo_externo(rot_x: float, rot_y: float, escala: float = 1.0):
-    """Mismo patrón que transmitir_desde_hilo_externo, pero para el canal de manipulación por mano."""
     global loop_real_servidor
 
     if loop_real_servidor is None:
