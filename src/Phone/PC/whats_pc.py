@@ -2,6 +2,7 @@ import os
 import re
 import urllib.parse
 import unicodedata
+import subprocess
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,11 +28,12 @@ def obtener_numero_contacto(nombre: str) -> str:
 
 def preparar_envio_pc(destinatario: str, mensaje: str) -> dict:
     try:
+        # Importante: usar quote_plus para asegurar que los espacios se codifiquen correctamente como %20
         mensaje_encoded = urllib.parse.quote(mensaje)
         numero = obtener_numero_contacto(destinatario)
 
         if numero:
-            # Protocolo Nativo directo para Windows Store App
+            # Protocolo estricto para chat directo en WhatsApp Windows
             url_app = f"whatsapp://send?phone={numero}&text={mensaje_encoded}"
             print(f"[WhatsApp PC]: Contacto '{destinatario}' resuelto como +{numero}.")
         else:
@@ -50,3 +52,11 @@ def preparar_envio_pc(destinatario: str, mensaje: str) -> dict:
             "exito": False,
             "error": f"Error al preparar WhatsApp PC: {str(e)}"
         }
+
+def ejecutar_abrir_whatsapp(url_app: str):
+    """Ejecuta la apertura directa del protocolo en Windows"""
+    try:
+        # Usa el comando start de Windows para invocar la URI directamente
+        os.system(f'start "" "{url_app}"')
+    except Exception as e:
+        print(f"Error al abrir WhatsApp: {e}")
