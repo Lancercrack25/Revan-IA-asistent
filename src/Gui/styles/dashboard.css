@@ -315,65 +315,110 @@ body {
 .log-entry.user { color: var(--green); }
 .log-entry.revan { color: var(--purple); }
 
-/* GRID DE MÓDULOS HOLOGRÁFICOS */
+/* GRID DE MÓDULOS EN CONFIGURACIÓN 4x2 */
 .hud-grid {
     flex: 1;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(2, 1fr);
-    gap: 16px;
+    gap: 12px;
 }
 
+/* ESTILOS DE TARJETAS Y COLORES */
 .module-card {
     position: relative;
-    background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     border-radius: 6px;
-    padding: 24px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    backdrop-filter: blur(16px);
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     transform-style: preserve-3d;
-    transition: border-color 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.cyan-card { border-top: 3px solid var(--cyan); }
+.cyan-card .icon-wrap, .cyan-card .badge { color: var(--cyan); }
+
+.green-card { border-top: 3px solid var(--green); }
+.green-card .icon-wrap, .green-card .badge { color: var(--green); }
+
+.purple-card { border-top: 3px solid var(--purple); }
+.purple-card .icon-wrap, .purple-card .badge { color: var(--purple); }
+
+.amber-card { border-top: 3px solid var(--amber); }
+.amber-card .icon-wrap, .amber-card .badge { color: var(--amber); }
+
+.blue-card { border-top: 3px solid #0099ff; }
+.blue-card .icon-wrap, .blue-card .badge { color: #0099ff; }
+
+.red-card { border-top: 3px solid #ff3355; }
+.red-card .icon-wrap, .red-card .badge { color: #ff3355; }
+
+.magenta-card { border-top: 3px solid #ff0077; }
+.magenta-card .icon-wrap, .magenta-card .badge { color: #ff0077; }
+
+.teal-card { border-top: 3px solid #00ffd5; }
+.teal-card .icon-wrap, .teal-card .badge { color: #00ffd5; }
+
+/* Oscurecedor para legibilidad */
+.card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(2, 6, 12, 0.88) 0%, rgba(5, 12, 24, 0.95) 100%);
+    z-index: 1;
+    transition: background 0.4s ease;
+}
+
+.card-head, .card-body, .card-foot {
+    position: relative;
+    z-index: 2;
+}
+
+/* FONDOS ESPECÍFICOS DE LAS 8 SALAS TEMÁTICAS */
+.mod-bg-camara { background-image: url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-phone { background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-network { background-image: url('https://images.unsplash.com/photo-1544197150-b99a580bb7a8?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-emails { background-image: url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-database { background-image: url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-sounds { background-image: url('https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-entrenamiento { background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop'); }
+.mod-bg-automation { background-image: url('https://images.unsplash.com/photo-1518432031352-d6fc5c10da5a?q=80&w=800&auto=format&fit=crop'); }
+
+/* ILUMINACIÓN AL PASAR EL MOUSE */
+.module-card:hover .card-overlay {
+    background: linear-gradient(180deg, rgba(2, 6, 12, 0.6) 0%, rgba(5, 12, 24, 0.8) 100%);
 }
 
 .module-card:hover {
     border-color: rgba(0, 240, 255, 0.6);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
 }
-
-.cyan-card { border-top: 3px solid var(--cyan); }
-.green-card { border-top: 3px solid var(--green); }
-.purple-card { border-top: 3px solid var(--purple); }
-.amber-card { border-top: 3px solid var(--amber); }
 
 .card-head {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     transform: translateZ(20px);
 }
 
-.icon-wrap {
-    font-size: 1.4rem;
-}
-
-.cyan-card .icon-wrap { color: var(--cyan); }
-.green-card .icon-wrap { color: var(--green); }
-.purple-card .icon-wrap { color: var(--purple); }
-.amber-card .icon-wrap { color: var(--amber); }
+.icon-wrap { font-size: 1.2rem; }
 
 .card-head h3 {
     font-family: var(--font-head);
-    font-size: 1.05rem;
+    font-size: 0.9rem;
     color: #fff;
-    letter-spacing: 1px;
+    letter-spacing: 0.8px;
 }
 
 .card-body p {
-    font-size: 0.9rem;
-    color: #9ca3af;
-    line-height: 1.5;
+    font-size: 0.8rem;
+    color: #d1d5db;
+    line-height: 1.35;
     transform: translateZ(15px);
 }
 
@@ -381,35 +426,27 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 8px;
     transform: translateZ(10px);
 }
 
 .badge {
     font-family: var(--font-code);
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
 }
-
-.cyan-card .badge { color: var(--cyan); }
-.green-card .badge { color: var(--green); }
-.purple-card .badge { color: var(--purple); }
-.amber-card .badge { color: var(--amber); }
 
 .mod-id {
     font-family: var(--font-code);
-    font-size: 0.68rem;
-    color: #4b5563;
+    font-size: 0.65rem;
+    color: #6b7280;
 }
 
 /* ESFERA 3D VISTA */
-#view-esfera {
-    width: 100%;
-    height: 100%;
-}
+#view-esfera { width: 100%; height: 100%; }
 
 .esfera-wrapper {
     width: 100%;
@@ -421,11 +458,7 @@ body {
     box-shadow: 0 0 30px rgba(0,0,0,0.9);
 }
 
-#iframe-esfera {
-    width: 100%;
-    height: 100%;
-    border: none;
-}
+#iframe-esfera { width: 100%; height: 100%; border: none; }
 
 /* FOOTER COMANDOS */
 .hud-footer {

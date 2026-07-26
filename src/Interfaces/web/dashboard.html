@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REVAN // COMMAND CENTER</title>
-    <!-- Librerías de Efectos y Fuentes -->
+    <!-- Fuentes Sci-Fi / HUD -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/styles/dashboard.css">
@@ -20,7 +20,7 @@
             <div class="brand-core">
                 <div class="reactor-icon"><div class="core-pulse"></div></div>
                 <div class="title-group">
-                    <h1 class="glitch-text" data-text="REVAN">REVAN</h1>
+                    <h1 class="glitch-text">REVAN</h1>
                     <span class="sub-text">PROT_V1.0 // TACTICAL OVERWATCH</span>
                 </div>
             </div>
@@ -92,71 +92,141 @@
                     </div>
                 </aside>
 
-                <!-- GRID DE MÓDULOS HOLOGRÁFICOS -->
+                <!-- GRID TÁCTICO DE 8 MÓDULOS DE REVAN -->
                 <section class="hud-grid">
-                    <div class="module-card cyan-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
-                        <div class="card-glow"></div>
-                        <div class="card-head">
-                            <div class="icon-wrap"><i class="fa-brands fa-whatsapp"></i></div>
-                            <h3>OFICINA & COMUNICACIÓN</h3>
-                        </div>
-                        <div class="card-body">
-                            <p>Gestión automatizada de mensajes, lectura de contexto y respuestas multicanal PC/ADB.</p>
-                        </div>
-                        <div class="card-foot">
-                            <span class="badge"><i class="fa-solid fa-circle"></i> ACTIVO</span>
-                            <span class="mod-id">MOD_01</span>
-                        </div>
-                    </div>
 
-                    <div class="module-card green-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
-                        <div class="card-glow"></div>
-                        <div class="card-head">
-                            <div class="icon-wrap"><i class="fa-solid fa-mobile-screen-button"></i></div>
-                            <h3>AUTOMATIZACIÓN ADB</h3>
-                        </div>
-                        <div class="card-body">
-                            <p>Control físico del dispositivo móvil, capturas de pantalla dinámicas y ejecución por eventos.</p>
-                        </div>
-                        <div class="card-foot">
-                            <span class="badge"><i class="fa-solid fa-circle"></i> LISTO</span>
-                            <span class="mod-id">MOD_02</span>
-                        </div>
-                    </div>
-
-                    <div class="module-card purple-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
-                        <div class="card-glow"></div>
+                    <!-- 1. CAMARA -->
+                    <div class="module-card purple-card mod-bg-camara" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
                         <div class="card-head">
                             <div class="icon-wrap"><i class="fa-solid fa-eye"></i></div>
-                            <h3>CÁMARA & VISIÓN AI</h3>
+                            <h3>CÁMARA & VISIÓN</h3>
                         </div>
                         <div class="card-body">
-                            <p>Análisis de imágenes en tiempo real mediante OpenCV, detección espacial e interpretación de gestos.</p>
+                            <p>Procesamiento visual, detección OpenCV e interpretación espacial en tiempo real.</p>
                         </div>
                         <div class="card-foot">
                             <span class="badge"><i class="fa-solid fa-circle"></i> STANDBY</span>
-                            <span class="mod-id">MOD_03</span>
+                            <span class="mod-id">SRC // CAMARA</span>
                         </div>
                     </div>
 
-                    <div class="module-card amber-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
-                        <div class="card-glow"></div>
+                    <!-- 2. PHONE -->
+                    <div class="module-card green-card mod-bg-phone" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
                         <div class="card-head">
-                            <div class="icon-wrap"><i class="fa-solid fa-database"></i></div>
-                            <h3>MEMORIA & CONTEXTO</h3>
+                            <div class="icon-wrap"><i class="fa-solid fa-mobile-screen-button"></i></div>
+                            <h3>PHONE & ADB</h3>
                         </div>
                         <div class="card-body">
-                            <p>Recuperación de eventos recientes, indexación de datos local y base de conocimiento Vector DB.</p>
+                            <p>Enlace directo a Android, automatización ADB, contactos y captura táctica.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> CONECTADO</span>
+                            <span class="mod-id">SRC // PHONE</span>
+                        </div>
+                    </div>
+
+                    <!-- 3. NETWORK -->
+                    <div class="module-card cyan-card mod-bg-network" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-network-wired"></i></div>
+                            <h3>NETWORK & COMMS</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Telemetría de red, sockets, intercepción de señales y enlace con servidor local.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> ONLINE</span>
+                            <span class="mod-id">SRC // NETWORK</span>
+                        </div>
+                    </div>
+
+                    <!-- 4. EMAILS -->
+                    <div class="module-card blue-card mod-bg-emails" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-envelope-open-text"></i></div>
+                            <h3>EMAILS & OFICINA</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Gestión automatizada de mensajería, análisis de correo y redacción asistida.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> SINCRONIZADO</span>
+                            <span class="mod-id">SRC // EMAILS</span>
+                        </div>
+                    </div>
+
+                    <!-- 5. DATABASE -->
+                    <div class="module-card amber-card mod-bg-database" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-database"></i></div>
+                            <h3>DATABASE & MEMORIA</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Almacenamiento de contexto, registros de eventos y persistencia de datos.</p>
                         </div>
                         <div class="card-foot">
                             <span class="badge"><i class="fa-solid fa-circle"></i> INDEXADO</span>
-                            <span class="mod-id">MOD_04</span>
+                            <span class="mod-id">SRC // DATABASE</span>
                         </div>
                     </div>
+
+                    <!-- 6. SOUNDS -->
+                    <div class="module-card red-card mod-bg-sounds" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-lines-leaning"></i></div>
+                            <h3>SOUNDS & VOICE</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Sintetizador de voz IA, captura de audio ambiental y reconocimiento de habla.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> LISTO</span>
+                            <span class="mod-id">SRC // SOUNDS</span>
+                        </div>
+                    </div>
+
+                    <!-- 7. ENTRENAMIENTO -->
+                    <div class="module-card magenta-card mod-bg-entrenamiento" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-brain"></i></div>
+                            <h3>ENTRENAMIENTO IA</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Ajuste fino de respuestas, aprendizaje con feedback y modelos locales.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> COMPLETO</span>
+                            <span class="mod-id">SRC // ENTRENAMIENTO</span>
+                        </div>
+                    </div>
+
+                    <!-- 8. AUTOMATION -->
+                    <div class="module-card teal-card mod-bg-automation" data-tilt data-tilt-max="6" data-tilt-glare data-tilt-max-glare="0.15">
+                        <div class="card-overlay"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-gears"></i></div>
+                            <h3>AUTOMATION & EXEC</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>Ejecución de comandos del sistema, scripts personalizados y tareas programadas.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> ACTIVO</span>
+                            <span class="mod-id">SRC // AUTOMATION</span>
+                        </div>
+                    </div>
+
                 </section>
             </div>
 
-            <!-- VISTA ESFERA 3D (IFRAME CORREGIDO) -->
+            <!-- VISTA ESFERA 3D -->
             <div id="view-esfera" class="view-panel">
                 <div class="esfera-wrapper">
                     <iframe id="iframe-esfera" src="/esfera" frameborder="0"></iframe>
@@ -176,7 +246,7 @@
         </footer>
     </div>
 
-    <!-- Scripts de Librerías Sci-Fi -->
+    <!-- Librerías JS Externas -->
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
     <script src="/static/dashboard.js"></script>
