@@ -9,14 +9,16 @@ from fastapi.responses import HTMLResponse
 
 conexiones_activas: set[WebSocket] = set()
 loop_real_servidor = None
+manejador_comando_texto_callback = None
 
-# Manejo moderno del ciclo de vida del servidor (Lifespan)
+
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
     global loop_real_servidor
     loop_real_servidor = asyncio.get_running_loop()
     print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
     yield
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -47,6 +49,7 @@ async def obtener_dashboard():
         status_code=404,
     )
 
+
 @app.get("/esfera")
 async def obtener_index():
     """Ruta secundaria: Carga la esfera 3D dentro del iframe del Dashboard"""
@@ -58,6 +61,14 @@ async def obtener_index():
         content="<h1> Error: index.html no encontrado en src/Interfaces/web</h1>",
         status_code=404,
     )
+
+
+# --- REGISTRO DE MANEJADORES ---
+
+def registrar_manejador_comando_texto(callback):
+    """Permite a main.py registrar la función que procesará los textos enviados desde la web UI."""
+    global manejador_comando_texto_callback
+    manejador_comando_texto_callback = callback
 
 
 # --- WEBSOCKET UNIFICADO ---
@@ -78,22 +89,17 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # Recibir comandos enviados desde el frontend (Voz o Texto)
             data_raw = await websocket.receive_text()
             try:
                 data = json.loads(data_raw)
                 
-                # Procesar comando de texto enviado desde el input del Dashboard
-                if data.get("type") == "text_command":
-                    prompt = data.get("content")
+                # Procesa comando de texto enviado desde el input del Dashboard
+                if data.get("type") in ["text_command", "comando_texto"]:
+                    prompt = data.get("content") or data.get("texto")
                     print(f"[WebSocket Text]: Orden recibida desde UI -> '{prompt}'")
                     
-                    # AQUÍ CONECTAS CON TU FUNCIÓN DE EJECUCIÓN/ORQUESTADOR
-                    # De momento responde confirmación en vivo al frontend
-                    await websocket.send_text(json.dumps({
-                        "tipo": "respuesta_texto",
-                        "mensaje": f"Procesando orden: '{prompt}'"
-                    }))
+                    if manejador_comando_texto_callback and prompt:
+                        manejador_comando_texto_callback(prompt)
 
             except json.JSONDecodeError:
                 pass
@@ -105,7 +111,7 @@ async def websocket_endpoint(websocket: WebSocket):
         print("[WebSocket]: Cliente desconectado.")
 
 
-# --- TRANSMISIONES BROADCAST (SIN CAMBIOS) ---
+# --- TRANSMISIONES BROADCAST ---
 
 async def cambiar_estado_esfera(estado: str, color_hex: str):
     if not conexiones_activas:
@@ -141,6 +147,26 @@ async def actualizar_manipulacion_esfera(rot_x: float, rot_y: float, escala: flo
         conexiones_activas.discard(ws)
 
 
+async def actualizar_chat_dashboard(rol: str, texto: str):
+    """Envía mensajes del historial de conversación al Dashboard web."""
+    if not conexiones_activas:
+        return
+
+    paquete = json.dumps({"tipo": "chat", "rol": rol, "texto": texto})
+    desconectados = set()
+
+    for conexion in list(conexiones_activas):
+        try:
+            await conexion.send_text(paquete)
+        except Exception:
+            desconectados.add(conexion)
+
+    for ws in desconectados:
+        conexiones_activas.discard(ws)
+
+
+# --- PUENTES MULTIHILO EXTERNOS ---
+
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     global loop_real_servidor
 
@@ -153,10 +179,6 @@ def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     if loop_real_servidor and loop_real_servidor.is_running():
         asyncio.run_coroutine_threadsafe(
             cambiar_estado_esfera(estado, color_hex), loop_real_servidor
-        )
-    else:
-        print(
-            f"[WebSocket Warn]: Se intentó enviar '{estado}' antes de que el servidor FastAPI estuviera listo."
         )
 
 
@@ -172,6 +194,22 @@ def transmitir_manipulacion_desde_hilo_externo(rot_x: float, rot_y: float, escal
     if loop_real_servidor and loop_real_servidor.is_running():
         asyncio.run_coroutine_threadsafe(
             actualizar_manipulacion_esfera(rot_x, rot_y, escala), loop_real_servidor
+        )
+
+
+def transmitir_chat_desde_hilo_externo(rol: str, texto: str):
+    """Puente multihilo para enviar mensajes del chat hacia la interfaz web."""
+    global loop_real_servidor
+
+    if loop_real_servidor is None:
+        try:
+            loop_real_servidor = asyncio.get_event_loop()
+        except RuntimeError:
+            pass
+
+    if loop_real_servidor and loop_real_servidor.is_running():
+        asyncio.run_coroutine_threadsafe(
+            actualizar_chat_dashboard(rol, texto), loop_real_servidor
         )
 
 
