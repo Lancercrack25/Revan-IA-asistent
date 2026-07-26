@@ -1,109 +1,65 @@
-# este archivo se encarga de enviar mensajes de whatsapp con validación estricta de seguridad
-import re
-import time
+import subprocess
 import urllib.parse
-from src.Phone.Android.contacts import obtener_contactos, listar_coincidencias
-from src.Phone.Android.phone_conection import (
-    _ejecutar_adb, dispositivo_conectado,
-    guardar_accion_pendiente, obtener_accion_pendiente, limpiar_accion_pendiente,
-)
+from src.Phone.Android.contacts import buscar_contacto
 
-def resolver_contacto_seguro(destinatario: str):
-    """
-    Busca contactos garantizando cero ambigüedad.
-    Devuelve: (Estado, Nombre/Detalle, Numero)
-    """
-    destinatario_limpio = destinatario.strip().lower()
-    solo_digitos = re.sub(r"[^\d]", "", destinatario)
+def _ejecutar_adb(*args) -> str:
+    """Ejecuta comandos ADB de bajo nivel."""
+    try:
+        cmd = ["adb"] + list(args)
+        resultado = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        return resultado.stdout.strip()
+    except Exception as e:
+        return f"Error ADB: {e}"
 
-    # 1. Si enviaron un número directo (Mínimo 10 dígitos)
-    if len(solo_digitos) >= 10:
-        return "EXACTO", destinatario, solo_digitos
+def preparar_envio_android(destinatario: str, mensaje: str, lista_contactos: dict = None) -> dict:
+    """Valida la presencia del contacto en Android y prepara el paquete URI."""
+    if not destinatario or not mensaje:
+        return {"exito": False, "error": "Destinatario o mensaje vacíos."}
 
-    contactos = obtener_contactos()
-    
-    # Busca coincidencias exactas primero
-    coincidencias_exactas = [c for c in contactos if c[0].lower() == destinatario_limpio]
-    if len(coincidencias_exactas) == 1:
-        return "EXACTO", coincidencias_exactas[0][0], re.sub(r"[^\d]", "", coincidencias_exactas[0][1])
+    # Verificar si el teléfono está conectado por ADB
+    dispositivos = _ejecutar_adb("devices")
+    if "device" not in dispositivos.replace("List of devices attached", ""):
+        return {"exito": False, "error": "Dispositivo Android no detectado por ADB."}
 
-    # Si no hay exacta, busca parciales
-    coincidencias_parciales = [c for c in contactos if destinatario_limpio in c[0].lower()]
+    # Si se pasa lista de contactos, usar la búsqueda normalizada
+    telefono = destinatario
+    nombre_contacto = destinatario
 
-    if len(coincidencias_parciales) == 0:
-        return "NO_ENCONTRADO", None, None
+    if lista_contactos:
+        coincidencias = buscar_contacto(destinatario, lista_contactos)
+        if not coincidencias:
+            return {"exito": False, "error": f"No se encontró a '{destinatario}' en sus contactos."}
+        if len(coincidencias) > 1:
+            nombres = ", ".join([c[0] for c in coincidencias])
+            return {"exito": False, "error": f"Existe ambigüedad con: {nombres}. Especifique mejor."}
+        
+        nombre_contacto, datos = coincidencias[0]
+        telefono = datos.get("telefono", destinatario)
 
-    if len(coincidencias_parciales) == 1:
-        return "EXACTO", coincidencias_parciales[0][0], re.sub(r"[^\d]", "", coincidencias_parciales[0][1])
+    # Limpiar número de teléfono
+    telefono_clean = ''.join(filter(str.isdigit, str(telefono)))
+    mensaje_encoded = urllib.parse.quote(mensaje)
+    uri = f"https://api.whatsapp.com/send?phone={telefono_clean}&text={mensaje_encoded}"
 
-    # Si hay más de una coincidencia, ES AMBIGUO -> Frenar por seguridad
-    nombres_posibles = [c[0] for c in coincidencias_parciales]
-    return "AMBIGUO", nombres_posibles, None
-
-
-def preparar_envio_whatsapp(destinatario: str, mensaje: str) -> str:
-    """
-    BLINDAJE DE SEGURIDAD:
-    Analiza el destinatario y detiene el proceso si no está 100% seguro de a quién enviar.
-    """
-    if not dispositivo_conectado():
-        return "Error de Seguridad: El teléfono no está conectado por ADB."
-
-    estado, info, numero = resolver_contacto_seguro(destinatario)
-
-    if estado == "NO_ENCONTRADO":
-        return f"Cancelado por seguridad: No existe ningún contacto llamado '{destinatario}' en tu agenda."
-
-    if estado == "AMBIGUO":
-        opciones = ", ".join(info[:4])
-        return (f"Acción detenida por seguridad: Encontré varios contactos similares ({opciones}). "
-                f"Por favor especifica el nombre completo para evitar confusiones.")
-
-    # Si todo es 100% seguro, guarda la acción
-    guardar_accion_pendiente("whatsapp", {
-        "nombre": info,
-        "numero": numero,
+    return {
+        "exito": True,
+        "canal": "android",
+        "contacto_nombre": nombre_contacto,
+        "telefono": telefono_clean,
         "mensaje": mensaje,
-    })
+        "uri": uri
+    }
 
-    return (f"Confirmación requerida: ¿Deseas enviar el siguiente mensaje a *{info}* ({numero})?\n"
-            f"Texto: \"{mensaje}\"\n\n"
-            f"Responde 'confirma' para enviar o 'cancela' para abortar.")
-
-
-def confirmar_envio_pendiente() -> str:
-    """
-    Ejecuta el envío ÚNICAMENTE tras la confirmación explícita del usuario.
-    """
-    pendiente = obtener_accion_pendiente()
-    if not pendiente or pendiente.get("tipo") != "whatsapp":
-        return "No hay ningún mensaje pendiente de envío."
-
-    datos = pendiente["datos"]
-    limpiar_accion_pendiente()
-
-    mensaje_codificado = urllib.parse.quote(datos["mensaje"])
-    url = f"https://wa.me/{datos['numero']}?text={mensaje_codificado}"
-
-    # 1. Asegurar encendido de pantalla
-    _ejecutar_adb("shell", "input", "keyevent", "224")
-
-    # 2. Abrir chat específico
-    exito, salida = _ejecutar_adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", url)
-    if not exito:
-        return f"Error abriendo el chat de {datos['nombre']}: {salida}"
-
-    # 3. Pausa para carga de interfaz
-    time.sleep(3.5)
-
-    # 4. Intento de auto-envío por ADB
-    _ejecutar_adb("shell", "input", "keyevent", "61")  # TAB
-    _ejecutar_adb("shell", "input", "keyevent", "66")  # ENTER
-
-    return f"Procesado: El mensaje para *{datos['nombre']}* se ha abierto y enviado en tu teléfono."
-
-
-def cancelar_envio_pendiente() -> str:
-    """Descarta cualquier envío en cola."""
-    limpiar_accion_pendiente()
-    return "Operación cancelada. Ningún mensaje fue enviado."
+def confirmar_envio_android(datos: dict) -> str:
+    """Abre el intent del mensaje en el teléfono sin mentir sobre el envío final."""
+    try:
+        cmd = f'shell am start -a android.intent.action.VIEW -d "{datos["uri"]}"'
+        _ejecutar_adb(cmd)
+        
+        # Eliminada simulación ciega de teclado para prevenir enviar a contactos equivocados
+        return (
+            f"Señor, el chat de *{datos['contacto_nombre']}* se ha abierto en su teléfono "
+            f"con el borrador listo. Por seguridad, presione el botón Enviar en pantalla."
+        )
+    except Exception as e:
+        return f"Error al abrir la conversación en el teléfono: {e}"

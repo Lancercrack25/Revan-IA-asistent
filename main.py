@@ -23,7 +23,7 @@ from src.Network.analize_network import analizar_red
 from src.Network.velocidad_latencia import probar_velocidad_con_navegador, reportar_latencia
 from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
 from src.Core.Gemini_client import GeminiClient
-from src.Phone.whatsapp_service import preparar_envio_inteligente,confirmar_envio_inteligente, cancelar_envio_pendiente
+from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_envio_inteligente, cancelar_envio_pendiente
 
 # Instancias y Controles Globales
 cerebro_ia = None    

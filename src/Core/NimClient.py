@@ -28,7 +28,7 @@ from src.Automation.System_commands import (
     crear_y_abrir_documento_word,
 )
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
-from src.Phone.whatsapp_service import preparar_envio_inteligente
+from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
 
 HERRAMIENTAS = [
     {
@@ -309,7 +309,6 @@ class NimClient:
                 registrar_accion_sistema(f"juego({juego_nombre})", resultado, "JUEGO")
                 return resultado
 
-            # EXTRAE CUALQUIER VARIANTE DE PARÁMETRO QUE MANDE LA IA (nombre, app, nombre_app, etc.)
             elif nombre in ["abrir_aplicacion", "lanzar_aplicacion_usuario"]:
                 app_nombre = argumentos.get("nombre") or argumentos.get("nombre_app") or argumentos.get("app") or ""
                 resultado = lanzar_aplicacion_usuario(app_nombre)
@@ -373,6 +372,14 @@ class NimClient:
             return f"Error ejecutando '{nombre}': {e}"
 
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
+        # 1. INTERCEPTACIÓN PRIORITARIA DE CONFIRMACIONES (Evita llamadas innecesarias a la API)
+        respuesta_confirmacion = procesar_confirmacion(orden_usuario)
+        if respuesta_confirmacion:
+            self.historial.append({"role": "user", "content": orden_usuario})
+            self.historial.append({"role": "assistant", "content": respuesta_confirmacion})
+            return respuesta_confirmacion
+
+        # 2. Si no hay confirmación pendiente, se procesa la solicitud mediante LLM
         self.historial.append({"role": "user", "content": orden_usuario})
 
         if len(self.historial) > 16:
@@ -395,7 +402,6 @@ class NimClient:
 
         mensaje = respuesta.choices[0].message
 
-        # Si la IA seleccionó una herramienta (función)
         if mensaje.tool_calls:
             self.historial.append(mensaje)
 
@@ -408,17 +414,13 @@ class NimClient:
                     argumentos = {}
 
                 print(f"[NimClient] Ejecutando Herramienta -> {nombre_herramienta}({argumentos})")
-                
-                # Ejecutar la acción localmente inmediatamente
                 res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
                 resultados.append(res)
             
-            # RESPUESTA DIRECTA: Devuelve la respuesta sin volver a consultar a la API para evitar demoras
             respuesta_directa = self._limpiar_para_voz(resultados[0])
             self.historial.append({"role": "assistant", "content": respuesta_directa})
             return respuesta_directa
 
-        # Si fue solo conversación de texto
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
         self.historial.append({"role": "assistant", "content": respuesta_final})
         return respuesta_final

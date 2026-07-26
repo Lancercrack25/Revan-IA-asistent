@@ -1,102 +1,81 @@
-# este archivo decide automáticamente si enviar el mensaje por Android (USB) o por la PC
-import re
+import time
+import os
+from src.Phone.Android.whats import preparar_envio_android, confirmar_envio_android
+from src.Phone.PC.whats_pc import preparar_envio_pc
 
-from src.Phone.Android.phone_conection import (
-    dispositivo_conectado,
-    guardar_accion_pendiente,
-    obtener_accion_pendiente,
-    limpiar_accion_pendiente,
-)
-from src.Phone.Android.whats import (
-    confirmar_envio_pendiente as confirmar_android,
-    preparar_envio_whatsapp as abrir_chat_con_mensaje, 
-)
-from src.Phone.Android.contacts import buscar_contacto, listar_coincidencias
-from src.Phone.PC.whats_pc import enviar_mensaje_pc
-
-
-def _resolver_destinatario(destinatario: str):
-    destinatario_limpio = destinatario.strip()
-    solo_digitos = re.sub(r"[^\d]", "", destinatario_limpio)
-
-    if len(solo_digitos) >= 10:
-        return destinatario_limpio, solo_digitos
-
-    # Intentar resolver usando la agenda
-    resultado = buscar_contacto(destinatario_limpio)
-    if resultado:
-        nombre, numero = resultado
-        return nombre, re.sub(r"[^\d]", "", numero)
-
-    return None, None
-
-
-def enviar_mensaje_whatsapp(destinatario: str, mensaje: str) -> str:
-    """
-    Función principal de envío:
-    Detecta si hay teléfono por USB. Si está, usa Android; si no, conmuta a la PC.
-    """
-    nombre, numero = _resolver_destinatario(destinatario)
-
-    if not numero:
-        coincidencias = listar_coincidencias(destinatario)
-        if len(coincidencias) > 1:
-            return f"Encontré varias coincidencias: {', '.join(coincidencias[:4])}. Especifica el nombre exacto."
-        return f"No se encontró al contacto '{destinatario}'."
-
-    # aqui el programa o script detecta si hay un cable usb en caso de que si manda al cel el mensaje pero si  no desde la pc 
-    if dispositivo_conectado():
-        # Vía 1: Teléfono Android conectado por USB
-        return abrir_chat_con_mensaje(numero, mensaje)
-    else:
-        print("[WhatsApp Service]: Teléfono no detectado por USB. Conmutando a App de PC...")
-        return enviar_mensaje_pc(numero, mensaje)
-
+ACCION_PENDIENTE = None
+TTL_CONFIRMACION = 60  # Límite de 60 segundos antes de expirar
 
 def preparar_envio_inteligente(destinatario: str, mensaje: str) -> str:
-    """
-    Prepara el mensaje con la confirmación de seguridad y determina
-    por qué vía se enviará cuando se diga 'confirma'.
-    """
-    via_uso = "Android (USB)" if dispositivo_conectado() else "WhatsApp PC"
-    nombre, numero = _resolver_destinatario(destinatario)
+    global ACCION_PENDIENTE
+    
+    # 1. Intentar canal Android (ADB)
+    datos_preparacion = preparar_envio_android(destinatario, mensaje)
+    
+    # 2. Fallback a PC si no hay ADB disponible
+    if not datos_preparacion.get("exito"):
+        datos_preparacion = preparar_envio_pc(destinatario, mensaje)
 
-    if not numero:
-        return f"No se pudo resolver el contacto '{destinatario}'."
+    if not datos_preparacion.get("exito"):
+        return datos_preparacion.get("error", "No se pudo preparar el mensaje, Señor.")
 
-    # Guardar la acción pendiente especificando la vía a utilizar
-    guardar_accion_pendiente("whatsapp", {
-        "nombre": nombre,
-        "numero": numero,
-        "mensaje": mensaje,
-        "via": "android" if dispositivo_conectado() else "pc"
-    })
+    # 3. Guardar estado con timestamp para TTL
+    ACCION_PENDIENTE = {
+        "tipo": "whatsapp",
+        "datos": datos_preparacion,
+        "timestamp": time.time()
+    }
 
-    return (f"Listo para enviar por vía [{via_uso}] a *{nombre}* ({numero}):\n"
-            f"\"{mensaje}\"\n\n"
-            f"Diga 'confirma' para enviar o 'cancela' para abortar, Señor.")
-
+    return (
+        f"Señor, he preparado el mensaje para *{datos_preparacion['contacto_nombre']}*:\n"
+        f"» \"{mensaje}\"\n\n"
+        f"¿Desea que proceda? Responda 'Confirma' o 'Cancela'."
+    )
 
 def confirmar_envio_inteligente() -> str:
-    """Ejecuta el envío confirmado en la plataforma que se determinó previamente."""
-    pendiente = obtener_accion_pendiente()
-    if not pendiente or pendiente.get("tipo") != "whatsapp":
-        return "No hay ningún mensaje pendiente de confirmar, Señor."
+    """Ejecuta la acción de confirmación si hay algo pendiente y dentro del TTL."""
+    global ACCION_PENDIENTE
+    
+    if not ACCION_PENDIENTE:
+        return "No hay ninguna acción pendiente por confirmar, Señor."
 
-    datos = pendiente["datos"]
-    limpiar_accion_pendiente()
+    tiempo_transcurrido = time.time() - ACCION_PENDIENTE["timestamp"]
+    if tiempo_transcurrido > TTL_CONFIRMACION:
+        ACCION_PENDIENTE = None
+        return "Señor, la confirmación pendiente ha expirado por razones de seguridad."
 
-    if datos.get("via") == "android" and dispositivo_conectado():
-        return confirmar_android()
+    datos = ACCION_PENDIENTE["datos"]
+    ACCION_PENDIENTE = None
+
+    if datos["canal"] == "android":
+        return confirmar_envio_android(datos)
     else:
-        # Si era para PC o si se desconectó el USB entre la preparación y la confirmación
-        return enviar_mensaje_pc(datos["numero"], datos["mensaje"])
+        os.system(f'start "" "{datos["url_app"]}"')
+        return f"Señor, he desplegado WhatsApp PC con el chat de *{datos['contacto_nombre']}* y el borrador listo. Por seguridad, haga clic en Enviar."
 
 def cancelar_envio_pendiente() -> str:
-    """Cancela y limpia cualquier acción de WhatsApp guardada en memoria."""
-    pendiente = obtener_accion_pendiente()
-    if not pendiente:
-        return "No hay ninguna acción o mensaje pendiente por cancelar, Señor."
+    """Cancela la acción pendiente activa."""
+    global ACCION_PENDIENTE
+    if not ACCION_PENDIENTE:
+        return "No hay ninguna acción pendiente que cancelar, Señor."
     
-    limpiar_accion_pendiente()
-    return "Envío de mensaje cancelado exitosamente, Señor."
+    ACCION_PENDIENTE = None
+    return "Acción cancelada, Señor. El borrador ha sido descartado."
+
+def procesar_confirmacion(orden: str) -> str:
+    """Mantiene compatibilidad cuando el usuario responde por texto completo (ej. 'si, hazlo')."""
+    global ACCION_PENDIENTE
+    
+    if not ACCION_PENDIENTE:
+        return None
+
+    orden_clean = orden.lower().strip()
+    
+    # Interceptación por palabras clave
+    if any(k in orden_clean for k in ["confirma", "confirmar", "procede", "si", "envialo", "ejecuta"]):
+        return confirmar_envio_inteligente()
+
+    elif any(k in orden_clean for k in ["cancela", "cancelar", "no", "abortar"]):
+        return cancelar_envio_pendiente()
+
+    return None
