@@ -3,126 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REVAN | Command Center</title>
-    <!-- Fuentes Cyberpunk/Sci-Fi -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <!-- CSS Servido desde src/Gui/styles/dashboard.css -->
+    <title>REVAN // COMMAND CENTER</title>
+    <!-- Librerías de Efectos y Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/styles/dashboard.css">
 </head>
 <body>
-    <div class="background-grid"></div>
-    <div class="scanline"></div>
+    <!-- Canvas de Partículas Sci-Fi de fondo -->
+    <div id="particles-js"></div>
+    <div class="cyber-overlay"></div>
 
-    <div class="app-container">
-        <!-- HEADER -->
-        <header class="header">
-            <div class="brand">
-                <div class="logo-glitch">REVAN</div>
-                <span class="sub-logo">// MISSION CONTROL v1.0</span>
-            </div>
-            <div class="header-status">
-                <div class="system-health">
-                    <span class="health-label">SYSTEM HEALTH</span>
-                    <div class="health-bar"><div class="health-fill"></div></div>
+    <div class="hud-frame">
+        <!-- TOP HEADER HUD -->
+        <header class="hud-header">
+            <div class="brand-core">
+                <div class="reactor-icon"><div class="core-pulse"></div></div>
+                <div class="title-group">
+                    <h1 class="glitch-text" data-text="REVAN">REVAN</h1>
+                    <span class="sub-text">PROT_V1.0 // TACTICAL OVERWATCH</span>
                 </div>
-                <nav class="nav-tabs">
-                    <button class="tab-btn active" id="btn-tactico" onclick="cambiarVista('tactico')">VISTA TÁCTICA</button>
-                    <button class="tab-btn" id="btn-esfera" onclick="cambiarVista('esfera')">ESFERA 3D</button>
-                </nav>
             </div>
+
+            <div class="status-center">
+                <div class="sys-metric">
+                    <span class="label">CPU CORES</span>
+                    <div class="meter"><div class="fill cpu-fill"></div></div>
+                </div>
+                <div class="sys-metric">
+                    <span class="label">NEURAL NET</span>
+                    <div class="meter"><div class="fill sync-fill"></div></div>
+                </div>
+                <div class="live-status">
+                    <span class="beacon"></span>
+                    <span class="status-txt">ONLINE</span>
+                </div>
+            </div>
+
+            <nav class="hud-switcher">
+                <button class="nav-btn active" id="btn-tactico" onclick="switchView('tactico')">
+                    <i class="fa-solid fa-border-all"></i> VISTA TÁCTICA
+                </button>
+                <button class="nav-btn" id="btn-esfera" onclick="switchView('esfera')">
+                    <i class="fa-solid fa-globe"></i> NÚCLEO 3D
+                </button>
+            </nav>
         </header>
 
-        <!-- MAIN CONTENT AREA -->
-        <main class="main-content">
+        <!-- CENTER VIEW AREA -->
+        <main class="hud-main">
             <!-- VISTA TÁCTICA -->
-            <div id="vista-tactica" class="view-panel active">
-                <aside class="sidebar">
-                    <div class="sidebar-header">
-                        <h3>ROSTER DE AGENTES</h3>
+            <div id="view-tactico" class="view-panel active">
+                <!-- BARRA LATERAL TÁCTICA -->
+                <aside class="hud-sidebar">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-users-gear"></i> ROSTER DE AGENTES
                     </div>
-                    <div class="agent-list">
-                        <div class="agent-card active">
-                            <div class="agent-avatar revan-avatar">R</div>
-                            <div class="agent-info">
-                                <span class="agent-name">REVAN</span>
-                                <span class="agent-role">Núcleo IA / Orquestador</span>
+                    
+                    <div class="agent-cards">
+                        <div class="agent-item active" data-tilt data-tilt-max="10" data-tilt-speed="400">
+                            <div class="hex-avatar cyan"><i class="fa-solid fa-brain"></i></div>
+                            <div class="agent-details">
+                                <span class="name">REVAN</span>
+                                <span class="role">Núcleo IA / Orquestador</span>
                             </div>
-                            <span class="status-pulse online"></span>
+                            <span class="agent-indicator online"></span>
                         </div>
-                        <div class="agent-card">
-                            <div class="agent-avatar action-avatar">ACT</div>
-                            <div class="agent-info">
-                                <span class="agent-name">ACTION AGENT</span>
-                                <span class="agent-role">Ejecutor Scripts / ADB</span>
+
+                        <div class="agent-item" data-tilt data-tilt-max="10" data-tilt-speed="400">
+                            <div class="hex-avatar purple"><i class="fa-solid fa-terminal"></i></div>
+                            <div class="agent-details">
+                                <span class="name">ACTION AGENT</span>
+                                <span class="role">Ejecutor Scripts / ADB</span>
                             </div>
-                            <span class="status-pulse standby"></span>
+                            <span class="agent-indicator standby"></span>
+                        </div>
+                    </div>
+
+                    <!-- TERMINAL DE TELEMETRÍA -->
+                    <div class="telemetry-box">
+                        <div class="telemetry-header">
+                            <i class="fa-solid fa-code-compare"></i> TELEMETRÍA EN VIVO
+                        </div>
+                        <div id="telemetry-log" class="telemetry-content">
+                            <div class="log-entry system">&gt; Núcleo sináptico inicializado.</div>
+                            <div class="log-entry system">&gt; Canal WebSocket listo en :8000.</div>
                         </div>
                     </div>
                 </aside>
 
-                <section class="modules-grid">
-                    <div class="module-card cyan-theme">
-                        <div class="card-corner top-left"></div>
-                        <div class="card-corner bottom-right"></div>
-                        <div class="module-header">
+                <!-- GRID DE MÓDULOS HOLOGRÁFICOS -->
+                <section class="hud-grid">
+                    <div class="module-card cyan-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
+                        <div class="card-glow"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-brands fa-whatsapp"></i></div>
                             <h3>OFICINA & COMUNICACIÓN</h3>
-                            <span class="module-tag">[WHATSAPP]</span>
                         </div>
-                        <p class="module-desc">Gestión de mensajes, lectura de respuestas y automatización PC/ADB.</p>
-                        <div class="module-status">ESTADO: ACTIVO</div>
+                        <div class="card-body">
+                            <p>Gestión automatizada de mensajes, lectura de contexto y respuestas multicanal PC/ADB.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> ACTIVO</span>
+                            <span class="mod-id">MOD_01</span>
+                        </div>
                     </div>
 
-                    <div class="module-card green-theme">
-                        <div class="card-corner top-left"></div>
-                        <div class="card-corner bottom-right"></div>
-                        <div class="module-header">
+                    <div class="module-card green-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
+                        <div class="card-glow"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-mobile-screen-button"></i></div>
                             <h3>AUTOMATIZACIÓN ADB</h3>
-                            <span class="module-tag">[TELÉFONO]</span>
                         </div>
-                        <p class="module-desc">Control físico del dispositivo móvil, capturas y acciones en pantalla.</p>
-                        <div class="module-status">ESTADO: LISTO</div>
+                        <div class="card-body">
+                            <p>Control físico del dispositivo móvil, capturas de pantalla dinámicas y ejecución por eventos.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> LISTO</span>
+                            <span class="mod-id">MOD_02</span>
+                        </div>
                     </div>
 
-                    <div class="module-card purple-theme">
-                        <div class="card-corner top-left"></div>
-                        <div class="card-corner bottom-right"></div>
-                        <div class="module-header">
-                            <h3>CÁMARA & VISIÓN</h3>
-                            <span class="module-tag">[VISIÓN AI]</span>
+                    <div class="module-card purple-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
+                        <div class="card-glow"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-eye"></i></div>
+                            <h3>CÁMARA & VISIÓN AI</h3>
                         </div>
-                        <p class="module-desc">Análisis de contexto visual en tiempo real mediante OpenCV y detección táctica.</p>
-                        <div class="module-status">ESTADO: STANDBY</div>
+                        <div class="card-body">
+                            <p>Análisis de imágenes en tiempo real mediante OpenCV, detección espacial e interpretación de gestos.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> STANDBY</span>
+                            <span class="mod-id">MOD_03</span>
+                        </div>
                     </div>
 
-                    <div class="module-card amber-theme">
-                        <div class="card-corner top-left"></div>
-                        <div class="card-corner bottom-right"></div>
-                        <div class="module-header">
+                    <div class="module-card amber-card" data-tilt data-tilt-max="8" data-tilt-glare data-tilt-max-glare="0.2">
+                        <div class="card-glow"></div>
+                        <div class="card-head">
+                            <div class="icon-wrap"><i class="fa-solid fa-database"></i></div>
                             <h3>MEMORIA & CONTEXTO</h3>
-                            <span class="module-tag">[RAG DB]</span>
                         </div>
-                        <p class="module-desc">Recuperación de eventos recientes y base de conocimientos local vinculada.</p>
-                        <div class="module-status">ESTADO: INDEXADO</div>
+                        <div class="card-body">
+                            <p>Recuperación de eventos recientes, indexación de datos local y base de conocimiento Vector DB.</p>
+                        </div>
+                        <div class="card-foot">
+                            <span class="badge"><i class="fa-solid fa-circle"></i> INDEXADO</span>
+                            <span class="mod-id">MOD_04</span>
+                        </div>
                     </div>
                 </section>
             </div>
 
-            <!-- VISTA ESFERA 3D (IFRAME) -->
-            <div id="vista-esfera" class="view-panel">
-                <iframe id="iframe-esfera" src="/esfera" frameborder="0"></iframe>
+            <!-- VISTA ESFERA 3D (IFRAME CORREGIDO) -->
+            <div id="view-esfera" class="view-panel">
+                <div class="esfera-wrapper">
+                    <iframe id="iframe-esfera" src="/esfera" frameborder="0"></iframe>
+                </div>
             </div>
         </main>
 
-        <!-- INPUT COMMAND BAR -->
-        <footer class="footer-input">
-            <div class="input-wrapper">
-                <span class="input-prefix">&gt;&gt;</span>
-                <input type="text" id="cmd-input" placeholder="Escribe una orden para REVAN o presiona Enter..." autocomplete="off">
-                <button id="btn-enviar" onclick="enviarComando()">ENVIAR</button>
+        <!-- COMMAND BAR FOOTER -->
+        <footer class="hud-footer">
+            <div class="input-container">
+                <i class="fa-solid fa-terminal prompt-icon"></i>
+                <input type="text" id="cmd-input" placeholder="Escribe un comando táctico o presiona Enter..." autocomplete="off">
+                <button id="btn-send" onclick="enviarComando()">
+                    <i class="fa-solid fa-paper-plane"></i> EXECUTAR
+                </button>
             </div>
         </footer>
     </div>
 
+    <!-- Scripts de Librerías Sci-Fi -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
     <script src="/static/dashboard.js"></script>
 </body>
 </html>
