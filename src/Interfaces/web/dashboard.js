@@ -1,30 +1,41 @@
+/* ==========================================================================
+   DASHBOARD KERNEL - HUD CONTROLLER
+   ========================================================================== */
+
 let ws = null;
+let reconnectTimer = null;
+
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
-    conectarWebSocket();
+    initTilt();
+    setupModuleNavigation();
     setupInputEvents();
-    setupModuleNavigation(); // <-- Registro automático de clics para módulos
+    conectarWebSocket();
+    startMetricsSimulation();
 });
-// --- INICIALIZAR LIBRERÍA DE PARTÍCULAS (PARTICLES.JS) ---
+
+/* --------------------------------------------------------------------------
+   1. AMBIENTE VISUAL (PARTICLES & TILT)
+   -------------------------------------------------------------------------- */
 function initParticles() {
     if (typeof particlesJS !== "undefined") {
         particlesJS("particles-js", {
             particles: {
-                number: { value: 65, density: { enable: true, value_area: 800 } },
+                number: { value: 70, density: { enable: true, value_area: 900 } },
                 color: { value: "#00f0ff" },
                 shape: { type: "circle" },
-                opacity: { value: 0.25, random: true },
-                size: { value: 2.5, random: true },
+                opacity: { value: 0.2, random: true },
+                size: { value: 2, random: true },
                 line_linked: {
                     enable: true,
-                    distance: 140,
+                    distance: 130,
                     color: "#00f0ff",
-                    opacity: 0.15,
+                    opacity: 0.12,
                     width: 1
                 },
                 move: {
                     enable: true,
-                    speed: 1.2,
+                    speed: 1,
                     direction: "none",
                     random: true,
                     out_mode: "out"
@@ -37,70 +48,29 @@ function initParticles() {
                     onclick: { enable: true, mode: "push" }
                 },
                 modes: {
-                    grab: { distance: 160, line_linked: { opacity: 0.4 } }
+                    grab: { distance: 140, line_linked: { opacity: 0.35 } }
                 }
             },
             retina_detect: true
         });
     }
 }
-// --- REDIRECCIÓN A MÓDULOS DE INFORMACIÓN ---
-function setupModuleNavigation() {
-    const rutasModulos = {
-        'btn-camera': '/modulos/camera',
-        'btn-phone': '/modulos/phone',
-        'btn-network': '/modulos/network',
-        'btn-mails': '/modulos/mails',
-        'btn-database': '/modulos/databases',
-        'btn-sounds': '/modulos/sounds',
-        'btn-training': '/modulos/training',
-        'btn-automation': '/modulos/automation',
-        'btn-security': '/modulos/security',
-        'btn-social': '/modulos/social',
-        'btn-inspector': '/modulos/inspector',
-        'btn-electronics': '/modulos/electronics'
-    };
 
-    Object.keys(rutasModulos).forEach(idElemento => {
-        const elemento = document.getElementById(idElemento);
-        if (elemento) {
-            elemento.style.cursor = "pointer";
-            elemento.addEventListener("click", () => {
-                window.location.href = rutasModulos[idElemento];
-            });
-        }
-    });
-}
-// --- CONEXIÓN WEBSOCKET Y SINCRONIZACIÓN ---
-function conectarWebSocket() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-    ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-        addLog("Conexión de red establecida con el núcleo.", "system");
-    };
-
-    ws.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            if (data.tipo === "chat") {
-                const tipoLog = data.rol === "usuario" ? "user" : "revan";
-                addLog(`[${data.rol.toUpperCase()}]: ${data.texto}`, tipoLog);
-            }
-        } catch (e) {
-            console.error("Error al decodificar mensaje WS:", e);
-        }
-    };
-
-    ws.onclose = () => {
-        addLog("Conexión perdida. Reintentando enlace...", "system");
-        setTimeout(conectarWebSocket, 3000);
-    };
+function initTilt() {
+    if (typeof VanillaTilt !== "undefined") {
+        VanillaTilt.init(document.querySelectorAll("[data-tilt]"), {
+            max: 8,
+            speed: 400,
+            glare: true,
+            "max-glare": 0.2,
+            scale: 1.01
+        });
+    }
 }
 
-// --- CAMBIO DE VISTAS TÁCTICA / NÚCLEO 3D ---
+/* --------------------------------------------------------------------------
+   2. GESTIÓN DE VISTAS (TÁCTICO VS NÚCLEO 3D)
+   -------------------------------------------------------------------------- */
 function switchView(vista) {
     const vTactico = document.getElementById("view-tactico");
     const vEsfera = document.getElementById("view-esfera");
@@ -119,43 +89,162 @@ function switchView(vista) {
         if (bEsfera) bEsfera.classList.add("active");
 
         const iframe = document.getElementById("iframe-esfera");
-        if (iframe && !iframe.src) {
+        if (iframe && !iframe.getAttribute("src")) {
             iframe.src = "/esfera";
         }
     }
 }
 
-// --- ENVÍO DE COMANDOS ---
-function enviarComando() {
-    const input = document.getElementById("cmd-input");
-    const texto = input.value.trim();
+/* --------------------------------------------------------------------------
+   3. NAVEGACIÓN Y REDIRECCIÓN DE MÓDULOS
+   -------------------------------------------------------------------------- */
+function setupModuleNavigation() {
+    const rutasModulos = {
+        'btn-camera': '/modulos/camera',
+        'btn-phone': '/modulos/phone',
+        'btn-network': '/modulos/network',
+        'btn-mails': '/modulos/mails',
+        'btn-database': '/modulos/databases',
+        'btn-sounds': '/modulos/sounds',
+        'btn-training': '/modulos/training',
+        'btn-automation': '/modulos/automation',
+        'btn-security': '/modulos/security',
+        'btn-social': '/modulos/social',
+        'btn-inspector': '/modulos/inspector',
+        'btn-electronics': '/modulos/electronics'
+    };
 
-    if (texto && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            type: "text_command",
-            content: texto
-        }));
-        addLog(`[ORDEN]: ${texto}`, "user");
-        input.value = "";
-    }
+    Object.entries(rutasModulos).forEach(([id, url]) => {
+        const card = document.getElementById(id);
+        if (card) {
+            card.addEventListener("click", () => {
+                addLog(`Accediendo al módulo: ${id.replace('btn-', '').toUpperCase()}...`, "system");
+                window.location.href = url;
+            });
+        }
+    });
 }
 
+/* --------------------------------------------------------------------------
+   4. WEBSOCKET & TELEMETRÍA EN TIEMPO REAL
+   -------------------------------------------------------------------------- */
+function conectarWebSocket() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+        addLog("Enlace neural establecido con la red.", "system");
+        updateLiveBeacon(true);
+        if (reconnectTimer) clearInterval(reconnectTimer);
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.tipo === "chat" || data.tipo === "log") {
+                const tag = data.rol ? data.rol.toUpperCase() : "SYS";
+                addLog(`[${tag}]: ${data.texto}`, data.rol || "system");
+            }
+        } catch (e) {
+            addLog(`> RAW: ${event.data}`, "system");
+        }
+    };
+
+    ws.onclose = () => {
+        addLog("Conexión interrumpida. Reintentando...", "system");
+        updateLiveBeacon(false);
+        reconnectTimer = setTimeout(conectarWebSocket, 4000);
+    };
+
+    ws.onerror = (err) => {
+        console.error("WebSocket Error:", err);
+        ws.close();
+    };
+}
+
+/* --------------------------------------------------------------------------
+   5. TERMINAL DE COMANDOS
+   -------------------------------------------------------------------------- */
 function setupInputEvents() {
     const input = document.getElementById("cmd-input");
+    const btn = document.getElementById("btn-send");
+
     if (input) {
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") enviarComando();
         });
     }
+
+    if (btn) {
+        btn.addEventListener("click", enviarComando);
+    }
+}
+
+function enviarComando() {
+    const input = document.getElementById("cmd-input");
+    if (!input) return;
+
+    const texto = input.value.trim();
+
+    if (texto) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "text_command",
+                content: texto
+            }));
+            addLog(`ORDEN: ${texto}`, "user");
+        } else {
+            addLog(`[OFFLINE]: No se pudo transmitir "${texto}"`, "system");
+        }
+        input.value = "";
+    }
 }
 
 function addLog(msg, type = "system") {
     const logBox = document.getElementById("telemetry-log");
-    if (logBox) {
-        const div = document.createElement("div");
-        div.className = `log-entry ${type}`;
-        div.textContent = `> ${msg}`;
-        logBox.appendChild(div);
-        logBox.scrollTop = logBox.scrollHeight;
+    if (!logBox) return;
+
+    const div = document.createElement("div");
+    div.className = `log-entry ${type}`;
+    
+    const timestamp = new Date().toLocaleTimeString('es-ES', { hour12: false });
+    div.textContent = `[${timestamp}] ${msg}`;
+    
+    logBox.appendChild(div);
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+/* --------------------------------------------------------------------------
+   6. SIMULADOR DE MÉTRICAS HUD
+   -------------------------------------------------------------------------- */
+function startMetricsSimulation() {
+    const cpuFill = document.querySelector(".cpu-fill");
+    
+    setInterval(() => {
+        if (cpuFill) {
+            const randomCpu = Math.floor(Math.random() * (65 - 28 + 1)) + 28;
+            cpuFill.style.width = `${randomCpu}%`;
+        }
+    }, 2500);
+}
+
+function updateLiveBeacon(online) {
+    const beacon = document.querySelector(".beacon");
+    const statusText = document.querySelector(".live-status span");
+
+    if (beacon && statusText) {
+        if (online) {
+            beacon.style.background = "var(--green)";
+            beacon.style.boxShadow = "0 0 10px var(--green)";
+            statusText.textContent = "ONLINE";
+            statusText.style.color = "var(--green)";
+        } else {
+            beacon.style.background = "var(--red)";
+            beacon.style.boxShadow = "0 0 10px var(--red)";
+            statusText.textContent = "OFFLINE";
+            statusText.style.color = "var(--red)";
+        }
     }
 }

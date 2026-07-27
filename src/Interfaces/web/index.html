@@ -4,17 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REVAN - Neural Core</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles/estilos.css">
 </head>
 <body>
     <div id="canvas-container"></div>
+
+    <!-- HUD Overlay sobre la Esfera 3D -->
     <div id="hud-banner">
-        <p id="status-text">REVAN V1.0</p>
-        <p id="sub-text">NÚCLEO COGNITIVO SINÁPTICO ACTIVO</p>
+        <div class="core-status-beacon"></div>
+        <div class="text-group">
+            <p id="status-text">REVAN V1.0 // CORE MATRIX</p>
+            <p id="sub-text">NÚCLEO COGNITIVO SINÁPTICO ACTIVO — FREC: 432.8 Hz</p>
+        </div>
     </div>
 
+    <div class="hud-corner top-left"></div>
+    <div class="hud-corner top-right"></div>
+    <div class="hud-corner bottom-left"></div>
+    <div class="hud-corner bottom-right"></div>
+
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
     <script src="/static/esfera.js"></script>
 </body>
 </html>

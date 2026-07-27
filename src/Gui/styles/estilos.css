@@ -1,17 +1,20 @@
-
-/* Configuración Base del Contenedor de la Ventana */
-body, html {
+/* CONFIGURACIÓN GENERAL DEL LIENZO Y PANTALLA */
+* {
     margin: 0;
     padding: 0;
-    width: 500vw;
-    height: 500vh;
+    box-sizing: border-box;
+}
+
+body, html {
+    width: 100vw;
+    height: 100vh;
     overflow: hidden;
-    background-color: #04040a; /* Fondo oscuro profundo para mitigar el destello blanco de Brave */
+    background-color: #04040a; /* Fondo ultra oscuro para evitar destellos */
     font-family: 'Segoe UI', 'Consolas', 'Courier New', monospace;
     user-select: none;
 }
 
-/* Lienzo de Renderizado 3D (Three.js) */
+/* Lienzo 3D (Three.js) */
 #canvas-container {
     width: 100vw;
     height: 100vh;
@@ -21,7 +24,7 @@ body, html {
     z-index: 1;
 }
 
-/* Banner de Estado Estilo HUD Militar / Inteligencia Artificial */
+/* BANNER DE ESTADO TÁCTICO HUD */
 #hud-banner {
     position: absolute;
     bottom: 6%;
@@ -31,49 +34,44 @@ body, html {
     
     /* Dimensiones y Espaciado */
     min-width: 280px;
-    padding: 15px 40px;
+    padding: 14px 36px;
     text-align: center;
-    border-radius: 12px;
+    border-radius: 8px;
     
-    /* Bordes y Fondos Avanzados (Vidrio Esmerilado Cyberpunk) */
+    /* Efecto Cristal Esmerilado Cyberpunk */
     border: 1px solid #00ffcc;
-    background: rgba(6, 6, 20, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(6, 10, 24, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     
-    /* Efectos de Iluminación Neon */
+    /* Brillos Neón */
     box-shadow: 0 0 30px rgba(0, 255, 204, 0.2), 
                 inset 0 0 15px rgba(0, 255, 204, 0.1);
     
-    /* Seguridad de Interacción */
     pointer-events: none;
-    
-    /* Transición Suave para Cambios de Color y Estado */
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
 }
 
-/* Texto de Estado Principal (Ej: EN ESPERA, ESCUCHANDO, PENSANDO) */
+/* Texto de Estado Principal */
 #status-text {
     color: #00ffcc;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 900;
     margin: 0;
     padding: 0;
-    letter-spacing: 4px;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    
-    /* Brillo Neón en el Texto */
-    text-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
+    text-shadow: 0 0 12px rgba(0, 255, 204, 0.6);
     transition: color 0.4s ease;
 }
-/* Subtexto Informativo Inferior */
+
+/* Subtexto Inferior */
 #sub-text {
-    color: #8888aa;
+    color: rgba(255, 255, 255, 0.6);
     font-size: 10px;
     font-weight: 600;
-    margin: 5px 0 0 0;
-    padding: 0;
+    margin-top: 4px;
     letter-spacing: 2px;
     text-transform: uppercase;
-    opacity: 0.8;
 }
