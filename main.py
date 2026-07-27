@@ -437,7 +437,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     print(f"[NimClient Error]: {err_nim}")
         else:
             print("[Enrutador]: Intención -> CONVERSACIÓN FLUIDA")
-            
             # Intento 1: Google Gemini
             if gemini_ia:
                 try:
