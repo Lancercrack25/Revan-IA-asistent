@@ -1,10 +1,12 @@
 let ws = null;
+
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
     conectarWebSocket();
     setupInputEvents();
     setupModuleNavigation(); // <-- Registro automático de clics para módulos
 });
+
 // --- INICIALIZAR LIBRERÍA DE PARTÍCULAS (PARTICLES.JS) ---
 function initParticles() {
     if (typeof particlesJS !== "undefined") {
@@ -44,15 +46,22 @@ function initParticles() {
         });
     }
 }
+
 // --- REDIRECCIÓN A MÓDULOS DE INFORMACIÓN ---
 function setupModuleNavigation() {
     const rutasModulos = {
-        "btn-database": "/modulos/databases",
-        "btn-mails": "/modulos/mails",
-        "btn-network": "/modulos/network",
-        "btn-phone": "/modulos/phone",
-        "btn-sounds": "/modulos/sounds",
-        "btn-training": "/modulos/training"
+        'btn-camera': '/info_camara.html',      // Corregido a 'camara' (con 'a')
+        'btn-phone': '/info_phone.html',
+        'btn-network': '/info_network.html',
+        'btn-mails': '/info_mails.html',
+        'btn-database': '/info_databases.html',  // Corregido a 'databases' (plural)
+        'btn-sounds': '/info_sounds.html',
+        'btn-training': '/info_training.html',
+        'btn-automation': '/info_automation.html',
+        'btn-security': '/info_security.html',
+        'btn-social': '/info_social.html',
+        'btn-inspector': '/info_inspector.html',
+        'btn-electronics': '/info_electronics.html'
     };
 
     Object.keys(rutasModulos).forEach(idElemento => {
@@ -65,6 +74,7 @@ function setupModuleNavigation() {
         }
     });
 }
+
 // --- CONEXIÓN WEBSOCKET Y SINCRONIZACIÓN ---
 function conectarWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -93,6 +103,7 @@ function conectarWebSocket() {
         setTimeout(conectarWebSocket, 3000);
     };
 }
+
 // --- CAMBIO DE VISTAS TÁCTICA / NÚCLEO 3D ---
 function switchView(vista) {
     const vTactico = document.getElementById("view-tactico");
@@ -117,6 +128,7 @@ function switchView(vista) {
         }
     }
 }
+
 // --- ENVÍO DE COMANDOS ---
 function enviarComando() {
     const input = document.getElementById("cmd-input");
@@ -131,6 +143,7 @@ function enviarComando() {
         input.value = "";
     }
 }
+
 function setupInputEvents() {
     const input = document.getElementById("cmd-input");
     if (input) {
@@ -139,6 +152,7 @@ function setupInputEvents() {
         });
     }
 }
+
 function addLog(msg, type = "system") {
     const logBox = document.getElementById("telemetry-log");
     if (logBox) {
