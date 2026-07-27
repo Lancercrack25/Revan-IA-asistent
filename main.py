@@ -287,12 +287,9 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         ultima_interaccion = time.time()
 
     try:
-        # =========================================================================
-        # 🛡️ ESCUDO LOCAL: CHARLA Y SALUDOS RÁPIDOS (Gasto 0 Tokens)
-        # =========================================================================
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
-            "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?"
+            "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda","que pedo"
         ]
         if orden_limpia_sin_acentos.strip().rstrip("?") in saludos_basicos:
             print("[Escudo Local]: Saludo común detectado. Respondiendo localmente sin gastar tokens.")
