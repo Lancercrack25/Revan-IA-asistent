@@ -62,7 +62,7 @@ body, html {
 }
 
 /* ==========================================================================
-   3. ESTRUCTURA Y MARCO DEL HUD (FIX DE ALTURA)
+   3. ESTRUCTURA Y MARCO DEL HUD
    ========================================================================== */
 .hud-frame {
     position: relative;
@@ -216,12 +216,12 @@ body, html {
 }
 
 /* ==========================================================================
-   4. ÁREA CENTRAL (HACE QUE EL SCROLL FUNCIONE)
+   4. ÁREA CENTRAL
    ========================================================================== */
 .hud-main {
     flex: 1;
     display: flex;
-    min-height: 0; /* OBLIGATORIO: Permite el scroll del contenedor interno */
+    min-height: 0;
     position: relative;
 }
 
@@ -366,22 +366,19 @@ body, html {
 .log-entry.system { color: #a0aec0; }
 
 /* ==========================================================================
-   6. GRID DE MÓDULOS CON SCROLL Y ADAPTACIÓN RESPONSIVA
+   6. GRID DE MÓDULOS (TARJETAS XXL CON FONDOS REALES Y DEGRADADOS)
    ========================================================================== */
 .hud-grid {
     flex: 1;
     display: grid;
-    /* Adapta dinámicamente las columnas según el espacio */
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    grid-auto-rows: minmax(150px, max-content);
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-auto-rows: minmax(270px, max-content);
+    gap: 18px;
     height: 100%;
-    /* SCROLL COMPLETO DESBLOQUEADO */
     overflow-y: auto;
-    padding-right: 6px;
+    padding-right: 8px;
 }
 
-/* BARRA DE SCROLL ESTILO CYBERPUNK */
 .hud-grid::-webkit-scrollbar {
     width: 6px;
 }
@@ -398,74 +395,125 @@ body, html {
     box-shadow: 0 0 8px var(--cyan);
 }
 
-/* DISEÑO DE LAS 12 TARJETAS */
+/* ESTRUCTURA BASE DE LA TARJETA */
 .module-card {
     position: relative;
-    background: var(--hud-bg);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: 8px;
+    padding: 22px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     cursor: pointer;
-    min-height: 150px;
+    min-height: 270px;
     box-sizing: border-box;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* OSCURECEDOR PARA QUE EL TEXTO SIEMPRE SEA LEGIBLE */
+.module-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, rgba(5, 8, 17, 0.82) 0%, rgba(5, 8, 17, 0.95) 100%);
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+
+.card-head, .card-body, .card-foot {
+    position: relative;
+    z-index: 2;
 }
 
 .module-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px) scale(1.01);
     border-color: var(--cyan);
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.35);
 }
 
+.module-card:hover::before {
+    opacity: 0.65; /* Revela más la imagen al hacer hover */
+}
+
+/* IMÁGENES DE FONDO SEGÚN EL COLOR/CLASE DEL MÓDULO */
+.purple-card {
+    background-image: url('https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=800&q=80');
+}
+.green-card {
+    background-image: url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80');
+}
+.cyan-card {
+    background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80');
+}
+.blue-card {
+    background-image: url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80');
+}
+.amber-card {
+    background-image: url('https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=800&q=80');
+}
+.red-card {
+    background-image: url('https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=800&q=80');
+}
+.magenta-card {
+    background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80');
+}
+.teal-card {
+    background-image: url('https://images.unsplash.com/photo-1510511459019-5dda7724fd87?auto=format&fit=crop&w=800&q=80');
+}
+
+/* CONTENIDO DE LA TARJETA */
 .card-head {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .card-head .icon-wrap {
-    font-size: 0.9rem;
-    width: 28px;
-    height: 28px;
+    font-size: 1.4rem;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(4px);
     flex-shrink: 0;
 }
 
 .card-head h3 {
     font-family: var(--font-title);
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
+    font-size: 1rem;
+    letter-spacing: 1px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
 }
 
 .card-body {
     flex: 1;
     display: flex;
     align-items: center;
-    margin: 6px 0;
+    margin: 12px 0;
 }
 
 .card-body p {
     font-family: var(--font-sub);
-    font-size: 0.75rem;
-    color: #cbd5e1;
-    line-height: 1.3;
+    font-size: 0.95rem;
+    color: #e2e8f0;
+    line-height: 1.5;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.95);
 }
 
 .card-foot {
@@ -473,21 +521,21 @@ body, html {
     justify-content: space-between;
     align-items: center;
     font-family: var(--font-mono);
-    font-size: 0.6rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-top: 6px;
+    font-size: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 10px;
 }
 
 .card-foot .badge {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     font-weight: bold;
 }
 
-.card-foot .mod-id { opacity: 0.6; }
+.card-foot .mod-id { opacity: 0.8; text-shadow: 0 1px 2px #000; }
 
-/* VARIACIONES DE COLOR */
+/* COLORES DE NEÓN PARA CADA CLASE */
 .purple-card .icon-wrap, .purple-card h3, .purple-card .badge { color: var(--purple); }
 .green-card  .icon-wrap, .green-card h3,  .green-card .badge  { color: var(--green); }
 .cyan-card   .icon-wrap, .cyan-card h3,   .cyan-card .badge   { color: var(--cyan); }
@@ -579,6 +627,7 @@ body, html {
     }
 
     .hud-grid {
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        grid-auto-rows: minmax(220px, max-content);
     }
 }
