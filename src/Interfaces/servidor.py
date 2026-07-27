@@ -11,17 +11,13 @@ conexiones_activas: set[WebSocket] = set()
 loop_real_servidor = None
 manejador_comando_texto_callback = None
 
-
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
     global loop_real_servidor
     loop_real_servidor = asyncio.get_running_loop()
     print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
     yield
-
-
 app = FastAPI(lifespan=lifespan)
-
 # Mapeo Absoluto Adaptado al Árbol de Trabajo Real
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
@@ -34,9 +30,7 @@ if os.path.exists(CARPETA_WEB):
 if os.path.exists(CARPETA_STYLES):
     app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
 
-
 # --- FUNCIÓN AUXILIAR PARA SERVIR HTMLs ---
-
 def servir_html_modulo(nombre_archivo: str):
     """Carga y retorna un archivo HTML existente en la carpeta web."""
     ruta_archivo = os.path.join(CARPETA_WEB, nombre_archivo)
@@ -47,64 +41,72 @@ def servir_html_modulo(nombre_archivo: str):
         content=f"<h1> Error: {nombre_archivo} no encontrado en src/Interfaces/web</h1>",
         status_code=404,
     )
-
-
-# --- RUTAS DE NAVEGACIÓN ---
-
+# --- RUTAS PRINCIPALES DE NAVEGACIÓN ---
 @app.get("/")
 async def obtener_dashboard():
     """Ruta Principal: Carga el Dashboard Táctico (Command Center)"""
     return servir_html_modulo("dashboard.html")
 
-
 @app.get("/esfera")
 async def obtener_index():
     """Ruta secundaria: Carga la esfera 3D dentro del iframe del Dashboard"""
     return servir_html_modulo("index.html")
-
-
 # --- RUTAS DE INFORMACIÓN DE MÓDULOS ---
+@app.get("/modulos/camera")
+async def info_camera():
+    return servir_html_modulo("info_camara.html")
 
 @app.get("/modulos/databases")
 async def info_databases():
     return servir_html_modulo("info_databases.html")
 
-
 @app.get("/modulos/mails")
 async def info_mails():
     return servir_html_modulo("info_mails.html")
-
 
 @app.get("/modulos/network")
 async def info_network():
     return servir_html_modulo("info_network.html")
 
-
 @app.get("/modulos/phone")
 async def info_phone():
     return servir_html_modulo("info_phone.html")
-
 
 @app.get("/modulos/sounds")
 async def info_sounds():
     return servir_html_modulo("info_sounds.html")
 
-
 @app.get("/modulos/training")
 async def info_training():
     return servir_html_modulo("info_training.html")
 
+@app.get("/modulos/automation")
+async def info_automation():
+    return servir_html_modulo("info_automation.html")
+
+@app.get("/modulos/security")
+async def info_security():
+    return servir_html_modulo("info_security.html")
+
+@app.get("/modulos/social")
+async def info_social():
+    return servir_html_modulo("info_social.html")
+
+@app.get("/modulos/inspector")
+async def info_inspector():
+    return servir_html_modulo("info_inspector.html")
+
+@app.get("/modulos/electronics")
+async def info_electronics():
+    return servir_html_modulo("info_electronics.html")
 
 # --- REGISTRO DE MANEJADORES ---
-
 def registrar_manejador_comando_texto(callback):
     """Permite a main.py registrar la función que procesará los textos enviados desde la web UI."""
     global manejador_comando_texto_callback
     manejador_comando_texto_callback = callback
 
-
 # --- WEBSOCKET UNIFICADO ---
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global loop_real_servidor
@@ -141,10 +143,7 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         conexiones_activas.discard(websocket)
         print("[WebSocket]: Cliente desconectado.")
-
-
 # --- TRANSMISIONES BROADCAST ---
-
 async def cambiar_estado_esfera(estado: str, color_hex: str):
     if not conexiones_activas:
         return
@@ -160,7 +159,6 @@ async def cambiar_estado_esfera(estado: str, color_hex: str):
 
     for ws in desconectados:
         conexiones_activas.discard(ws)
-
 
 async def actualizar_manipulacion_esfera(rot_x: float, rot_y: float, escala: float):
     if not conexiones_activas:
@@ -178,7 +176,6 @@ async def actualizar_manipulacion_esfera(rot_x: float, rot_y: float, escala: flo
     for ws in desconectados:
         conexiones_activas.discard(ws)
 
-
 async def actualizar_chat_dashboard(rol: str, texto: str):
     """Envía mensajes del historial de conversación al Dashboard web."""
     if not conexiones_activas:
@@ -195,10 +192,7 @@ async def actualizar_chat_dashboard(rol: str, texto: str):
 
     for ws in desconectados:
         conexiones_activas.discard(ws)
-
-
 # --- PUENTES MULTIHILO EXTERNOS ---
-
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     global loop_real_servidor
 
@@ -213,7 +207,6 @@ def transmitir_desde_hilo_externo(estado: str, color_hex: str):
             cambiar_estado_esfera(estado, color_hex), loop_real_servidor
         )
 
-
 def transmitir_manipulacion_desde_hilo_externo(rot_x: float, rot_y: float, escala: float = 1.0):
     global loop_real_servidor
 
@@ -227,7 +220,6 @@ def transmitir_manipulacion_desde_hilo_externo(rot_x: float, rot_y: float, escal
         asyncio.run_coroutine_threadsafe(
             actualizar_manipulacion_esfera(rot_x, rot_y, escala), loop_real_servidor
         )
-
 
 def transmitir_chat_desde_hilo_externo(rol: str, texto: str):
     """Puente multihilo para enviar mensajes del chat hacia la interfaz web."""

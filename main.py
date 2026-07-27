@@ -414,7 +414,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_red:
             _hablar_y_mostrar(analizar_red())
             return
-
         # --- ENRUTAMIENTO INTELIGENTE (ORDEN VS CONVERSACIÓN) ---
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
@@ -495,7 +494,6 @@ def main():
         time.sleep(0.1)
 
     encender_sistemas()
-
     try:
         while sistema_activo:
             time.sleep(1)
