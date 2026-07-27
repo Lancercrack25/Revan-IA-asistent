@@ -1,49 +1,70 @@
 let ws = null;
-
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
     conectarWebSocket();
     setupInputEvents();
+    setupModuleNavigation(); // <-- Registro automático de clics para módulos
 });
-
 // --- INICIALIZAR LIBRERÍA DE PARTÍCULAS (PARTICLES.JS) ---
 function initParticles() {
-    particlesJS("particles-js", {
-        particles: {
-            number: { value: 65, density: { enable: true, value_area: 800 } },
-            color: { value: "#00f0ff" },
-            shape: { type: "circle" },
-            opacity: { value: 0.25, random: true },
-            size: { value: 2.5, random: true },
-            line_linked: {
-                enable: true,
-                distance: 140,
-                color: "#00f0ff",
-                opacity: 0.15,
-                width: 1
+    if (typeof particlesJS !== "undefined") {
+        particlesJS("particles-js", {
+            particles: {
+                number: { value: 65, density: { enable: true, value_area: 800 } },
+                color: { value: "#00f0ff" },
+                shape: { type: "circle" },
+                opacity: { value: 0.25, random: true },
+                size: { value: 2.5, random: true },
+                line_linked: {
+                    enable: true,
+                    distance: 140,
+                    color: "#00f0ff",
+                    opacity: 0.15,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 1.2,
+                    direction: "none",
+                    random: true,
+                    out_mode: "out"
+                }
             },
-            move: {
-                enable: true,
-                speed: 1.2,
-                direction: "none",
-                random: true,
-                out_mode: "out"
-            }
-        },
-        interactivity: {
-            detect_on: "canvas",
-            events: {
-                onhover: { enable: true, mode: "grab" },
-                onclick: { enable: true, mode: "push" }
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: { enable: true, mode: "grab" },
+                    onclick: { enable: true, mode: "push" }
+                },
+                modes: {
+                    grab: { distance: 160, line_linked: { opacity: 0.4 } }
+                }
             },
-            modes: {
-                grab: { distance: 160, line_linked: { opacity: 0.4 } }
-            }
-        },
-        retina_detect: true
+            retina_detect: true
+        });
+    }
+}
+// --- REDIRECCIÓN A MÓDULOS DE INFORMACIÓN ---
+function setupModuleNavigation() {
+    const rutasModulos = {
+        "btn-database": "/modulos/databases",
+        "btn-mails": "/modulos/mails",
+        "btn-network": "/modulos/network",
+        "btn-phone": "/modulos/phone",
+        "btn-sounds": "/modulos/sounds",
+        "btn-training": "/modulos/training"
+    };
+
+    Object.keys(rutasModulos).forEach(idElemento => {
+        const elemento = document.getElementById(idElemento);
+        if (elemento) {
+            elemento.style.cursor = "pointer";
+            elemento.addEventListener("click", () => {
+                window.location.href = rutasModulos[idElemento];
+            });
+        }
     });
 }
-
 // --- CONEXIÓN WEBSOCKET Y SINCRONIZACIÓN ---
 function conectarWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -72,7 +93,6 @@ function conectarWebSocket() {
         setTimeout(conectarWebSocket, 3000);
     };
 }
-
 // --- CAMBIO DE VISTAS TÁCTICA / NÚCLEO 3D ---
 function switchView(vista) {
     const vTactico = document.getElementById("view-tactico");
@@ -81,15 +101,15 @@ function switchView(vista) {
     const bEsfera = document.getElementById("btn-esfera");
 
     if (vista === "tactico") {
-        vTactico.classList.add("active");
-        vEsfera.classList.remove("active");
-        bTactico.classList.add("active");
-        bEsfera.classList.remove("active");
+        if (vTactico) vTactico.classList.add("active");
+        if (vEsfera) vEsfera.classList.remove("active");
+        if (bTactico) bTactico.classList.add("active");
+        if (bEsfera) bEsfera.classList.remove("active");
     } else if (vista === "esfera") {
-        vTactico.classList.remove("active");
-        vEsfera.classList.add("active");
-        bTactico.classList.remove("active");
-        bEsfera.classList.add("active");
+        if (vTactico) vTactico.classList.remove("active");
+        if (vEsfera) vEsfera.classList.add("active");
+        if (bTactico) bTactico.classList.remove("active");
+        if (bEsfera) bEsfera.classList.add("active");
 
         const iframe = document.getElementById("iframe-esfera");
         if (iframe && !iframe.src) {
@@ -97,7 +117,6 @@ function switchView(vista) {
         }
     }
 }
-
 // --- ENVÍO DE COMANDOS ---
 function enviarComando() {
     const input = document.getElementById("cmd-input");
@@ -112,7 +131,6 @@ function enviarComando() {
         input.value = "";
     }
 }
-
 function setupInputEvents() {
     const input = document.getElementById("cmd-input");
     if (input) {
@@ -121,7 +139,6 @@ function setupInputEvents() {
         });
     }
 }
-
 function addLog(msg, type = "system") {
     const logBox = document.getElementById("telemetry-log");
     if (logBox) {

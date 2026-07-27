@@ -4,7 +4,6 @@ import time
 import threading
 import subprocess
 import unicodedata
-import pygame
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True

@@ -35,32 +35,64 @@ if os.path.exists(CARPETA_STYLES):
     app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
 
 
+# --- FUNCIÓN AUXILIAR PARA SERVIR HTMLs ---
+
+def servir_html_modulo(nombre_archivo: str):
+    """Carga y retorna un archivo HTML existente en la carpeta web."""
+    ruta_archivo = os.path.join(CARPETA_WEB, nombre_archivo)
+    if os.path.exists(ruta_archivo):
+        with open(ruta_archivo, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(
+        content=f"<h1> Error: {nombre_archivo} no encontrado en src/Interfaces/web</h1>",
+        status_code=404,
+    )
+
+
 # --- RUTAS DE NAVEGACIÓN ---
 
 @app.get("/")
 async def obtener_dashboard():
     """Ruta Principal: Carga el Dashboard Táctico (Command Center)"""
-    ruta_dashboard = os.path.join(CARPETA_WEB, "dashboard.html")
-    if os.path.exists(ruta_dashboard):
-        with open(ruta_dashboard, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(
-        content="<h1> Error: dashboard.html no encontrado en src/Interfaces/web</h1>",
-        status_code=404,
-    )
+    return servir_html_modulo("dashboard.html")
 
 
 @app.get("/esfera")
 async def obtener_index():
     """Ruta secundaria: Carga la esfera 3D dentro del iframe del Dashboard"""
-    ruta_index = os.path.join(CARPETA_WEB, "index.html")
-    if os.path.exists(ruta_index):
-        with open(ruta_index, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(
-        content="<h1> Error: index.html no encontrado en src/Interfaces/web</h1>",
-        status_code=404,
-    )
+    return servir_html_modulo("index.html")
+
+
+# --- RUTAS DE INFORMACIÓN DE MÓDULOS ---
+
+@app.get("/modulos/databases")
+async def info_databases():
+    return servir_html_modulo("info_databases.html")
+
+
+@app.get("/modulos/mails")
+async def info_mails():
+    return servir_html_modulo("info_mails.html")
+
+
+@app.get("/modulos/network")
+async def info_network():
+    return servir_html_modulo("info_network.html")
+
+
+@app.get("/modulos/phone")
+async def info_phone():
+    return servir_html_modulo("info_phone.html")
+
+
+@app.get("/modulos/sounds")
+async def info_sounds():
+    return servir_html_modulo("info_sounds.html")
+
+
+@app.get("/modulos/training")
+async def info_training():
+    return servir_html_modulo("info_training.html")
 
 
 # --- REGISTRO DE MANEJADORES ---
