@@ -445,7 +445,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                         respuesta_final = res_gemini
                 except Exception as err_gemini:
                     print(f"[Gemini Error / Quota Exhausted]: {err_gemini}")
-
             # Intento 2 (Respaldo Automático): NVIDIA NIM si Gemini se agotó por cuota o falló
             if not respuesta_final or not respuesta_final.strip():
                 print("[Enrutador]: Gemini no disponible. Derivando a Cerebro NVIDIA NIM...")
@@ -453,7 +452,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
                 except Exception as err_nim:
                     print(f"[NimClient Error]: {err_nim}")
-
         # Mensaje de contingencia final
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
@@ -466,7 +464,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
 def main():
     global oidos_ia, sistema_activo, titulo
-
     print("[REVAN]: Inicializando infraestructura base...")
     try:
         inicializar_base_datos()
@@ -475,10 +472,8 @@ def main():
 
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
-    
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
-    
     oidos_ia = MicrophoneClient()
 
     print("REVAN en modo pasivo. Esperando señal acústica...")
