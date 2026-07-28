@@ -1,4 +1,3 @@
-#este archivo se encarga de escanear la red local y detectar dispositivos desconocidos conectados
 import os
 import re
 import json
@@ -7,6 +6,15 @@ import subprocess
 import platform
 from concurrent.futures import ThreadPoolExecutor
 
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
+
+def abrir_terminal_intrusos():
+    """Lanza la ventana táctil de comandos net_search_intrusos.bat"""
+    bat_path = os.path.join(SCRIPTS_DIR, "net_search_intrusos.bat")
+    try:
+        subprocess.Popen(f'start cmd /k "{bat_path}"', shell=True)
+    except Exception as e:
+        print(f"[BusquedaIntrusos]: No se pudo abrir la terminal externa: {e}")
 
 def _obtener_ip_local():
     try:
@@ -19,7 +27,7 @@ def _obtener_ip_local():
         return None
 
 def _ping_host(ip: str, timeout_ms: int = 300) -> bool:
-    """Ping silencioso de un solo intento, solo para saber si el host responde."""
+    """Ping silencioso de un solo intento."""
     sistema = platform.system().lower()
     if "windows" in sistema:
         cmd = ["ping", "-n", "1", "-w", str(timeout_ms), ip]
@@ -35,10 +43,8 @@ def _ping_host(ip: str, timeout_ms: int = 300) -> bool:
     except Exception:
         return False
 
-
 def _leer_tabla_arp():
-    """Lee la tabla ARP del sistema (IP <-> MAC de dispositivos con los que
-    esta PC ya intercambió tráfico), usando el comando nativo 'arp -a'."""
+    """Lee la tabla ARP del sistema usando el comando nativo 'arp -a'."""
     dispositivos = []
     try:
         salida = subprocess.run(
@@ -46,8 +52,6 @@ def _leer_tabla_arp():
         ).stdout
 
         for linea in salida.splitlines():
-            # Formato típico de Windows: "  192.168.1.1     00-11-22-33-44-55     dinámico"
-            # Formato típico de Linux/macOS: "? (192.168.1.1) at 00:11:22:33:44:55 ..."
             match_win = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F]{2}[-:][0-9a-fA-F-:]{14,16})", linea)
             if match_win:
                 ip = match_win.group(1)
@@ -59,15 +63,8 @@ def _leer_tabla_arp():
 
     return dispositivos
 
-
 def escanear_red_local(timeout_ms: int = 300, max_hilos: int = 60):
-    """
-    Hace un barrido de ping sobre todo el rango /24 de tu red local (ej.
-    192.168.1.1 al 192.168.1.254) para forzar que los dispositivos activos
-    aparezcan en la tabla ARP, y luego lee esa tabla para obtener sus IP y
-    MAC. Tarda unos segundos (paralelizado con hilos, no secuencial).
-    Devuelve una lista de dicts: [{"ip": ..., "mac": ...}, ...]
-    """
+    """Hace un barrido de ping sobre el rango /24 y retorna la tabla ARP."""
     ip_local = _obtener_ip_local()
     if not ip_local:
         print("[BusquedaIntrusos]: No se pudo determinar la IP local, no se puede escanear.")
@@ -81,16 +78,11 @@ def escanear_red_local(timeout_ms: int = 300, max_hilos: int = 60):
 
     return _leer_tabla_arp()
 
-
 def _ruta_dispositivos_conocidos() -> str:
-    """Ruta al archivo config/dispositivos_conocidos.json, junto a tus
-    otros archivos de configuración (credentials.json, settings.json)."""
     raiz_proyecto = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return os.path.join(raiz_proyecto, "config", "dispositivos_conocidos.json")
 
-
 def cargar_dispositivos_conocidos() -> dict:
-    """Devuelve {mac: nombre_asignado} de los dispositivos ya marcados como conocidos."""
     ruta = _ruta_dispositivos_conocidos()
     if not os.path.exists(ruta):
         return {}
@@ -101,24 +93,16 @@ def cargar_dispositivos_conocidos() -> dict:
         print(f"[BusquedaIntrusos]: Error al leer dispositivos conocidos: {e}")
         return {}
 
-
 def guardar_dispositivos_conocidos(dispositivos: dict):
     ruta = _ruta_dispositivos_conocidos()
     try:
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(dispositivos, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"[BusquedaIntrusos]: Error al guardar dispositivos conocidos: {e}")
 
-
 def marcar_todos_como_conocidos() -> str:
-    """
-    Escanea la red AHORA y guarda todo lo que encuentra como 'conocido'.
-    Pensado para correr una vez al principio (baseline), para que la
-    primera vez que uses detectar_intrusos() no te marque tu propio celular,
-    laptop, smart TV, etc. como 'intrusos' solo por ser la primera vez que
-    se ven.
-    """
     encontrados = escanear_red_local()
     if not encontrados:
         return "No se encontraron dispositivos para guardar, Señor."
@@ -130,13 +114,10 @@ def marcar_todos_como_conocidos() -> str:
 
     return f"Se guardaron {len(encontrados)} dispositivos como conocidos, Señor."
 
-
 def _ruta_carpeta_reportes() -> str:
-    """Carpeta 'Reportes' dentro de src/Network, junto a este mismo archivo."""
     carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reportes")
     os.makedirs(carpeta, exist_ok=True)
     return carpeta
-
 
 def generar_reporte_seguridad(encontrados: list, desconocidos: list) -> str:
     from datetime import datetime
@@ -180,8 +161,10 @@ def generar_reporte_seguridad(encontrados: list, desconocidos: list) -> str:
         print(f"[BusquedaIntrusos]: Error al generar el reporte: {e}")
         return ""
 
+def detectar_intrusos(abrir_terminal: bool = True) -> str:
+    if abrir_terminal:
+        abrir_terminal_intrusos()
 
-def detectar_intrusos() -> str:
     conocidos = cargar_dispositivos_conocidos()
 
     if not conocidos:
@@ -211,7 +194,6 @@ def detectar_intrusos() -> str:
         texto += f" Generé un reporte detallado: {nombre_reporte}."
 
     return texto
-
 
 if __name__ == "__main__":
     print("Escaneando red local...")

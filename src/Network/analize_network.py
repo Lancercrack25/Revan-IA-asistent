@@ -1,7 +1,11 @@
-#este archivo se encargara de realizar un analisis de la red y obtener informacion relevante sobre la misma
 import socket
 import psutil
 import requests
+import os
+import subprocess
+
+# Ruta absoluta a la carpeta de scripts .bat
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
 
 def hay_conexion_internet(timeout: float = 3.0) -> bool:
     try:
@@ -39,8 +43,7 @@ def obtener_ip_publica():
         return None
 
 def obtener_estadisticas_trafico():
-    """Bytes enviados/recibidos por todas las interfaces desde que arrancó el sistema
-    (no desde que arrancó REVAN, es un contador acumulado del propio sistema operativo)."""
+    """Bytes enviados/recibidos por todas las interfaces desde que arrancó el sistema."""
     try:
         io = psutil.net_io_counters()
         return {
@@ -50,10 +53,8 @@ def obtener_estadisticas_trafico():
     except Exception:
         return None
 
-
 def listar_interfaces_red():
-    """Lista las interfaces de red disponibles (Wi-Fi, Ethernet, etc.) y si están activas.
-    Pensado para depuración en consola, no para hablarse en voz alta (puede ser largo)."""
+    """Lista las interfaces de red disponibles (Wi-Fi, Ethernet, etc.) y si están activas."""
     try:
         interfaces = {}
         direcciones = psutil.net_if_addrs()
@@ -67,6 +68,23 @@ def listar_interfaces_red():
         print(f"[Red]: Error al listar interfaces: {e}")
         return {}
 
+def abrir_terminal_ping(target: str = "8.8.8.8") -> str:
+    """Ejecuta el script net_ping.bat en una terminal externa."""
+    bat_path = os.path.join(SCRIPTS_DIR, "net_ping.bat")
+    try:
+        subprocess.Popen(f'start cmd /k "{bat_path} {target}"', shell=True)
+        return f"Desplegando diagnóstico de Ping hacia {target}."
+    except Exception as e:
+        return f"Error al abrir la terminal de Ping: {e}"
+
+def abrir_terminal_scan() -> str:
+    """Ejecuta el script net_scan.bat en una terminal externa."""
+    bat_path = os.path.join(SCRIPTS_DIR, "net_scan.bat")
+    try:
+        subprocess.Popen(f'start cmd /k "{bat_path}"', shell=True)
+        return "Desplegando escaneo de sockets y puertos en terminal externa."
+    except Exception as e:
+        return f"Error al abrir la terminal de escaneo: {e}"
 
 def analizar_red() -> str:
     if not hay_conexion_internet():
@@ -91,7 +109,7 @@ def analizar_red() -> str:
         )
 
     return " ".join(partes)
-#aqui se ejecuta la logica de este modulo 
+
 if __name__ == "__main__":
     print(analizar_red())
     print(listar_interfaces_red())

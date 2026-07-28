@@ -8,6 +8,7 @@ import unicodedata
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
+# --- CORE E INFRAESTRUCTURA ---
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
@@ -19,12 +20,18 @@ from src.Interfaces.servidor import (
 )
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
+from src.Core.Gemini_client import GeminiClient
+
+# --- MÓDULO CÁMARA Y CONTROL DE ESFERA ---
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
-from src.Network.analize_network import analizar_red
+
+# --- MÓDULO DE RED Y DIAGNÓSTICOS ---
+from src.Network.analize_network import analizar_red, abrir_terminal_ping, abrir_terminal_scan
 from src.Network.velocidad_latencia import probar_velocidad_con_navegador, reportar_latencia
 from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
-from src.Core.Gemini_client import GeminiClient
+
+# --- MÓDULO TELÉFONO / WHATSAPP ---
 from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_envio_inteligente, cancelar_envio_pendiente
 
 # --- INSTANCIAS Y CONTROLES GLOBALES ---
@@ -288,7 +295,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     try:
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
-            "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda","que pedo"
+            "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
         ]
         if orden_limpia_sin_acentos.strip().rstrip("?") in saludos_basicos:
             print("[Escudo Local]: Saludo común detectado. Respondiendo localmente sin gastar tokens.")
@@ -370,18 +377,23 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
 
-        # --- INTERCEPTOR DE CONSULTAS DE RED ---
+        # --- INTERCEPTOR DE CONSULTAS Y COMANDOS DE RED ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
-        es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or "ping" in palabras_lista
+        es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
+        
+        es_ping_terminal = "ping" in palabras_lista and any(p in orden_limpia_sin_acentos for p in ["terminal", "cmd", "consola", "haz"])
+        es_escaneo_puertos = any(p in orden_limpia_sin_acentos for p in ["escaneo de puertos", "escanear puertos", "puertos abiertos", "ver conexiones", "netstat"])
+
         es_consulta_intrusos = any(p in orden_limpia_sin_acentos for p in [
             "intruso", "intrusos", "quien esta conectado",
             "dispositivos conectados", "estoy seguro", "es segura mi red",
             "seguridad de mi red", "mi red es segura",
         ])
         es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
+        
         es_consulta_red = (
-            not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos)
+            not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
             and ("red" in palabras_lista or "ip" in palabras_lista or
                  any(p in orden_limpia_sin_acentos for p in ["internet", "conexion"]))
         )
@@ -397,6 +409,16 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             _hablar_y_mostrar(reportar_latencia())
             return
 
+        if es_ping_terminal:
+            partes_ping = orden_limpia.split("ping")
+            target = partes_ping[-1].replace("a", "").strip() if len(partes_ping) > 1 and partes_ping[-1].strip() else "8.8.8.8"
+            _hablar_y_mostrar(abrir_terminal_ping(target))
+            return
+
+        if es_escaneo_puertos:
+            _hablar_y_mostrar(abrir_terminal_scan())
+            return
+
         if es_marcar_conocidos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red...")
@@ -407,13 +429,14 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_intrusos:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
-            resultado_intrusos = detectar_intrusos()
+            resultado_intrusos = detectar_intrusos(abrir_terminal=True)
             _hablar_y_mostrar(resultado_intrusos)
             return
 
         if es_consulta_red:
             _hablar_y_mostrar(analizar_red())
             return
+
         # --- ENRUTAMIENTO INTELIGENTE (ORDEN VS CONVERSACIÓN) ---
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
@@ -445,13 +468,14 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                         respuesta_final = res_gemini
                 except Exception as err_gemini:
                     print(f"[Gemini Error / Quota Exhausted]: {err_gemini}")
-            # Intento 2 (Respaldo Automático): NVIDIA NIM si Gemini se agotó por cuota o falló
+            # Intento 2 (Respaldo Automático): NVIDIA NIM
             if not respuesta_final or not respuesta_final.strip():
                 print("[Enrutador]: Gemini no disponible. Derivando a Cerebro NVIDIA NIM...")
                 try:
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
                 except Exception as err_nim:
                     print(f"[NimClient Error]: {err_nim}")
+
         # Mensaje de contingencia final
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
