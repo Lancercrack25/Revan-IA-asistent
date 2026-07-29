@@ -7,7 +7,6 @@ from email import encoders
 import os
 from src.Emails.account_conection import obtener_servicio_gmail
 
-
 def leer_ultimos_correos(max_resultados: int = 5) -> list:
     """Obtiene un resumen de los últimos correos no leídos."""
     try:
@@ -46,7 +45,6 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str
         mensaje = MIMEMultipart()
         mensaje['to'] = destinatario
         mensaje['subject'] = asunto
-
         mensaje.attach(MIMEText(cuerpo, 'plain'))
 
         # Adjuntar archivo si existe (ej. reporte del Inspector)
@@ -67,7 +65,6 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str
     except Exception as e:
         print(f"[EMAIL CONTROL]: Error al enviar correo -> {e}")
         return False
-
 
 if __name__ == "__main__":
     print("Prueba de lectura de correos...")

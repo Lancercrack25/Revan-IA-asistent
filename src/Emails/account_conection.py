@@ -11,12 +11,10 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/calendar'
 ]
-
 # Rutas de credenciales
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
-
 
 def obtener_credenciales():
     """Maneja el flujo de autenticación OAuth2 y devuelve las credenciales activas."""
@@ -40,21 +38,17 @@ def obtener_credenciales():
         # Guardar token para futuras sesiones
         with open(TOKEN_PATH, 'w', encoding='utf-8') as token_file:
             token_file.write(creds.to_json())
-
     return creds
-
 
 def obtener_servicio_gmail():
     """Devuelve el cliente construido para la API de Gmail."""
     creds = obtener_credenciales()
     return build('gmail', 'v1', credentials=creds)
 
-
 def obtener_servicio_calendar():
     """Devuelve el cliente construido para la API de Google Calendar."""
     creds = obtener_credenciales()
     return build('calendar', 'v3', credentials=creds)
-
 
 if __name__ == "__main__":
     print("[GOOGLE CONNECTION]: Verificando autenticación...")
