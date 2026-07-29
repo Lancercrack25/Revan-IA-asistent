@@ -3,17 +3,27 @@ import sys
 import shutil
 import subprocess
 import time
+import base64
 import psutil
 import cv2
 
 sys.dont_write_bytecode = True
 
+# Cliente OpenAI para los endpoints de NVIDIA NIM
 try:
-    import ollama
+    from openai import OpenAI
 except ImportError:
-    print("La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
+    OpenAI = None
+
+# Cliente de Gemini como respaldo opcional
+try:
+    from google import genai
+except ImportError:
+    genai = None
 
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
+from src.Core.Config_loader import cargar_credenciales
+
 
 def obtener_ruta_escritorio() -> str:
     """Detecta de forma inteligente la ruta real del Escritorio, con o sin OneDrive."""
@@ -26,6 +36,7 @@ def obtener_ruta_escritorio() -> str:
     elif os.path.exists(ruta_onedrive_en):
         return ruta_onedrive_en
     return ruta_normal
+
 
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
@@ -105,6 +116,7 @@ def obtener_ruta_actual() -> str:
     finally:
         liberar_conexion(conn)
 
+
 def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     """
     Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
@@ -161,7 +173,6 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     elif os.path.isabs(ruta_base):
         ruta_padre = ruta_base
     else:
-        # Ruta relativa desconocida: la tratamos como subcarpeta del Escritorio
         ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
 
     ruta_final = os.path.join(ruta_padre, nombre_nueva_carpeta)
@@ -210,58 +221,94 @@ def obtener_diagnostico_hardware() -> str:
         return f"Error al leer sensores de rendimiento: {e}"
 
 
+# --- MÓDULO DE VISIÓN NATIVE API (NVIDIA NIM / GEMINI FALLBACK) ---
 def _analizar_frame_con_llava(frame) -> str:
-    ruta_foto_temp = "temp_vision.jpg"
-    cv2.imwrite(ruta_foto_temp, frame)
-
     try:
-        print(" [REVAN Vision]: Procesando análisis visual con LLaVA...")
-
-        t0 = time.time()
-        respuesta = ollama.chat(
-            model='llava',
-            messages=[{
-                'role': 'user',
-                'content': 'Describe brevemente en español y en una sola frase qué ves en esta imagen frente a la cámara.',
-                'images': [ruta_foto_temp]
-            }]
+        creds = cargar_credenciales() or {}
+        
+        # Detectar la clave de NVIDIA considerando tu nombre en el config ("NVIDIA_NIM_API_KEY")
+        nvidia_key = (
+            creds.get("NVIDIA_NIM_API_KEY") 
+            or creds.get("NVIDIA_API_KEY") 
+            or os.getenv("NVIDIA_NIM_API_KEY") 
+            or os.getenv("NVIDIA_API_KEY")
         )
-        t_llava = time.time() - t0
+        
+        gemini_key = creds.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-        total_ns = respuesta.get("total_duration")
-        if total_ns is not None:
-            print(f"[LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
+        # 1. Codificar el frame a Base64 JPEG en memoria
+        _, buffer = cv2.imencode('.jpg', frame)
+        base64_image = base64.b64encode(buffer).decode('utf-8')
+        
+        prompt_texto = "Describe brevemente en español y en una sola frase ejecutiva qué ves en esta imagen frente a la cámara."
+
+        # INTENTO 1: NVIDIA NIM API (Llama 3.2 11B Vision)
+        if nvidia_key and OpenAI:
+            print(" [REVAN Vision]: Procesando análisis con NVIDIA NIM API (Llama 3.2 Vision)...")
+            client = OpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=nvidia_key
+            )
+
+            response = client.chat.completions.create(
+                model="meta/llama-3.2-11b-vision-instruct",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_texto},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=150,
+                temperature=0.2
+            )
+            analisis = response.choices[0].message.content.strip()
+            print(f" [Análisis NVIDIA]: {analisis}")
+            return f"Según mi sensor óptico: {analisis}"
+
+        # INTENTO 2: GEMINI API (Fallback si falla NVIDIA)
+        elif gemini_key and genai:
+            print(" [REVAN Vision]: Procesando análisis con Gemini API...")
+            client = genai.Client(api_key=gemini_key)
+            imagen_data = {
+                "mime_type": "image/jpeg",
+                "data": buffer.tobytes()
+            }
+            respuesta = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[prompt_texto, imagen_data]
+            )
+            analisis = respuesta.text.strip()
+            print(f" [Análisis Gemini]: {analisis}")
+            return f"Según mi sensor óptico: {analisis}"
+
         else:
-            print(f"[LLaVA] Medido en Python: {t_llava:.2f}s")
-
-        if os.path.exists(ruta_foto_temp):
-            os.remove(ruta_foto_temp)
-
-        analisis = respuesta['message']['content'].strip()
-        print(f" [Análisis]: {analisis}")
-        return f"Según mi sensor óptico: {analisis}"
+            return "No se detectaron claves válidas para NVIDIA_NIM_API_KEY o GEMINI_API_KEY en la configuración."
 
     except Exception as e:
-        if os.path.exists(ruta_foto_temp):
-            os.remove(ruta_foto_temp)
-        print(f" Error en el módulo de visión: {e}")
-        return "Tuve un problema al procesar la visión. Asegúrate de tener instalado el modelo 'llava' en Ollama ejecutando: ollama run llava"
-
+        print(f" Error en el módulo de visión API: {e}")
+        return f"Error al procesar la imagen con el servicio de visión: {e}"
 
 def analizar_entorno_vision() -> str:
-    """Captura un fotograma de la webcam (abre y cierra la cámara) y lo analiza con LLaVA."""
+    """Captura un fotograma de la webcam (abre y cierra la cámara) y lo analiza con la API."""
     print("[REVAN Vision]: Activando sensor óptico...")
 
-    # Usar CAP_DSHOW en Windows para apertura instantánea del driver
+    # Usar CAP_DSHOW en Windows para apertura instantánea
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)
 
     if not cap.isOpened():
         return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
 
     ret, frame = cap.read()
-    cap.release()  # Liberar el dispositivo inmediatamente
+    cap.release()
 
     if not ret or frame is None:
         return "Error al capturar la imagen de la cámara."
-
     return _analizar_frame_con_llava(frame)

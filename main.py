@@ -8,7 +8,6 @@ import unicodedata
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
-# --- CORE E INFRAESTRUCTURA ---
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
@@ -21,17 +20,11 @@ from src.Interfaces.servidor import (
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Core.Gemini_client import GeminiClient
-
-# --- MÓDULO CÁMARA Y CONTROL DE ESFERA ---
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
-
-# --- MÓDULO DE RED Y DIAGNÓSTICOS ---
 from src.Network.analize_network import analizar_red, abrir_terminal_ping, abrir_terminal_scan
 from src.Network.velocidad_latencia import probar_velocidad_con_navegador, reportar_latencia
 from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
-
-# --- MÓDULO TELÉFONO / WHATSAPP ---
 from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_envio_inteligente, cancelar_envio_pendiente
 
 # --- INSTANCIAS Y CONTROLES GLOBALES ---
@@ -55,7 +48,6 @@ PALABRAS_CLAVE_ACCION = [
 ]
 
 def quitar_acentos(texto: str) -> str:
-    """Elimina acentos y tildes para evitar fallos de coincidencia por STT."""
     if not texto:
         return ""
     return ''.join(
@@ -64,7 +56,6 @@ def quitar_acentos(texto: str) -> str:
     )
 
 def es_intencion_de_comando(texto: str) -> bool:
-    """Clasificación local ultrarrápida que consume 0 tokens de la API."""
     texto_sin_acentos = quitar_acentos(texto.lower())
     es_orden = any(palabra in texto_sin_acentos for palabra in PALABRAS_CLAVE_ACCION)
     
@@ -169,7 +160,6 @@ def encender_sistemas():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
 
         threading.Thread(target=saludo_inicial, daemon=True).start()
-
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
 
@@ -302,13 +292,11 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             _hablar_y_mostrar(f"Sistemas nominales y en línea, {titulo}. ¿En qué puedo ayudarle hoy?")
             return
 
-        # --- INTERCEPTOR DE APAGADO ---
         palabras_desconexion = ["desconectar", "desconectate", "apagar", "apagate", "cerrar programa", "adios revan", "desconexion"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
 
-        # --- INTERCEPTOR MÓDULO TELÉFONO / WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
@@ -339,7 +327,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
-        # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
@@ -356,8 +343,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("No había ninguna vigilancia activa, Señor.")
             return
-
-        # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
+        
         raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
 
@@ -377,14 +363,11 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
 
-        # --- INTERCEPTOR DE CONSULTAS Y COMANDOS DE RED ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
-        
         es_ping_terminal = "ping" in palabras_lista and any(p in orden_limpia_sin_acentos for p in ["terminal", "cmd", "consola", "haz"])
         es_escaneo_puertos = any(p in orden_limpia_sin_acentos for p in ["escaneo de puertos", "escanear puertos", "puertos abiertos", "ver conexiones", "netstat"])
-
         es_consulta_intrusos = any(p in orden_limpia_sin_acentos for p in [
             "intruso", "intrusos", "quien esta conectado",
             "dispositivos conectados", "estoy seguro", "es segura mi red",
@@ -436,8 +419,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_red:
             _hablar_y_mostrar(analizar_red())
             return
-
-        # --- ENRUTAMIENTO INTELIGENTE (ORDEN VS CONVERSACIÓN) ---
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
@@ -460,7 +441,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     print(f"[NimClient Error]: {err_nim}")
         else:
             print("[Enrutador]: Intención -> CONVERSACIÓN FLUIDA")
-            # Intento 1: Google Gemini
             if gemini_ia:
                 try:
                     res_gemini = gemini_ia.generar_respuesta(orden_limpia)
@@ -468,15 +448,13 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                         respuesta_final = res_gemini
                 except Exception as err_gemini:
                     print(f"[Gemini Error / Quota Exhausted]: {err_gemini}")
-            # Intento 2 (Respaldo Automático): NVIDIA NIM
+
             if not respuesta_final or not respuesta_final.strip():
                 print("[Enrutador]: Gemini no disponible. Derivando a Cerebro NVIDIA NIM...")
                 try:
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
                 except Exception as err_nim:
                     print(f"[NimClient Error]: {err_nim}")
-
-        # Mensaje de contingencia final
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
 
