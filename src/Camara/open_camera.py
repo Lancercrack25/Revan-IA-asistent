@@ -19,6 +19,9 @@ class RevanCameraManager:
         self.cooldown_seg = 10.0
         self.intervalo_seg = 1.5
         self.ultimo_analisis = 0.0
+        # --- ESTADO HUD Y RESULTADOS VISUALES ---
+        self.ultimo_resultado_txt = ""
+        self.tiempo_mostrar_resultado = 0.0  # Timestamp para ocultar la tarjeta tras 8s
 
     def _porcentaje_cambio(self, frame_a, frame_b) -> float:
         """Aritmética ligera en OpenCV para detectar movimiento sin consumir IA."""
@@ -47,6 +50,62 @@ class RevanCameraManager:
         self._thread_camera.start()
         return True
 
+    def _dibujar_hud_tactico(self, frame) -> cv2.Mat:
+        """Renderiza elementos cibernéticos en el video sin alterar la imagen original."""
+        hud = frame.copy()
+        h, w, _ = frame.shape
+        color_hud = (0, 255, 136) if self.vigilancia_activa else (255, 230, 0)  # BGR
+        long = 35
+        grosor = 2
+        pad = 20
+        # Top-Left
+        cv2.line(hud, (pad, pad), (pad + long, pad), color_hud, grosor)
+        cv2.line(hud, (pad, pad), (pad, pad + long), color_hud, grosor)
+        # Top-Right
+        cv2.line(hud, (w - pad, pad), (w - pad - long, pad), color_hud, grosor)
+        cv2.line(hud, (w - pad, pad), (w - pad, pad + long), color_hud, grosor)
+        # Bottom-Left
+        cv2.line(hud, (pad, h - pad), (pad + long, h - pad), color_hud, grosor)
+        cv2.line(hud, (pad, h - pad), (pad, h - pad - long), color_hud, grosor)
+        # Bottom-Right
+        cv2.line(hud, (w - pad, h - pad), (w - pad - long, h - pad), color_hud, grosor)
+        cv2.line(hud, (w - pad, h - pad), (w - pad, h - pad - long), color_hud, grosor)
+
+        # 2. BANNER DE ESTADO SUPERIOR
+        estado_txt = "MODO VIGILANCIA [ACTIVO]" if self.vigilancia_activa else "VISION DIRECTA"
+        cv2.rectangle(hud, (pad, pad), (320, pad + 30), (15, 15, 15), -1)
+        cv2.rectangle(hud, (pad, pad), (320, pad + 30), color_hud, 1)
+        cv2.putText(hud, f"REVAN // {estado_txt}", (pad + 10, pad + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color_hud, 1)
+
+        cv2.circle(hud, (w - pad - 10, pad + 10), 6, color_hud, -1)
+
+        if self.ultimo_resultado_txt and (time.time() - self.tiempo_mostrar_resultado < 8.0):
+            overlay = hud.copy()
+            caja_y1 = h - 110
+            caja_y2 = h - pad
+
+            # Caja de vidrio oscuro
+            cv2.rectangle(overlay, (pad, caja_y1), (w - pad, caja_y2), (10, 10, 15), -1)
+            cv2.rectangle(overlay, (pad, caja_y1), (w - pad, caja_y2), (0, 255, 136), 1)
+
+            # Título del reporte
+            cv2.putText(overlay, "INFORME VISUAL // NVIDIA NIM & GEMINI API", (pad + 15, caja_y1 + 25),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 136), 1)
+
+            # Texto del reporte
+            texto_clean = self.ultimo_resultado_txt.replace("Según mi sensor óptico: ", "")
+            if len(texto_clean) > 85:
+                texto_clean = texto_clean[:82] + "..."
+
+            cv2.putText(overlay, texto_clean, (pad + 15, caja_y1 + 55),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+
+            # Fusionar capa con transparencia
+            cv2.addWeighted(overlay, 0.85, hud, 0.15, 0, hud)
+
+        return hud
+
     def _bucle_principal(self, voz_ia=None, sincronizar_estado_esfera=None):
         self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if not self.cap.isOpened():
@@ -70,7 +129,10 @@ class RevanCameraManager:
 
             with self.lock:
                 self.current_frame = frame.copy()
+
             ahora = time.time()
+
+            # Lógica de Vigilancia
             if self.vigilancia_activa and (ahora - ultimo_chequeo_vigilancia >= self.intervalo_seg):
                 ultimo_chequeo_vigilancia = ahora
                 
@@ -79,10 +141,9 @@ class RevanCameraManager:
                     en_cooldown = (ahora - self.ultimo_analisis) < self.cooldown_seg
 
                     if cambio >= self.sensibilidad_pct and not en_cooldown:
-                        print(f"[Vigilancia]: Cambio detectado ({cambio:.1f}%). Consultando a LLaVA...")
+                        print(f"[Vigilancia]: Cambio detectado ({cambio:.1f}%). Consultando visión API...")
                         self.ultimo_analisis = ahora
 
-                        # Disparar análisis de LLaVA en un hilo separado para NO congelar el video en vivo
                         threading.Thread(
                             target=self._ejecutar_analisis_llava,
                             args=(frame.copy(), voz_ia, sincronizar_estado_esfera),
@@ -90,16 +151,10 @@ class RevanCameraManager:
                         ).start()
 
                 self.frame_referencia = frame.copy()
-            hud_frame = frame.copy()
-            estado_txt = "MODO VIGILANCIA: ACTIVO" if self.vigilancia_activa else "VISION DIRECTA"
-            color_badge = (0, 255, 136) if self.vigilancia_activa else (255, 240, 0)
 
-            # Capas visuales del HUD
-            cv2.putText(hud_frame, f"REVAN // {estado_txt}", (20, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_badge, 2)
-            cv2.circle(hud_frame, (frame.shape[1] - 30, 30), 8, color_badge, -1)
-
-            cv2.imshow("REVAN - CAMERA & VISION CENTER", hud_frame)
+            # RENDERIZAR HUD CIBERNÉTICO
+            frame_hud = self._dibujar_hud_tactico(frame)
+            cv2.imshow("REVAN - CAMERA & VISION CENTER", frame_hud)
 
             # Salida manual con tecla ESC o 'q'
             if cv2.waitKey(1) & 0xFF in (ord('q'), 27):
@@ -108,11 +163,16 @@ class RevanCameraManager:
         self.cerrar_camara()
 
     def _ejecutar_analisis_llava(self, frame, voz_ia, sincronizar_estado_esfera):
-        """Ejecuta LLaVA y gestiona los estados de la interfaz/voz."""
+        """Ejecuta la visión por API y actualiza la tarjeta gráfica del HUD."""
         if sincronizar_estado_esfera:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         resultado = _analizar_frame_con_llava(frame)
+
+        # Actualizar datos para el HUD
+        with self.lock:
+            self.ultimo_resultado_txt = resultado
+            self.tiempo_mostrar_resultado = time.time()
 
         if sincronizar_estado_esfera:
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
@@ -134,7 +194,6 @@ class RevanCameraManager:
                 return "No hay señal de cámara activa."
             snapshot = self.current_frame.copy()
 
-        # Ejecuta LLaVA bajo demanda
         threading.Thread(
             target=self._ejecutar_analisis_llava,
             args=(snapshot, voz_ia, sincronizar_estado_esfera),
@@ -153,10 +212,6 @@ class RevanCameraManager:
 
 # Instancia Global del Módulo
 revan_cam = RevanCameraManager()
-
-# ==============================================================================
-# FUNCIONES ENVOLVENTES (WRAPPERS) PARA COMPATIBILIDAD DIRECTA CON MAIN.PY
-# ==============================================================================
 
 def iniciar_vigilancia(voz_ia=None, sincronizar_estado_esfera=None) -> bool:
     """Abre la cámara si no está activa y habilita el modo vigilancia."""
@@ -181,7 +236,7 @@ def vigilancia_activa() -> bool:
     return revan_cam.vigilancia_activa or revan_cam.is_running
 
 def analizar_que_ve_camara(voz_ia=None, sincronizar_estado_esfera=None) -> str:
-    """Abre la cámara si está apagada y ejecuta la visión LLaVA instantánea."""
+    """Abre la cámara si está apagada y ejecuta la visión instantánea."""
     if not revan_cam.is_running:
         revan_cam.abrir_camara(voz_ia=voz_ia, sincronizar_estado_esfera=sincronizar_estado_esfera)
         time.sleep(0.8)
