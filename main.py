@@ -7,7 +7,7 @@ import unicodedata
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
+# --- IMPORTS DEL CORE Y SERVICIOS ---
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
@@ -26,7 +26,9 @@ from src.Network.analize_network import analizar_red, abrir_terminal_ping, abrir
 from src.Network.velocidad_latencia import probar_velocidad_con_navegador, reportar_latencia
 from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
 from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_envio_inteligente, cancelar_envio_pendiente
-
+from src.Emails.email_control import (leer_ultimos_correos, contar_correos_sin_leer,preparar_borrador_correo, confirmar_envio_correo, cancelar_borrador_correo)
+from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
+from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
 # --- INSTANCIAS Y CONTROLES GLOBALES ---
 cerebro_ia = None
 gemini_ia = None
@@ -34,7 +36,7 @@ voz_ia = None
 oidos_ia = None
 titulo = "Señor"
 sistema_activo = False
-esta_hablando = False  # Previene interrupciones visuales de la esfera mientras REVAN habla
+esta_hablando = False
 ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
@@ -44,7 +46,8 @@ PALABRAS_CLAVE_ACCION = [
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
     "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
     "corre", "prende", "enciende", "investiga", "recuerda", "guarda", "analiza",
-    "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar"
+    "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar",
+    "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -283,6 +286,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         ultima_interaccion = time.time()
 
     try:
+        # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
             "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
@@ -292,11 +296,115 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             _hablar_y_mostrar(f"Sistemas nominales y en línea, {titulo}. ¿En qué puedo ayudarle hoy?")
             return
 
+        # --- 2. DESCONEXIÓN ---
         palabras_desconexion = ["desconectar", "desconectate", "apagar", "apagate", "cerrar programa", "adios revan", "desconexion"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
+        es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
+        es_consulta_correo = not es_conteo_correo and any(p in orden_limpia_sin_acentos for p in ["leer correo", "revisar correo", "mis correos", "ver correos", "buzon"])
+        es_redaccion_asistida = any(p in orden_limpia_sin_acentos for p in ["ayudame a redactar", "redacta un correo", "escribe un correo", "haz un correo"])
+        es_envio_directo = not es_redaccion_asistida and any(p in orden_limpia_sin_acentos for p in ["enviar correo", "manda un correo", "mandar correo", "envia un correo", "manda correo", "envia correo"])
 
+        # Confirmación / Cancelación
+        es_confirmar_mail = any(p in orden_limpia_sin_acentos for p in ["confirma el correo", "envia el correo", "confirmo correo"])
+        es_cancelar_mail = any(p in orden_limpia_sin_acentos for p in ["cancela el correo", "descarta el correo"])
+
+        if es_confirmar_mail:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            _hablar_y_mostrar(confirmar_envio_correo())
+            return
+
+        if es_cancelar_mail:
+            _hablar_y_mostrar(cancelar_borrador_correo())
+            return
+
+        if es_conteo_correo:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            cantidad = contar_correos_sin_leer()
+            if cantidad >= 0:
+                _hablar_y_mostrar(f"Tiene {cantidad} correos sin leer en su buzón de entrada, {titulo}.")
+            else:
+                _hablar_y_mostrar("No pude verificar la cantidad de correos sin leer. Revise sus credenciales de acceso.")
+            return
+
+        if es_consulta_correo:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            hablar_en_hilo_seguro(f"Revisando su buzón de entrada, {titulo}...")
+            resumenes = leer_ultimos_correos(max_resultados=3)
+            _hablar_y_mostrar("Señor, " + " ".join(resumenes))
+            return
+
+        if es_redaccion_asistida:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            prompt_redaccion = f"Redacta un correo profesional basado en esta solicitud del usuario: '{orden_limpia}'. Devuelve únicamente el asunto y el cuerpo del mensaje bien formateados."
+            
+            cuerpo_generado = cerebro_ia.generar_respuesta(prompt_redaccion) if cerebro_ia else "No fue posible generar la redacción automáticamente."
+            
+            destinatario = "correo_por_defecto@ejemplo.com"
+            if " a " in orden_limpia:
+                partes = orden_limpia.split(" a ", 1)
+                destinatario = partes[1].split()[0].strip()
+
+            respuesta_preparada = preparar_borrador_correo(destinatario, "Notificación Generada por REVAN", cuerpo_generado)
+            _hablar_y_mostrar(respuesta_preparada)
+            return
+
+        if es_envio_directo:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            try:
+                partes_a = orden_limpia.split(" a ", 1)
+                if len(partes_a) > 1:
+                    resto = partes_a[1]
+                    partes_asunto = resto.split(" con asunto ", 1)
+                    destinatario = partes_asunto[0].strip()
+
+                    if len(partes_asunto) > 1:
+                        partes_mensaje = partes_asunto[1].split(" y mensaje ", 1)
+                        asunto = partes_mensaje[0].strip()
+                        cuerpo = partes_mensaje[1].strip() if len(partes_mensaje) > 1 else "Mensaje enviado desde REVAN Assistant."
+                    else:
+                        asunto = "Notificación de REVAN Assistant"
+                        cuerpo = "Mensaje sin cuerpo especificado."
+
+                    respuesta_preparada = preparar_borrador_correo(destinatario, asunto, cuerpo)
+                    _hablar_y_mostrar(respuesta_preparada)
+                    return
+                else:
+                    _hablar_y_mostrar("Indíqueme el correo con el formato: envía un correo a 'destinatario' con asunto 'tema' y mensaje 'texto'.")
+                    return
+            except Exception as err_mail:
+                print(f"[Email Error]: {err_mail}")
+
+        es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
+        es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
+
+        if es_consulta_agenda:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            resumen_agenda = consultar_agenda_hoy()
+            _hablar_y_mostrar(resumen_agenda)
+            return
+
+        if es_crear_evento:
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            fecha_iso = parsear_fecha_natural(orden_limpia_sin_acentos)
+            
+            titulo_evento = "Compromiso Agendado"
+            for disparador in ["agendar", "agenda", "recuerdame", "crea un evento"]:
+                if disparador in orden_limpia_sin_acentos:
+                    partes = orden_limpia.split(disparador, 1)
+                    if len(partes) > 1 and partes[1].strip():
+                        titulo_evento = partes[1].strip().capitalize()
+                    break
+
+            resultado_agendado = agendar_evento(
+                titulo=titulo_evento,
+                fecha_hora_str=fecha_iso,
+                duracion_minutos=60
+            )
+            _hablar_y_mostrar(resultado_agendado)
+            return
+        # --- 5. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
@@ -327,6 +435,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
+        # --- 6. MÓDULO CÁMARA Y VISIÓN ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
@@ -343,7 +452,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("No había ninguna vigilancia activa, Señor.")
             return
-        
         raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
 
@@ -362,7 +470,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-
+        # --- 7. MÓDULO RED Y DIAGNÓSTICO ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
@@ -419,6 +527,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_red:
             _hablar_y_mostrar(analizar_red())
             return
+        # --- 8. PROCESAMIENTO GENERAL DE IA (ORQUESTADOR / GEMINI / NIM) ---
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
@@ -455,6 +564,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
                 except Exception as err_nim:
                     print(f"[NimClient Error]: {err_nim}")
+
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
 

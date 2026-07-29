@@ -1,113 +1,156 @@
-import os
-import json
 import smtplib
 import imaplib
 import email
+from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 
-def _cargar_credenciales() -> tuple[str, str]:
-    """Busca y carga EMAIL_USER y EMAIL_PASSWORD desde el archivo JSON de configuración."""
-    # Buscar el archivo json en la raíz del proyecto o en la carpeta config
-    posibles_rutas = [
-        os.path.join(os.path.dirname(__file__), "..", "..", "config.json"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "keys.json"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "config", "keys.json"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "config", "config.json"),
-    ]
+# Importación del cargador de credenciales del proyecto
+from src.Core.Config_loader import cargar_credenciales
 
-    for ruta in posibles_rutas:
-        if os.path.exists(ruta):
-            try:
-                with open(ruta, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    user = data.get("EMAIL_USER") or data.get("EMAIL") or data.get("REVAN_EMAIL_USER")
-                    password = data.get("EMAIL_PASSWORD") or data.get("EMAIL_PASS") or data.get("REVAN_EMAIL_PASS")
-                    if user and password:
-                        return user, password
-            except Exception as e:
-                print(f"[EMAIL CONFIG ERROR]: Error al leer {ruta} -> {e}")
+# Variable global en memoria para pausar envíos hasta confirmación explícita
+borrador_correo_pendiente = None
 
-    # Si no se encuentra en JSON, intenta desde variables de entorno del sistema
-    user_env = os.getenv("EMAIL_USER")
-    pass_env = os.getenv("EMAIL_PASSWORD")
-    return user_env or "", pass_env or ""
 
-EMAIL_USER, EMAIL_PASS = _cargar_credenciales()
-
-def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str = None) -> bool:
-    """Envía un correo electrónico mediante el servidor SMTP de Google."""
-    if not EMAIL_USER or not EMAIL_PASS:
-        print("[EMAIL CONTROL]: Error -> No se encontraron EMAIL_USER o EMAIL_PASSWORD en el JSON de configuración.")
-        return False
-
+def enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
+    """Envía un correo electrónico mediante SMTP usando las credenciales cargadas."""
     try:
+        credenciales = cargar_credenciales() or {}
+        remitente = credenciales.get("EMAIL_USER", "")
+        password = credenciales.get("EMAIL_PASSWORD", "")
+
+        if not remitente or not password:
+            print("[Email Error]: Falta EMAIL_USER o EMAIL_PASSWORD en las credenciales/configuración.")
+            return False
+
         msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
+        msg['From'] = remitente
         msg['To'] = destinatario
         msg['Subject'] = asunto
-        msg.attach(MIMEText(cuerpo, 'plain'))
+        msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
 
-        # Adjuntar archivo si existe (ej. la gráfica del Inspector)
-        if ruta_adjunto and os.path.exists(ruta_adjunto):
-            with open(ruta_adjunto, 'rb') as adj:
-                parte = MIMEBase('application', 'octet-stream')
-                parte.set_payload(adj.read())
-                encoders.encode_base64(parte)
-                parte.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(ruta_adjunto)}"')
-                msg.attach(parte)
-
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, destinatario, msg.as_string())
+        # Configuración por defecto para servidores SMTP SSL/TLS (ej. Gmail)
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(remitente, password)
+        server.send_message(msg)
         server.quit()
 
-        print(f"[EMAIL CONTROL]: Correo enviado con éxito a {destinatario}.")
+        print(f"[Email]: Correo enviado con éxito a {destinatario}")
         return True
-
     except Exception as e:
-        print(f"[EMAIL CONTROL ERROR]: Fallo al enviar correo -> {e}")
+        print(f"[Email Error]: Falló el envío del correo: {e}")
         return False
 
-def leer_ultimos_correos(max_resultados: int = 3) -> list:
-    """Lee los últimos mensajes no leídos vía IMAP."""
-    if not EMAIL_USER or not EMAIL_PASS:
-        return ["Error: Credenciales de correo no encontradas en la configuración."]
 
+def contar_correos_sin_leer() -> int:
+    """Conecta por IMAP y devuelve la cantidad exacta de correos NO leídos (UNSEEN)."""
     try:
-        mail = imaplib.IMAP4_SSL('imap.gmail.com')
-        mail.login(EMAIL_USER, EMAIL_PASS)
-        mail.select('inbox')
+        credenciales = cargar_credenciales() or {}
+        usuario = credenciales.get("EMAIL_USER", "")
+        password = credenciales.get("EMAIL_PASSWORD", "")
 
-        # Buscar correos sin leer
-        _, status_data = mail.search(None, 'UNSEEN')
-        id_list = status_data[0].split()
+        if not usuario or not password:
+            return -1
 
-        if not id_list:
-            return ["Señor, no tiene correos nuevos sin leer."]
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(usuario, password)
+        mail.select("inbox")
 
-        resumenes = []
-        for num in id_list[-max_resultados:]:
-            _, data = mail.fetch(num, '(RFC822)')
-            raw_email = data[0][1]
-            msg = email.message_from_bytes(raw_email)
-
-            asunto = msg.get('Subject', 'Sin Asunto')
-            remitente = msg.get('From', 'Desconocido')
-            resumenes.append(f"De: {remitente} | Asunto: {asunto}")
+        status, response = mail.search(None, 'UNSEEN')
+        if status == 'OK':
+            unread_ids = response[0].split()
+            mail.logout()
+            return len(unread_ids)
 
         mail.logout()
+        return 0
+    except Exception as e:
+        print(f"[IMAP Error - Contar]: {e}")
+        return -1
+
+
+def leer_ultimos_correos(max_resultados: int = 3) -> list:
+    """Lee el remitente y asunto de los últimos correos recibidos."""
+    resumenes = []
+    try:
+        credenciales = cargar_credenciales() or {}
+        usuario = credenciales.get("EMAIL_USER", "")
+        password = credenciales.get("EMAIL_PASSWORD", "")
+
+        if not usuario or not password:
+            return ["No se encontraron las credenciales configuradas para consultar el correo."]
+
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(usuario, password)
+        mail.select("inbox")
+
+        status, response = mail.search(None, 'ALL')
+        if status == 'OK':
+            ids = response[0].split()
+            ultimos_ids = ids[-max_resultados:]
+
+            for msg_id in reversed(ultimos_ids):
+                _, msg_data = mail.fetch(msg_id, '(RFC822)')
+                for response_part in msg_data:
+                    if isinstance(response_part, tuple):
+                        msg = email.message_from_bytes(response_part[1])
+                        
+                        # Decodificación del asunto
+                        subject, encoding = decode_header(msg["Subject"])[0]
+                        if isinstance(subject, bytes):
+                            subject = subject.decode(encoding if encoding else "utf-8", errors="ignore")
+                        
+                        from_ = msg.get("From", "Desconocido")
+                        resumenes.append(f"De {from_} con asunto: {subject}.")
+
+        mail.logout()
+        if not resumenes:
+            return ["No tiene correos recientes en su bandeja."]
         return resumenes
 
     except Exception as e:
-        print(f"[EMAIL CONTROL ERROR]: Fallo al leer buzón -> {e}")
-        return [f"Error de conexión: {e}"]
+        print(f"[IMAP Error - Leer]: {e}")
+        return ["Hubo un problema al intentar conectar con el servidor de correo."]
 
-if __name__ == "__main__":
-    print("Probando módulo de correo...")
-    print("Usuario detectado:", EMAIL_USER if EMAIL_USER else "No detectado")
-    correos = leer_ultimos_correos()
-    for c in correos:
-        print("-", c)
+
+# =========================================================================
+# 🛡️ CAPA DE SEGURIDAD Y CONFIRMACIÓN EN 2 PASOS
+# =========================================================================
+
+def preparar_borrador_correo(destinatario: str, asunto: str, cuerpo: str) -> str:
+    """Almacena temporalmente los datos del correo sin realizar el envío."""
+    global borrador_correo_pendiente
+    borrador_correo_pendiente = {
+        "destinatario": destinatario,
+        "asunto": asunto,
+        "cuerpo": cuerpo
+    }
+    return f"Tengo listo el borrador para {destinatario}, con asunto '{asunto}'. El contenido es: '{cuerpo}'. ¿Desea que proceda con el envío, Señor?"
+
+
+def confirmar_envio_correo() -> str:
+    """Ejecuta el envío definitivo del borrador almacenado tras la orden explícita."""
+    global borrador_correo_pendiente
+    if not borrador_correo_pendiente:
+        return "No hay ningún borrador de correo pendiente por enviar, Señor."
+
+    datos = borrador_correo_pendiente
+    exito = enviar_correo(datos["destinatario"], datos["asunto"], datos["cuerpo"])
+    
+    # Limpieza del borrador tras procesar la orden
+    borrador_correo_pendiente = None 
+
+    if exito:
+        return f"Correo entregado exitosamente a {datos['destinatario']}."
+    else:
+        return "No se pudo entregar el correo. Por favor revise la conexión o sus credenciales."
+
+
+def cancelar_borrador_correo() -> str:
+    """Elimina el borrador en espera de confirmación."""
+    global borrador_correo_pendiente
+    if borrador_correo_pendiente:
+        borrador_correo_pendiente = None
+        return "Borrador de correo cancelado y descartado."
+    return "No había ningún correo pendiente por cancelar."
