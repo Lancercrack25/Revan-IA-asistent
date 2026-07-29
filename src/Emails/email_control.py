@@ -1,73 +1,118 @@
-#se encargara de gestionar y controlar los corrreos auqney se nececita seguridad lo mas importante.,n
-import base64
+import os
+import json
+import smtplib
+import imaplib
+import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-import os
-from src.Emails.account_conection import obtener_servicio_gmail
 
-def leer_ultimos_correos(max_resultados: int = 5) -> list:
-    """Obtiene un resumen de los últimos correos no leídos."""
-    try:
-        service = obtener_servicio_gmail()
-        results = service.users().messages().list(
-            userId='me', q='is:unread', maxResults=max_resultados
-        ).execute()
-        
-        messages = results.get('messages', [])
-        lista_resumen = []
+def _cargar_credenciales() -> tuple[str, str]:
+    """Busca y carga EMAIL_USER y EMAIL_PASSWORD desde el archivo JSON de configuración."""
+    # Buscar el archivo json en la raíz del proyecto o en la carpeta config
+    posibles_rutas = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "config.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "keys.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "config", "keys.json"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "config", "config.json"),
+    ]
 
-        if not messages:
-            return ["No tienes correos nuevos sin leer."]
+    for ruta in posibles_rutas:
+        if os.path.exists(ruta):
+            try:
+                with open(ruta, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    user = data.get("EMAIL_USER") or data.get("EMAIL") or data.get("REVAN_EMAIL_USER")
+                    password = data.get("EMAIL_PASSWORD") or data.get("EMAIL_PASS") or data.get("REVAN_EMAIL_PASS")
+                    if user and password:
+                        return user, password
+            except Exception as e:
+                print(f"[EMAIL CONFIG ERROR]: Error al leer {ruta} -> {e}")
 
-        for msg in messages:
-            txt = service.users().messages().get(userId='me', id=msg['id']).execute()
-            headers = txt['payload']['headers']
-            
-            asunto = next((h['value'] for h in headers if h['name'].lower() == 'subject'), "Sin Asunto")
-            remitente = next((h['value'] for h in headers if h['name'].lower() == 'from'), "Desconocido")
-            snippet = txt.get('snippet', '')
+    # Si no se encuentra en JSON, intenta desde variables de entorno del sistema
+    user_env = os.getenv("EMAIL_USER")
+    pass_env = os.getenv("EMAIL_PASSWORD")
+    return user_env or "", pass_env or ""
 
-            lista_resumen.append(f"De: {remitente} | Asunto: {asunto} | Resumen: {snippet[:80]}...")
 
-        return lista_resumen
-
-    except Exception as e:
-        print(f"[EMAIL CONTROL]: Error al leer correos -> {e}")
-        return [f"Error al conectar con Gmail: {e}"]
+EMAIL_USER, EMAIL_PASS = _cargar_credenciales()
 
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str = None) -> bool:
-    """Envía un correo electrónico con soporte para archivos adjuntos."""
-    try:
-        service = obtener_servicio_gmail()
-        mensaje = MIMEMultipart()
-        mensaje['to'] = destinatario
-        mensaje['subject'] = asunto
-        mensaje.attach(MIMEText(cuerpo, 'plain'))
+    """Envía un correo electrónico mediante el servidor SMTP de Google."""
+    if not EMAIL_USER or not EMAIL_PASS:
+        print("[EMAIL CONTROL]: Error -> No se encontraron EMAIL_USER o EMAIL_PASSWORD en el JSON de configuración.")
+        return False
 
-        # Adjuntar archivo si existe (ej. reporte del Inspector)
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = destinatario
+        msg['Subject'] = asunto
+        msg.attach(MIMEText(cuerpo, 'plain'))
+
+        # Adjuntar archivo si existe (ej. la gráfica del Inspector)
         if ruta_adjunto and os.path.exists(ruta_adjunto):
             with open(ruta_adjunto, 'rb') as adj:
                 parte = MIMEBase('application', 'octet-stream')
                 parte.set_payload(adj.read())
                 encoders.encode_base64(parte)
                 parte.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(ruta_adjunto)}"')
-                mensaje.attach(parte)
+                msg.attach(parte)
 
-        raw_message = base64.urlsafe_b64encode(mensaje.as_bytes()).decode('utf-8')
-        service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
-        
-        print(f"[EMAIL CONTROL]: Correo enviado exitosamente a {destinatario}.")
+        # Conexión SSL por puerto 465
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, destinatario, msg.as_string())
+        server.quit()
+
+        print(f"[EMAIL CONTROL]: Correo enviado con éxito a {destinatario}.")
         return True
 
     except Exception as e:
-        print(f"[EMAIL CONTROL]: Error al enviar correo -> {e}")
+        print(f"[EMAIL CONTROL ERROR]: Fallo al enviar correo -> {e}")
         return False
 
+
+def leer_ultimos_correos(max_resultados: int = 3) -> list:
+    """Lee los últimos mensajes no leídos vía IMAP."""
+    if not EMAIL_USER or not EMAIL_PASS:
+        return ["Error: Credenciales de correo no encontradas en la configuración."]
+
+    try:
+        mail = imaplib.IMAP4_SSL('imap.gmail.com')
+        mail.login(EMAIL_USER, EMAIL_PASS)
+        mail.select('inbox')
+
+        # Buscar correos sin leer
+        _, status_data = mail.search(None, 'UNSEEN')
+        id_list = status_data[0].split()
+
+        if not id_list:
+            return ["Señor, no tiene correos nuevos sin leer."]
+
+        resumenes = []
+        for num in id_list[-max_resultados:]:
+            _, data = mail.fetch(num, '(RFC822)')
+            raw_email = data[0][1]
+            msg = email.message_from_bytes(raw_email)
+
+            asunto = msg.get('Subject', 'Sin Asunto')
+            remitente = msg.get('From', 'Desconocido')
+            resumenes.append(f"De: {remitente} | Asunto: {asunto}")
+
+        mail.logout()
+        return resumenes
+
+    except Exception as e:
+        print(f"[EMAIL CONTROL ERROR]: Fallo al leer buzón -> {e}")
+        return [f"Error de conexión: {e}"]
+
+
 if __name__ == "__main__":
-    print("Prueba de lectura de correos...")
-    correos = leer_ultimos_correos(3)
+    print("Probando módulo de correo...")
+    print("Usuario detectado:", EMAIL_USER if EMAIL_USER else "No detectado")
+    correos = leer_ultimos_correos()
     for c in correos:
         print("-", c)

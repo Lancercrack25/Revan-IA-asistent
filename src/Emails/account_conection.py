@@ -1,59 +1,68 @@
-#se encarga de conectarse a la cuenta de ggogle con una api y asi poder proceder con lo demas.
 import os
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+import json
 
-# Permisos requeridos para Gmail y Google Calendar
-SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/calendar'
-]
-# Rutas de credenciales
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
-TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
 
-def obtener_credenciales():
-    """Maneja el flujo de autenticación OAuth2 y devuelve las credenciales activas."""
-    creds = None
+def cargar_configuracion_json() -> dict:
+    """
+    Busca y carga las credenciales desde el archivo de configuración JSON 
+    en las rutas más comunes del proyecto REVAN.
+    """
+    # Rutas donde REVAN buscará tu archivo de claves
+    posibles_rutas = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "keys.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config", "config.json")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config", "keys.json")),
+    ]
 
-    if os.path.exists(TOKEN_PATH):
-        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+    for ruta in posibles_rutas:
+        if os.path.exists(ruta):
+            try:
+                with open(ruta, 'r', encoding='utf-8') as f:
+                    datos = json.load(f)
+                    print(f"[ACCOUNT CONNECTION]: Configuración cargada desde -> {os.path.basename(ruta)}")
+                    return datos
+            except Exception as e:
+                print(f"[ACCOUNT CONNECTION ERROR]: Error al leer {ruta} -> {e}")
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not os.path.exists(CREDENTIALS_PATH):
-                raise FileNotFoundError(
-                    f"Falta el archivo 'credentials.json' en {BASE_DIR}. "
-                    "Descárgalo desde Google Cloud Console."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
+    print("[ACCOUNT CONNECTION WARNING]: No se encontró ningún archivo JSON de configuración válido.")
+    return {}
 
-        # Guardar token para futuras sesiones
-        with open(TOKEN_PATH, 'w', encoding='utf-8') as token_file:
-            token_file.write(creds.to_json())
-    return creds
 
-def obtener_servicio_gmail():
-    """Devuelve el cliente construido para la API de Gmail."""
-    creds = obtener_credenciales()
-    return build('gmail', 'v1', credentials=creds)
+def obtener_credenciales_email() -> tuple[str, str]:
+    """
+    Extrae la cuenta de correo y la contraseña de aplicación de 16 caracteres.
+    Retorna: (EMAIL_USER, EMAIL_PASSWORD)
+    """
+    config = cargar_configuracion_json()
 
-def obtener_servicio_calendar():
-    """Devuelve el cliente construido para la API de Google Calendar."""
-    creds = obtener_credenciales()
-    return build('calendar', 'v3', credentials=creds)
+    # Soporta varios nombres de llaves comunes por si cambiaste la etiqueta en el JSON
+    user = (
+        config.get("EMAIL_USER") 
+        or config.get("EMAIL") 
+        or config.get("REVAN_EMAIL_USER") 
+        or os.getenv("EMAIL_USER", "")
+    )
+    
+    password = (
+        config.get("EMAIL_PASSWORD") 
+        or config.get("EMAIL_PASS") 
+        or config.get("REVAN_EMAIL_PASS") 
+        or os.getenv("EMAIL_PASSWORD", "")
+    )
+
+    return user, password
+
 
 if __name__ == "__main__":
-    print("[GOOGLE CONNECTION]: Verificando autenticación...")
-    try:
-        credenciales = obtener_credenciales()
-        print("[GOOGLE CONNECTION]: Autenticación exitosa y token activo.")
-    except Exception as e:
-        print(f"[GOOGLE CONNECTION]: Error -> {e}")
+    print("[GOOGLE CONNECTION]: Comprobando lectura de credenciales desde el JSON...")
+    usuario, clave = obtener_credenciales_email()
+
+    if usuario and clave:
+        # Muestra los primeros 3 caracteres por seguridad
+        clave_oculta = clave[:3] + "*" * (len(clave) - 3)
+        print(f"[GOOGLE CONNECTION]: ✅ Credenciales detectadas con éxito.")
+        print(f" -> Usuario: {usuario}")
+        print(f" -> Clave: {clave_oculta}")
+    else:
+        print("[GOOGLE CONNECTION]: ❌ No se pudieron cargar las credenciales. Revisa tu archivo JSON porfavor.")

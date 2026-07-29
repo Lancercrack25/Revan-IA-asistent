@@ -1,72 +1,89 @@
+import os
+import json
 from datetime import datetime, timedelta
-from src.Emails.account_conection import obtener_servicio_calendar
+
+# Ruta de almacenamiento local de eventos
+DATABASE_DIR = os.path.join(os.path.dirname(__file__), "..", "Database")
+AGENDA_PATH = os.path.join(DATABASE_DIR, "agenda.json")
 
 
-def agendar_evento(titulo: str, fecha_inicio_iso: str, duracion_minutos: int = 60, descripcion: str = "") -> str:
+def _cargar_agenda() -> list:
+    """Carga los eventos guardados en la base de datos local."""
+    if not os.path.exists(DATABASE_DIR):
+        os.makedirs(DATABASE_DIR, exist_ok=True)
+
+    if os.path.exists(AGENDA_PATH):
+        try:
+            with open(AGENDA_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[AGENDA ERROR]: Error al leer archivo de agenda -> {e}")
+
+    return []
+
+
+def _guardar_agenda(eventos: list) -> bool:
+    """Guarda la lista de eventos en el archivo JSON."""
+    try:
+        if not os.path.exists(DATABASE_DIR):
+            os.makedirs(DATABASE_DIR, exist_ok=True)
+
+        with open(AGENDA_PATH, 'w', encoding='utf-8') as f:
+            json.dump(eventos, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"[AGENDA ERROR]: Error al guardar evento -> {e}")
+        return False
+
+
+def agendar_evento(titulo: str, fecha_hora_str: str, duracion_minutos: int = 60, descripcion: str = "") -> str:
     """
-    Agenda un evento en Google Calendar.
-    `fecha_inicio_iso` debe venir en formato ISO (ej: '2026-07-29T16:00:00').
+    Agenda un nuevo evento.
+    `fecha_hora_str` acepta formatos como 'YYYY-MM-DD HH:MM' (ej: '2026-07-30 16:00').
     """
     try:
-        service = obtener_servicio_calendar()
-        
-        inicio_dt = datetime.fromisoformat(fecha_inicio_iso)
-        fin_dt = inicio_dt + timedelta(minutes=duracion_minutos)
+        dt_inicio = datetime.strptime(fecha_hora_str, "%Y-%m-%d %H:%M")
+        dt_fin = dt_inicio + timedelta(minutes=duracion_minutos)
 
-        evento = {
-            'summary': titulo,
-            'description': descripcion or 'Agendado automáticamente por REVAN AI',
-            'start': {
-                'dateTime': inicio_dt.isoformat(),
-                'timeZone': 'America/Mexico_City',  # Ajusta según tu zona horaria
-            },
-            'end': {
-                'dateTime': fin_dt.isoformat(),
-                'timeZone': 'America/Mexico_City',
-            },
+        nuevo_evento = {
+            "id": int(datetime.now().timestamp()),
+            "titulo": titulo,
+            "inicio": dt_inicio.strftime("%Y-%m-%d %H:%M"),
+            "fin": dt_fin.strftime("%Y-%m-%d %H:%M"),
+            "descripcion": descripcion or "Agendado por REVAN Assistant"
         }
 
-        evento_creado = service.events().insert(calendarId='primary', body=evento).execute()
-        link = evento_creado.get('htmlLink')
-        print(f"[CALENDAR]: Evento '{titulo}' agendado con éxito. Link: {link}")
-        return f"Evento '{titulo}' agendado para el {inicio_dt.strftime('%d/%m/%Y a las %H:%M')}."
+        eventos = _cargar_agenda()
+        eventos.append(nuevo_evento)
 
+        if _guardar_agenda(eventos):
+            return f"Señor, he agendado '{titulo}' para el {dt_inicio.strftime('%d/%m/%Y a las %H:%M')}."
+        return "No se pudo guardar el evento en la base de datos."
+
+    except ValueError:
+        return "Formato de fecha inválido. Use el formato 'YYYY-MM-DD HH:MM' (ej: 2026-07-30 15:30)."
     except Exception as e:
-        print(f"[CALENDAR]: Error al agendar evento -> {e}")
-        return f"No se pudo agendar el evento debido a un error: {e}"
+        return f"Error al agendar evento: {e}"
 
 
 def consultar_agenda_hoy() -> str:
-    """Consulta los eventos agendados para el día de hoy."""
-    try:
-        service = obtener_servicio_calendar()
-        ahora = datetime.utcnow()
-        inicio_dia = ahora.replace(hour=0, minute=0, second=0).isoformat() + 'Z'
-        fin_dia = ahora.replace(hour=23, minute=59, second=59).isoformat() + 'Z'
+    """Muestra los eventos programados para la fecha actual."""
+    eventos = _cargar_agenda()
+    hoy_str = datetime.now().strftime("%Y-%m-%d")
 
-        events_result = service.events().list(
-            calendarId='primary', timeMin=inicio_dia, timeMax=fin_dia,
-            singleEvents=True, orderBy='startTime'
-        ).execute()
+    eventos_hoy = [e for e in eventos if e["inicio"].startswith(hoy_str)]
 
-        eventos = events_result.get('items', [])
+    if not eventos_hoy:
+        return "Señor, no tiene ningún evento agendado para hoy."
 
-        if not eventos:
-            return "No tienes ningún evento agendado para hoy."
+    respuesta = "Sus eventos agendados para hoy son:\n"
+    for ev in eventos_hoy:
+        hora = ev["inicio"].split(" ")[1]
+        respuesta += f"• {ev['titulo']} a las {hora}\n"
 
-        resumen = "Tus eventos para hoy son:\n"
-        for event in eventos:
-            inicio = event['start'].get('dateTime', event['start'].get('date'))
-            hora = datetime.fromisoformat(inicio).strftime('%H:%M')
-            resumen += f"- {event['summary']} a las {hora}\n"
-
-        return resumen
-
-    except Exception as e:
-        print(f"[CALENDAR]: Error al consultar la agenda -> {e}")
-        return "Hubo un error al intentar consultar tu agenda."
+    return respuesta
 
 
 if __name__ == "__main__":
-    print("Prueba de consulta de agenda...")
+    print("Prueba de agenda local...")
     print(consultar_agenda_hoy())
