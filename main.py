@@ -7,16 +7,14 @@ import unicodedata
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
+
 # --- IMPORTS DEL CORE Y SERVICIOS ---
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Automation.System_commands import desplegar_monitores_windows
-from src.Interfaces.servidor import (
-    iniciar_servidor_ui, transmitir_desde_hilo_externo,
-    transmitir_chat_desde_hilo_externo, registrar_manejador_comando_texto,
-)
+from src.Interfaces.servidor import (iniciar_servidor_ui, transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo, registrar_manejador_comando_texto,)
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Core.Gemini_client import GeminiClient
@@ -115,7 +113,6 @@ def apagar_sistema():
     sys.exit(0)
 
 def encender_sistemas():
-    """Secuencia de despliegue cronológico exclusivo Web."""
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, titulo, sistema_activo, esta_hablando
     sistema_activo = True
 
@@ -132,13 +129,10 @@ def encender_sistemas():
     try:
         credenciales = cargar_credenciales() or {}
         api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
-
         cerebro_ia = NimClient(api_key=api_key_nim)
         gemini_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
-
         sincronizar_chat_dashboard("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
-
         time.sleep(0.2)
 
         try:
@@ -296,17 +290,21 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             _hablar_y_mostrar(f"Sistemas nominales y en línea, {titulo}. ¿En qué puedo ayudarle hoy?")
             return
 
-        # --- 2. DESCONEXIÓN ---
         palabras_desconexion = ["desconectar", "desconectate", "apagar", "apagate", "cerrar programa", "adios revan", "desconexion"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
-        es_consulta_correo = not es_conteo_correo and any(p in orden_limpia_sin_acentos for p in ["leer correo", "revisar correo", "mis correos", "ver correos", "buzon"])
+        es_consulta_correo = not es_conteo_correo and any(
+            p in orden_limpia_sin_acentos for p in [
+                "leer correo", "revisar correo", "mis correos", "ver correos", 
+                "buzon", "ultimos correos", "cuales son los correos", "cuales son los ultimos correos",
+                "que correos tengo", "mis ultimos correos"
+            ]
+        )
+        
         es_redaccion_asistida = any(p in orden_limpia_sin_acentos for p in ["ayudame a redactar", "redacta un correo", "escribe un correo", "haz un correo"])
         es_envio_directo = not es_redaccion_asistida and any(p in orden_limpia_sin_acentos for p in ["enviar correo", "manda un correo", "mandar correo", "envia un correo", "manda correo", "envia correo"])
-
-        # Confirmación / Cancelación
         es_confirmar_mail = any(p in orden_limpia_sin_acentos for p in ["confirma el correo", "envia el correo", "confirmo correo"])
         es_cancelar_mail = any(p in orden_limpia_sin_acentos for p in ["cancela el correo", "descarta el correo"])
 
@@ -375,7 +373,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_mail:
                 print(f"[Email Error]: {err_mail}")
-
         es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
         es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
 
@@ -404,7 +401,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             )
             _hablar_y_mostrar(resultado_agendado)
             return
-        # --- 5. MÓDULO WHATSAPP ---
+
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
@@ -452,6 +449,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("No había ninguna vigilancia activa, Señor.")
             return
+        
         raices_control = ["control", "manipul", "mueve", "mover"]
         palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
 
@@ -470,6 +468,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
+
         # --- 7. MÓDULO RED Y DIAGNÓSTICO ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
@@ -527,7 +526,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_red:
             _hablar_y_mostrar(analizar_red())
             return
-        # --- 8. PROCESAMIENTO GENERAL DE IA (ORQUESTADOR / GEMINI / NIM) ---
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
