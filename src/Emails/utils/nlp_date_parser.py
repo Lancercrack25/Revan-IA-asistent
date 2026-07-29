@@ -15,7 +15,6 @@ def parsear_fecha_natural(texto: str) -> str:
 
     hora = 10  # Hora por defecto (10:00 AM) si no especifica
     minuto = 0
-
     # Buscar patrón de horas con am/pm (ej: 4 pm, 4:30 pm)
     match_ampm = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)', texto)
     if match_ampm:
@@ -35,7 +34,6 @@ def parsear_fecha_natural(texto: str) -> str:
         if match_24h:
             hora = int(match_24h.group(1))
             minuto = int(match_24h.group(2))
-
     # Construir objeto datetime completo
     dt_resultado = datetime(
         year=fecha_base.year,
