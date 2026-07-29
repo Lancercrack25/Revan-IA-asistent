@@ -35,9 +35,7 @@ def _cargar_credenciales() -> tuple[str, str]:
     pass_env = os.getenv("EMAIL_PASSWORD")
     return user_env or "", pass_env or ""
 
-
 EMAIL_USER, EMAIL_PASS = _cargar_credenciales()
-
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str = None) -> bool:
     """Envía un correo electrónico mediante el servidor SMTP de Google."""
@@ -61,7 +59,6 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str
                 parte.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(ruta_adjunto)}"')
                 msg.attach(parte)
 
-        # Conexión SSL por puerto 465
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(EMAIL_USER, EMAIL_PASS)
         server.sendmail(EMAIL_USER, destinatario, msg.as_string())
@@ -73,7 +70,6 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str, ruta_adjunto: str
     except Exception as e:
         print(f"[EMAIL CONTROL ERROR]: Fallo al enviar correo -> {e}")
         return False
-
 
 def leer_ultimos_correos(max_resultados: int = 3) -> list:
     """Lee los últimos mensajes no leídos vía IMAP."""
@@ -108,7 +104,6 @@ def leer_ultimos_correos(max_resultados: int = 3) -> list:
     except Exception as e:
         print(f"[EMAIL CONTROL ERROR]: Fallo al leer buzón -> {e}")
         return [f"Error de conexión: {e}"]
-
 
 if __name__ == "__main__":
     print("Probando módulo de correo...")

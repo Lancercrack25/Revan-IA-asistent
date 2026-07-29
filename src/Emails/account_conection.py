@@ -28,7 +28,6 @@ def cargar_configuracion_json() -> dict:
     print("[ACCOUNT CONNECTION WARNING]: No se encontró ningún archivo JSON de configuración válido.")
     return {}
 
-
 def obtener_credenciales_email() -> tuple[str, str]:
     """
     Extrae la cuenta de correo y la contraseña de aplicación de 16 caracteres.
@@ -52,8 +51,6 @@ def obtener_credenciales_email() -> tuple[str, str]:
     )
 
     return user, password
-
-
 if __name__ == "__main__":
     print("[GOOGLE CONNECTION]: Comprobando lectura de credenciales desde el JSON...")
     usuario, clave = obtener_credenciales_email()

@@ -45,7 +45,6 @@ def parsear_fecha_natural(texto: str) -> str:
 
     return dt_resultado.strftime("%Y-%m-%d %H:%M")
 
-
 if __name__ == "__main__":
     print("🧪 Probando parser de lenguaje natural...")
     

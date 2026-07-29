@@ -1,11 +1,9 @@
 import os
 import json
 from datetime import datetime, timedelta
-
 # Ruta de almacenamiento local de eventos
 DATABASE_DIR = os.path.join(os.path.dirname(__file__), "..", "Database")
 AGENDA_PATH = os.path.join(DATABASE_DIR, "agenda.json")
-
 
 def _cargar_agenda() -> list:
     """Carga los eventos guardados en la base de datos local."""
@@ -21,7 +19,6 @@ def _cargar_agenda() -> list:
 
     return []
 
-
 def _guardar_agenda(eventos: list) -> bool:
     """Guarda la lista de eventos en el archivo JSON."""
     try:
@@ -35,12 +32,7 @@ def _guardar_agenda(eventos: list) -> bool:
         print(f"[AGENDA ERROR]: Error al guardar evento -> {e}")
         return False
 
-
 def agendar_evento(titulo: str, fecha_hora_str: str, duracion_minutos: int = 60, descripcion: str = "") -> str:
-    """
-    Agenda un nuevo evento.
-    `fecha_hora_str` acepta formatos como 'YYYY-MM-DD HH:MM' (ej: '2026-07-30 16:00').
-    """
     try:
         dt_inicio = datetime.strptime(fecha_hora_str, "%Y-%m-%d %H:%M")
         dt_fin = dt_inicio + timedelta(minutes=duracion_minutos)
@@ -65,7 +57,6 @@ def agendar_evento(titulo: str, fecha_hora_str: str, duracion_minutos: int = 60,
     except Exception as e:
         return f"Error al agendar evento: {e}"
 
-
 def consultar_agenda_hoy() -> str:
     """Muestra los eventos programados para la fecha actual."""
     eventos = _cargar_agenda()
@@ -80,9 +71,7 @@ def consultar_agenda_hoy() -> str:
     for ev in eventos_hoy:
         hora = ev["inicio"].split(" ")[1]
         respuesta += f"• {ev['titulo']} a las {hora}\n"
-
     return respuesta
-
 
 if __name__ == "__main__":
     print("Prueba de agenda local...")
