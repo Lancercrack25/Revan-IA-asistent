@@ -10,9 +10,7 @@ except Exception:
     import winsound
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 def _play_audio(ruta_archivo: str):
-    """Ejecuta el archivo de audio en segundo plano en un canal independiente."""
     if not os.path.exists(ruta_archivo):
         return
     try:
@@ -35,4 +33,4 @@ def reproducir_sfx(categoria: str, nombre_efecto: str):
     if os.path.exists(target):
         threading.Thread(target=_play_audio, args=(target,), daemon=True).start()
     else:
-        print(f"[SFX Info]: No se encontró audio en '{categoria}/{nombre_efecto}'")
+        print(f"[SFX Info]: No se encontró el audio en '{categoria}/{nombre_efecto}'")
