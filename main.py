@@ -27,6 +27,7 @@ from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_env
 from src.Emails.email_control import (leer_ultimos_correos, contar_correos_sin_leer,preparar_borrador_correo, confirmar_envio_correo, cancelar_borrador_correo)
 from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
 from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
+from src.Sounds.sounds_main import reproducir_sfx
 # --- INSTANCIAS Y CONTROLES GLOBALES ---
 cerebro_ia = None
 gemini_ia = None
@@ -141,6 +142,7 @@ def encender_sistemas():
                 shell=True
             )
             print("[2/2] Núcleo Web Desplegado (Esfera 3D + Dashboard).")
+            reproducir_sfx("welcome", "Bienvenida")
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
 
@@ -151,7 +153,7 @@ def encender_sistemas():
             esta_hablando = True
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if voz_ia:
-                voz_ia.hablar(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
+                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea, módulos y agentes sincronizados.un honor estar de vuelta listo para ejecutar sus nuevas ideas {titulo}")
             time.sleep(0.3)
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
