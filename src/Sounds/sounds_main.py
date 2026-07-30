@@ -1,6 +1,5 @@
 import os
 import threading
-
 HAS_PYGAME = False
 try:
     import pygame
@@ -24,10 +23,8 @@ def _play_audio(ruta_archivo: str):
 
 def reproducir_sfx(categoria: str, nombre_efecto: str):
     carpeta_destino = os.path.join(BASE_DIR, categoria)
-    
     ruta_wav = os.path.join(carpeta_destino, f"{nombre_efecto}.wav")
     ruta_mp3 = os.path.join(carpeta_destino, f"{nombre_efecto}.mp3")
-
     target = ruta_wav if os.path.exists(ruta_wav) else ruta_mp3
 
     if os.path.exists(target):

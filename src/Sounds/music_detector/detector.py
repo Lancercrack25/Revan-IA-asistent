@@ -22,11 +22,9 @@ async def _reconocer(ruta_wav: str):
 def identificar_y_abrir_cancion() -> str:
     try:
         archivo = capturar_audio_ambiente(segundos=6)
-        
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         res = loop.run_until_complete(_reconocer(archivo))
-
         # Borrar temporal después de procesar
         if os.path.exists(archivo):
             os.remove(archivo)

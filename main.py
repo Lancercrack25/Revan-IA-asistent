@@ -153,7 +153,7 @@ def encender_sistemas():
             esta_hablando = True
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if voz_ia:
-                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea, módulos y agentes sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?")
+                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,los módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?")
             time.sleep(0.3)
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -173,7 +173,6 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def procesar_ciclo_voz():
-    """Captura audio, aplica el filtro de palabra de activación y delega la orden."""
     global oidos_ia, ultima_interaccion, esta_hablando
     try:
         if esta_hablando:
@@ -587,7 +586,6 @@ def main():
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
     oidos_ia = MicrophoneClient()
-
     print("REVAN en modo pasivo. Esperando señal acústica...")
     while True:
         try:
