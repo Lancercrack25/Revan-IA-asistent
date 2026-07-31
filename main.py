@@ -61,9 +61,9 @@ def es_intencion_de_comando(texto: str) -> bool:
     es_orden = any(palabra in texto_sin_acentos for palabra in PALABRAS_CLAVE_ACCION)
     
     if es_orden:
-        print("[Clasificador Intents]: Clasificado localmente -> ORDEN")
+        print("Clasificado localmente -> ORDEN")
     else:
-        print("[Clasificador Intents]: Clasificado localmente -> CONVERSACIÓN")
+        print("Clasificado localmente -> CONVERSACIÓN")
         
     return es_orden
 
@@ -491,7 +491,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "seguridad de mi red", "mi red es segura",
         ])
         es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
-        
         es_consulta_red = (
             not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
             and ("red" in palabras_lista or "ip" in palabras_lista or
