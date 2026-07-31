@@ -302,11 +302,16 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "como se llama esta cancion", "identifica esta cancion", "que cancion suena"
         ]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
-            reproducir_sfx("modules", "Sonidos")  # 👈 Reproduce tu SFX 'Sonidos'
+            reproducir_sfx("modules", "Sonidos")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             
-            # Aquí conectarás la lógica del escuchador / reconocedor (e.g. Shazam/AudD API)
-            _hablar_y_mostrar(f"Escuchando el entorno para identificar la canción, {titulo}. Un momento...")
+            # Avisa por voz de forma limpia antes de ponerse a escuchar
+            hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
+            
+            # Ejecuta la captura por Loopback y la consulta en Shazam
+            respuesta_musica = identificar_y_abrir_cancion()
+            
+            _hablar_y_mostrar(respuesta_musica)
             return
 
         # --- 3. MÓDULO EMAIL ---
@@ -395,6 +400,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_mail:
                 print(f"[Email Error]: {err_mail}")
+
         # --- 4. MÓDULO AGENDA ---
         es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
         es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
@@ -426,6 +432,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             )
             _hablar_y_mostrar(resultado_agendado)
             return
+
         # --- 5. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
