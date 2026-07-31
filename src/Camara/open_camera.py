@@ -241,4 +241,4 @@ def analizar_que_ve_camara(voz_ia=None, sincronizar_estado_esfera=None) -> str:
         revan_cam.abrir_camara(voz_ia=voz_ia, sincronizar_estado_esfera=sincronizar_estado_esfera)
         time.sleep(0.8)
     
-    return revan_cam.analizar_ahora(voz_ia=voz_ia, sincronizar_estado_esfera=sincronizar_estado_esfera)
+    return revan_cam.analizar_ahnnora(voz_ia=voz_ia, sincronizar_estado_esfera=sincronizar_estado_esfera)

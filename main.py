@@ -179,7 +179,6 @@ def procesar_ciclo_voz():
 
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         print("\n[REVAN]: Escuchando...")
-
         orden_sucia = oidos_ia.escuchar()
 
         if esta_hablando:
@@ -192,7 +191,6 @@ def procesar_ciclo_voz():
         orden_minusculas = orden_sucia.lower().strip()
         orden_busqueda = quitar_acentos(orden_minusculas)
         print(f"[Captura]: '{orden_minusculas}'")
-
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
@@ -247,7 +245,6 @@ def procesar_comando_texto(texto: str):
 
 def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     global cerebro_ia, gemini_ia, voz_ia, ultima_interaccion, esta_hablando
-
     orden_mostrar = orden_mostrar if orden_mostrar is not None else orden_limpia
     orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
 
@@ -271,10 +268,8 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
             
             time.sleep(0.3)
-            
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
-
         threading.Thread(target=tarea_sincronizada_voz, daemon=True).start()
         ultima_interaccion = time.time()
 
@@ -293,6 +288,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
+        # --- 2. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
             p in orden_limpia_sin_acentos for p in [
@@ -308,15 +304,18 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         es_cancelar_mail = any(p in orden_limpia_sin_acentos for p in ["cancela el correo", "descarta el correo"])
 
         if es_confirmar_mail:
+            reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             _hablar_y_mostrar(confirmar_envio_correo())
             return
 
         if es_cancelar_mail:
+            reproducir_sfx("modules", "emails")
             _hablar_y_mostrar(cancelar_borrador_correo())
             return
 
         if es_conteo_correo:
+            reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             cantidad = contar_correos_sin_leer()
             if cantidad >= 0:
@@ -326,6 +325,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if es_consulta_correo:
+            reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro(f"Revisando su buzón de entrada, {titulo}...")
             resumenes = leer_ultimos_correos(max_resultados=3)
@@ -333,6 +333,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if es_redaccion_asistida:
+            reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             prompt_redaccion = f"Redacta un correo profesional basado en esta solicitud del usuario: '{orden_limpia}'. Devuelve únicamente el asunto y el cuerpo del mensaje bien formateados."
             
@@ -348,6 +349,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if es_envio_directo:
+            reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             try:
                 partes_a = orden_limpia.split(" a ", 1)
@@ -372,16 +374,19 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_mail:
                 print(f"[Email Error]: {err_mail}")
+        # --- 3. MÓDULO AGENDA ---
         es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
         es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
 
         if es_consulta_agenda:
+            reproducir_sfx("modules", "Agenda")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             resumen_agenda = consultar_agenda_hoy()
             _hablar_y_mostrar(resumen_agenda)
             return
 
         if es_crear_evento:
+            reproducir_sfx("modules", "Agenda")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             fecha_iso = parsear_fecha_natural(orden_limpia_sin_acentos)
             
@@ -400,23 +405,26 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             )
             _hablar_y_mostrar(resultado_agendado)
             return
-
+        # --- 4. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
 
         if es_confirmacion:
+            reproducir_sfx("modules", "whats")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             resultado = confirmar_envio_inteligente()
             _hablar_y_mostrar(resultado)
             return
 
         if es_cancelacion:
+            reproducir_sfx("modules", "whats")
             resultado = cancelar_envio_pendiente()
             _hablar_y_mostrar(resultado)
             return
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_whatsapp):
+            reproducir_sfx("modules", "whats")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             try:
                 partes_a = orden_limpia.split(" a ", 1)
@@ -431,10 +439,12 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
+        # --- 5. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
+            reproducir_sfx("modules", "Cam")
             if iniciar_vigilancia(voz_ia, sincronizar_estado_esfera):
                 _hablar_y_mostrar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
             else:
@@ -442,6 +452,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_detener_vigilancia):
+            reproducir_sfx("modules", "Cam")
             if detener_vigilancia():
                 _hablar_y_mostrar("Vigilancia de cámara desactivada.")
             else:
@@ -452,6 +463,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
 
         if "esfera" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in palabras_detener_intent):
+            reproducir_sfx("modules", "Cam")
             if detener_control_esfera():
                 _hablar_y_mostrar("Control de esfera desactivado.")
             else:
@@ -459,6 +471,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if "esfera" in orden_limpia_sin_acentos and any(r in orden_limpia_sin_acentos for r in raices_control):
+            reproducir_sfx("modules", "Cam")
             if vigilancia_activa():
                 _hablar_y_mostrar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
             elif iniciar_control_esfera():
@@ -466,7 +479,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-  
+        # --- 6. MÓDULO REDES ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
@@ -486,6 +499,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         )
 
         if es_consulta_velocidad:
+            reproducir_sfx("modules", "redes")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
             resultado_red = probar_velocidad_con_navegador()
@@ -493,20 +507,24 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if es_consulta_latencia:
+            reproducir_sfx("modules", "redes")
             _hablar_y_mostrar(reportar_latencia())
             return
 
         if es_ping_terminal:
+            reproducir_sfx("modules", "redes")
             partes_ping = orden_limpia.split("ping")
             target = partes_ping[-1].replace("a", "").strip() if len(partes_ping) > 1 and partes_ping[-1].strip() else "8.8.8.8"
             _hablar_y_mostrar(abrir_terminal_ping(target))
             return
 
         if es_escaneo_puertos:
+            reproducir_sfx("modules", "redes")
             _hablar_y_mostrar(abrir_terminal_scan())
             return
 
         if es_marcar_conocidos:
+            reproducir_sfx("modules", "redes")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red...")
             resultado_marcado = marcar_todos_como_conocidos()
@@ -514,6 +532,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if es_consulta_intrusos:
+            reproducir_sfx("modules", "redes")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
             resultado_intrusos = detectar_intrusos(abrir_terminal=True)
@@ -521,11 +540,14 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         if es_consulta_red:
+            reproducir_sfx("modules", "redes")
             _hablar_y_mostrar(analizar_red())
             return
+
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
+            reproducir_sfx("modules", "Cam")
             orden_limpia = "enciende la camara y dime que ves"
 
         es_orden_tecnica = es_intencion_de_comando(orden_limpia)
