@@ -27,6 +27,7 @@ from src.Emails.email_control import (leer_ultimos_correos, contar_correos_sin_l
 from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
 from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
 from src.Sounds.sounds_main import reproducir_sfx
+from src.Sounds.music_detector.detector import identificar_y_abrir_cancion
 
 cerebro_ia = None
 gemini_ia = None
@@ -45,7 +46,8 @@ PALABRAS_CLAVE_ACCION = [
     "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
     "corre", "prende", "enciende", "investiga", "recuerda", "guarda", "analiza",
     "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar",
-    "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita"
+    "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
+    "cancion", "musica", "adivina", "reconoce", "identifica", "sonando"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -143,7 +145,6 @@ def encender_sistemas():
             reproducir_sfx("welcome", "Bienvenida")
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
-
         registrar_manejador_comando_texto(procesar_comando_texto)
 
         def saludo_inicial():
@@ -179,6 +180,7 @@ def procesar_ciclo_voz():
 
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         print("\n[REVAN]: Escuchando...")
+
         orden_sucia = oidos_ia.escuchar()
 
         if esta_hablando:
@@ -191,6 +193,7 @@ def procesar_ciclo_voz():
         orden_minusculas = orden_sucia.lower().strip()
         orden_busqueda = quitar_acentos(orden_minusculas)
         print(f"[Captura]: '{orden_minusculas}'")
+
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
@@ -245,6 +248,7 @@ def procesar_comando_texto(texto: str):
 
 def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     global cerebro_ia, gemini_ia, voz_ia, ultima_interaccion, esta_hablando
+
     orden_mostrar = orden_mostrar if orden_mostrar is not None else orden_limpia
     orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
 
@@ -268,8 +272,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
             
             time.sleep(0.3)
+            
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+
         threading.Thread(target=tarea_sincronizada_voz, daemon=True).start()
         ultima_interaccion = time.time()
 
@@ -288,7 +294,22 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
-        # --- 2. MÓDULO EMAIL ---
+
+        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
+        palabras_reconocer_cancion = [
+            "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
+            "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
+            "como se llama esta cancion", "identifica esta cancion", "que cancion suena"
+        ]
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
+            reproducir_sfx("modules", "Sonidos")  # 👈 Reproduce tu SFX 'Sonidos'
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            
+            # Aquí conectarás la lógica del escuchador / reconocedor (e.g. Shazam/AudD API)
+            _hablar_y_mostrar(f"Escuchando el entorno para identificar la canción, {titulo}. Un momento...")
+            return
+
+        # --- 3. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
             p in orden_limpia_sin_acentos for p in [
@@ -374,7 +395,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_mail:
                 print(f"[Email Error]: {err_mail}")
-        # --- 3. MÓDULO AGENDA ---
+        # --- 4. MÓDULO AGENDA ---
         es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
         es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
 
@@ -405,7 +426,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             )
             _hablar_y_mostrar(resultado_agendado)
             return
-        # --- 4. MÓDULO WHATSAPP ---
+        # --- 5. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
@@ -439,7 +460,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
-        # --- 5. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
+        # --- 6. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
@@ -479,7 +500,8 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-        # --- 6. MÓDULO REDES ---
+
+        # --- 7. MÓDULO REDES ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
@@ -491,6 +513,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "seguridad de mi red", "mi red es segura",
         ])
         es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
+        
         es_consulta_red = (
             not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
             and ("red" in palabras_lista or "ip" in palabras_lista or
@@ -613,7 +636,6 @@ def main():
         except Exception as e:
             print(f"Aviso en escaneo pasivo: {e}")
         time.sleep(0.1)
-
     encender_sistemas()
     try:
         while sistema_activo:
