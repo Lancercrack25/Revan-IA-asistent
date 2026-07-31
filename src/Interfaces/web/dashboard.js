@@ -1,13 +1,5 @@
-/* ==========================================================================
-   DASHBOARD KERNEL - HUD AUDIO & NAVIGATION ENGINE (PERFECT CLICKS)
-   ========================================================================== */
-
 let ws = null;
 let reconnectTimer = null;
-
-/* --------------------------------------------------------------------------
-   0. MOTOR DE AUDIO CON PROMESAS Y BLOQUEO NAVEGACIONAL
-   -------------------------------------------------------------------------- */
 const BASE_URL = window.location.origin;
 
 const SOUND_PATHS = {
@@ -18,7 +10,6 @@ const SOUND_PATHS = {
 
 let userInteracted = false;
 
-// Liberar restricciones de Chrome en el primer clic
 function unlockAudioEngine() {
     if (userInteracted) return;
     userInteracted = true;
@@ -82,10 +73,6 @@ function playClickAndNavigate(callbackUrl = null) {
 
 function playHoverSFX() { playDirectSound('hover', 0.25); }
 function playSectionSFX() { playDirectSound('section', 0.5); }
-
-/* --------------------------------------------------------------------------
-   INICIALIZACIÓN DEL SISTEMA
-   -------------------------------------------------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
     initTilt();
@@ -106,9 +93,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-/* --------------------------------------------------------------------------
-   DELEGACIÓN GLOBAL DE EVENTOS
-   -------------------------------------------------------------------------- */
 let currentHoveredElement = null;
 
 function setupGlobalAudioListeners() {
@@ -155,9 +139,6 @@ function setupGlobalAudioListeners() {
     }, true);
 }
 
-/* --------------------------------------------------------------------------
-   1. AMBIENTE VISUAL (PARTICLES & TILT)
-   -------------------------------------------------------------------------- */
 function initParticles() {
     if (typeof particlesJS !== "undefined" && document.getElementById("particles-js")) {
         particlesJS("particles-js", {
@@ -206,9 +187,6 @@ function initTilt() {
     }
 }
 
-/* --------------------------------------------------------------------------
-   2. GESTIÓN DE VISTAS (TÁCTICO VS NÚCLEO 3D)
-   -------------------------------------------------------------------------- */
 function switchView(vista) {
     playSectionSFX();
     const vTactico = document.getElementById("view-tactico");
@@ -234,9 +212,6 @@ function switchView(vista) {
     }
 }
 
-/* --------------------------------------------------------------------------
-   3. NAVEGACIÓN MÓDULOS
-   -------------------------------------------------------------------------- */
 function setupModuleNavigation() {
     const rutasModulos = {
         'btn-camera': '/modulos/camera',
@@ -266,9 +241,6 @@ function setupModuleNavigation() {
     });
 }
 
-/* --------------------------------------------------------------------------
-   4. WEBSOCKET & TELEMETRÍA EN TIEMPO REAL
-   -------------------------------------------------------------------------- */
 function conectarWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -305,9 +277,6 @@ function conectarWebSocket() {
     };
 }
 
-/* --------------------------------------------------------------------------
-   5. TERMINAL DE COMANDOS Y AUXILIARES
-   -------------------------------------------------------------------------- */
 function setupInputEvents() {
     const input = document.getElementById("cmd-input");
     const btn = document.getElementById("btn-send");

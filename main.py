@@ -7,7 +7,6 @@ import unicodedata
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-
 # --- IMPORTS DEL CORE Y SERVICIOS ---
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
