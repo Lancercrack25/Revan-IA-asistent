@@ -264,9 +264,6 @@ function addLog(msg, type = "system") {
     logBox.scrollTop = logBox.scrollHeight;
 }
 
-/* --------------------------------------------------------------------------
-   6. SIMULADOR DE MÉTRICAS HUD
-   -------------------------------------------------------------------------- */
 function startMetricsSimulation() {
     const cpuFill = document.querySelector(".cpu-fill");
     

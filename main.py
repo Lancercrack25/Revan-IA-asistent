@@ -104,10 +104,10 @@ def apagar_sistema():
     esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
-        voz_ia.hablar(f"Desconectando sistemas.vuelva pronto señor, {titulo}.")
-        reproducir_sfx("welcome", "close")
+        voz_ia.hablar(f"Desconectando sistemas, {titulo}.")
 
     esta_hablando = False
+    reproducir_sfx("welcome", "close")
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
 
@@ -154,7 +154,7 @@ def encender_sistemas():
             esta_hablando = True
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if voz_ia:
-                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,los módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?")
+                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?")
             time.sleep(0.3)
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
