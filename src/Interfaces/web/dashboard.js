@@ -1,39 +1,77 @@
 /* ==========================================================================
-   DASHBOARD KERNEL - HUD CONTROLLER
+   DASHBOARD KERNEL - ULTRA-LOW LATENCY AUDIO & HUD SYSTEM
    ========================================================================== */
 
 let ws = null;
 let reconnectTimer = null;
 
 /* --------------------------------------------------------------------------
-   0. AUDIO ENGINE & SFX SYSTEM
+   0. MOTOR DE AUDIO NATIVO (SINTETIZADOR HUD DE LEY - ZERO LAG)
    -------------------------------------------------------------------------- */
-const soundHover = new Audio('../../Sounds/welcome/hovers.mp3');
-const soundClick = new Audio('../../Sounds/welcome/close.mp3'); 
-const soundSection = new Audio('../../Sounds/welcome/sections.mp3');
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
 
-// Configuración de volúmenes suaves
-soundHover.volume = 0.2;
-soundClick.volume = 0.4;
-soundSection.volume = 0.5;
-
-function playHoverSFX() {
-    soundHover.currentTime = 0;
-    soundHover.play().catch(() => {});
+function initAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new AudioCtx();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
 }
 
-function playClickSFX() {
-    soundClick.currentTime = 0;
-    soundClick.play().catch(() => {});
+// Generador de efectos tácticos sintetizados (Garantiza sonido instantáneo de 0ms)
+function playToneSFX(type) {
+    initAudioContext();
+    if (!audioCtx) return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'hover') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.04);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
+        osc.start(now);
+        osc.stop(now + 0.04);
+    } else if (type === 'click') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1500, now);
+        osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+    } else if (type === 'section') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.15);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+    }
 }
 
-function playSectionSFX() {
-    soundSection.currentTime = 0;
-    soundSection.play().catch(() => {});
-}
+function playHoverSFX() { playToneSFX('hover'); }
+function playClickSFX() { playToneSFX('click'); }
+function playSectionSFX() { playToneSFX('section'); }
+
+// Desbloqueo al primer contacto del usuario
+['click', 'keydown', 'mousemove'].forEach(evt => {
+    document.addEventListener(evt, () => {
+        initAudioContext();
+    }, { once: true });
+});
 
 /* --------------------------------------------------------------------------
-   INICIALIZACIÓN DEL KERNEL
+   INICIALIZACIÓN Y EVENTOS
    -------------------------------------------------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
@@ -42,22 +80,42 @@ document.addEventListener("DOMContentLoaded", () => {
     setupInputEvents();
     conectarWebSocket();
     startMetricsSimulation();
-    setupAudioListeners(); // Init SFX
+    setupGlobalAudioListeners();
 });
 
-function setupAudioListeners() {
-    // 1. Hover y Click para interactivos y botones de módulos
-    const elementosInteractivos = document.querySelectorAll('button, a, .card, .module-card, .hud-btn, input');
-    
-    elementosInteractivos.forEach(elemento => {
-        elemento.addEventListener('mouseenter', playHoverSFX);
-        elemento.addEventListener('click', playClickSFX);
+/* --------------------------------------------------------------------------
+   DELEGACIÓN DE AUDIO PERFECTA (HOVER Y CLICK)
+   -------------------------------------------------------------------------- */
+function setupGlobalAudioListeners() {
+    // 1. HOVER Instantáneo
+    document.addEventListener('mouseover', (e) => {
+        const target = e.target.closest('button, a, .card, .module-card, .keyword-card, .hud-btn, input, [onclick]');
+        if (target && !target.dataset.hoverActive) {
+            target.dataset.hoverActive = "true";
+            playHoverSFX();
+            setTimeout(() => delete target.dataset.hoverActive, 100);
+        }
     });
 
-    // 2. Sonido de despliegue de sección/pestañas
-    const botonesSeccion = document.querySelectorAll('.nav-link, .open-info-btn, [onClick*="switchView"]');
-    botonesSeccion.forEach(btn => {
-        btn.addEventListener('click', playSectionSFX);
+    // 2. CLIC Instantáneo (Garantizado)
+    document.addEventListener('pointerdown', (e) => {
+        const target = e.target.closest('button, a, .card, .module-card, .keyword-card, .hud-btn, .btn-back, [onclick]');
+        if (target) {
+            playClickSFX();
+        }
+    });
+
+    // 3. Manejo de enlaces para garantizar que suenen ANTES de cambiar la página
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (link && link.href && !link.href.startsWith('#') && !link.target) {
+            e.preventDefault();
+            const destination = link.href;
+            playClickSFX();
+            setTimeout(() => {
+                window.location.href = destination;
+            }, 90); // Tiempo suficiente para oír el clic sintetizado
+        }
     });
 }
 
@@ -65,10 +123,10 @@ function setupAudioListeners() {
    1. AMBIENTE VISUAL (PARTICLES & TILT)
    -------------------------------------------------------------------------- */
 function initParticles() {
-    if (typeof particlesJS !== "undefined") {
+    if (typeof particlesJS !== "undefined" && document.getElementById("particles-js")) {
         particlesJS("particles-js", {
             particles: {
-                number: { value: 70, density: { enable: true, value_area: 900 } },
+                number: { value: 50, density: { enable: true, value_area: 900 } },
                 color: { value: "#00f0ff" },
                 shape: { type: "circle" },
                 opacity: { value: 0.2, random: true },
@@ -93,9 +151,6 @@ function initParticles() {
                 events: {
                     onhover: { enable: true, mode: "grab" },
                     onclick: { enable: true, mode: "push" }
-                },
-                modes: {
-                    grab: { distance: 140, line_linked: { opacity: 0.35 } }
                 }
             },
             retina_detect: true
@@ -106,10 +161,10 @@ function initParticles() {
 function initTilt() {
     if (typeof VanillaTilt !== "undefined") {
         VanillaTilt.init(document.querySelectorAll("[data-tilt]"), {
-            max: 8,
-            speed: 400,
+            max: 6,
+            speed: 300,
             glare: true,
-            "max-glare": 0.2,
+            "max-glare": 0.15,
             scale: 1.01
         });
     }
@@ -119,7 +174,7 @@ function initTilt() {
    2. GESTIÓN DE VISTAS (TÁCTICO VS NÚCLEO 3D)
    -------------------------------------------------------------------------- */
 function switchView(vista) {
-    playSectionSFX(); // Trigger SFX al cambiar vista táctica / esfera
+    playSectionSFX();
     const vTactico = document.getElementById("view-tactico");
     const vEsfera = document.getElementById("view-esfera");
     const bTactico = document.getElementById("btn-tactico");
@@ -144,7 +199,7 @@ function switchView(vista) {
 }
 
 /* --------------------------------------------------------------------------
-   3. NAVEGACIÓN Y REDIRECCIÓN DE MÓDULOS
+   3. NAVEGACIÓN Y DASHBOARD
    -------------------------------------------------------------------------- */
 function setupModuleNavigation() {
     const rutasModulos = {
@@ -165,9 +220,14 @@ function setupModuleNavigation() {
     Object.entries(rutasModulos).forEach(([id, url]) => {
         const card = document.getElementById(id);
         if (card) {
-            card.addEventListener("click", () => {
+            card.addEventListener("click", (e) => {
+                e.preventDefault();
+                playClickSFX();
                 addLog(`Accediendo al módulo: ${id.replace('btn-', '').toUpperCase()}...`, "system");
-                window.location.href = url;
+                
+                setTimeout(() => {
+                    window.location.href = url;
+                }, 90);
             });
         }
     });
@@ -213,7 +273,7 @@ function conectarWebSocket() {
 }
 
 /* --------------------------------------------------------------------------
-   5. TERMINAL DE COMANDOS
+   5. TERMINAL DE COMANDOS Y AUXILIARES
    -------------------------------------------------------------------------- */
 function setupInputEvents() {
     const input = document.getElementById("cmd-input");

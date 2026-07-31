@@ -23,12 +23,16 @@ CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
 RAIZ_SRC = os.path.dirname(CARPETA_INTERFACES)
 CARPETA_STYLES = os.path.join(RAIZ_SRC, "Gui", "styles")
+CARPETA_SOUNDS = os.path.join(RAIZ_SRC, "Sounds") 
 
 if os.path.exists(CARPETA_WEB):
     app.mount("/static", StaticFiles(directory=CARPETA_WEB), name="static")
 
 if os.path.exists(CARPETA_STYLES):
     app.mount("/styles", StaticFiles(directory=CARPETA_STYLES), name="styles")
+
+if os.path.exists(CARPETA_SOUNDS):  # <--- NUEVA LÍNEA
+    app.mount("/src/Sounds", StaticFiles(directory=CARPETA_SOUNDS), name="sounds")
 
 # --- FUNCIÓN AUXILIAR PARA SERVIR HTMLs ---
 def servir_html_modulo(nombre_archivo: str):

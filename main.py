@@ -103,11 +103,11 @@ def apagar_sistema():
 
     esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
+    reproducir_sfx("welcome", "close")
     if voz_ia:
         voz_ia.hablar(f"Desconectando sistemas, {titulo}.")
 
     esta_hablando = False
-    reproducir_sfx("welcome", "close")
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
 
