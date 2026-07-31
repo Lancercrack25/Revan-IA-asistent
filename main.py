@@ -7,7 +7,7 @@ import unicodedata
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-# --- IMPORTS DEL CORE Y SERVICIOS ---
+
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
@@ -27,7 +27,7 @@ from src.Emails.email_control import (leer_ultimos_correos, contar_correos_sin_l
 from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
 from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
 from src.Sounds.sounds_main import reproducir_sfx
-# --- INSTANCIAS Y CONTROLES GLOBALES ---
+
 cerebro_ia = None
 gemini_ia = None
 voz_ia = None
@@ -83,7 +83,6 @@ def sincronizar_estado_esfera(estado, color_hex):
         print(f" Error al sincronizar esfera: {e}")
 
 def sincronizar_chat_dashboard(rol: str, texto: str):
-    """Envía un mensaje de chat al dashboard web."""
     try:
         transmitir_chat_desde_hilo_externo(rol, texto)
     except Exception as e:
@@ -105,7 +104,6 @@ def apagar_sistema():
     reproducir_sfx("welcome", "close")
     if voz_ia:
         voz_ia.hablar(f"Desconectando sistemas, {titulo}.")
-
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
@@ -433,7 +431,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
-        # --- 6. MÓDULO CÁMARA Y VISIÓN ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
