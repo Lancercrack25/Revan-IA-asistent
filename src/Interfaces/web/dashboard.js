@@ -5,6 +5,36 @@
 let ws = null;
 let reconnectTimer = null;
 
+/* --------------------------------------------------------------------------
+   0. AUDIO ENGINE & SFX SYSTEM
+   -------------------------------------------------------------------------- */
+const soundHover = new Audio('../../Sounds/welcome/hovers.mp3');
+const soundClick = new Audio('../../Sounds/welcome/close.mp3'); 
+const soundSection = new Audio('../../Sounds/welcome/sections.mp3');
+
+// Configuración de volúmenes suaves
+soundHover.volume = 0.2;
+soundClick.volume = 0.4;
+soundSection.volume = 0.5;
+
+function playHoverSFX() {
+    soundHover.currentTime = 0;
+    soundHover.play().catch(() => {});
+}
+
+function playClickSFX() {
+    soundClick.currentTime = 0;
+    soundClick.play().catch(() => {});
+}
+
+function playSectionSFX() {
+    soundSection.currentTime = 0;
+    soundSection.play().catch(() => {});
+}
+
+/* --------------------------------------------------------------------------
+   INICIALIZACIÓN DEL KERNEL
+   -------------------------------------------------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
     initTilt();
@@ -12,7 +42,24 @@ document.addEventListener("DOMContentLoaded", () => {
     setupInputEvents();
     conectarWebSocket();
     startMetricsSimulation();
+    setupAudioListeners(); // Init SFX
 });
+
+function setupAudioListeners() {
+    // 1. Hover y Click para interactivos y botones de módulos
+    const elementosInteractivos = document.querySelectorAll('button, a, .card, .module-card, .hud-btn, input');
+    
+    elementosInteractivos.forEach(elemento => {
+        elemento.addEventListener('mouseenter', playHoverSFX);
+        elemento.addEventListener('click', playClickSFX);
+    });
+
+    // 2. Sonido de despliegue de sección/pestañas
+    const botonesSeccion = document.querySelectorAll('.nav-link, .open-info-btn, [onClick*="switchView"]');
+    botonesSeccion.forEach(btn => {
+        btn.addEventListener('click', playSectionSFX);
+    });
+}
 
 /* --------------------------------------------------------------------------
    1. AMBIENTE VISUAL (PARTICLES & TILT)
@@ -72,6 +119,7 @@ function initTilt() {
    2. GESTIÓN DE VISTAS (TÁCTICO VS NÚCLEO 3D)
    -------------------------------------------------------------------------- */
 function switchView(vista) {
+    playSectionSFX(); // Trigger SFX al cambiar vista táctica / esfera
     const vTactico = document.getElementById("view-tactico");
     const vEsfera = document.getElementById("view-esfera");
     const bTactico = document.getElementById("btn-tactico");

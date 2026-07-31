@@ -104,7 +104,8 @@ def apagar_sistema():
     esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     if voz_ia:
-        voz_ia.hablar(f"Desconectando sistemas. Hasta luego, {titulo}.")
+        voz_ia.hablar(f"Desconectando sistemas.vuelva pronto señor, {titulo}.")
+        reproducir_sfx("welcome", "close")
 
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
@@ -469,7 +470,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-
         # --- 7. MÓDULO RED Y DIAGNÓSTICO ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
