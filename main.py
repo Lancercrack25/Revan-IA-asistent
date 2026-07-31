@@ -134,18 +134,16 @@ def encender_sistemas():
         gemini_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
         sincronizar_chat_dashboard("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
-        time.sleep(0.2)
-
         try:
             subprocess.Popen(
                 'start brave --app=http://127.0.0.1:8000 --window-size=670,670',
                 shell=True
             )
             print("[2/2] Núcleo Web Desplegado (Esfera 3D + Dashboard).")
-            reproducir_sfx("welcome", "Bienvenida")
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
         registrar_manejador_comando_texto(procesar_comando_texto)
+        reproducir_sfx("welcome", "Bienvenida")
 
         def saludo_inicial():
             global esta_hablando
