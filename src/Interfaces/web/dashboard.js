@@ -1,77 +1,90 @@
 /* ==========================================================================
-   DASHBOARD KERNEL - ULTRA-LOW LATENCY AUDIO & HUD SYSTEM
+   DASHBOARD KERNEL - HUD AUDIO & NAVIGATION ENGINE (PERFECT CLICKS)
    ========================================================================== */
 
 let ws = null;
 let reconnectTimer = null;
 
 /* --------------------------------------------------------------------------
-   0. MOTOR DE AUDIO NATIVO (SINTETIZADOR HUD DE LEY - ZERO LAG)
+   0. MOTOR DE AUDIO CON PROMESAS Y BLOQUEO NAVEGACIONAL
    -------------------------------------------------------------------------- */
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let audioCtx = null;
+const BASE_URL = window.location.origin;
 
-function initAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new AudioCtx();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+const SOUND_PATHS = {
+    hover: `${BASE_URL}/src/Sounds/welcome/hovers.mp3`,
+    click: `${BASE_URL}/src/Sounds/welcome/clicks.mp3`,
+    section: `${BASE_URL}/src/Sounds/welcome/sections.mp3`
+};
+
+let userInteracted = false;
+
+// Liberar restricciones de Chrome en el primer clic
+function unlockAudioEngine() {
+    if (userInteracted) return;
+    userInteracted = true;
+    
+    const dummy = new Audio(SOUND_PATHS.click);
+    dummy.volume = 0.01;
+    dummy.play().then(() => dummy.pause()).catch(() => {});
+    
+    window.removeEventListener('pointerdown', unlockAudioEngine);
+    window.removeEventListener('keydown', unlockAudioEngine);
+}
+
+window.addEventListener('pointerdown', unlockAudioEngine);
+window.addEventListener('keydown', unlockAudioEngine);
+
+// Reproduce audio normal (Hover/Section)
+function playDirectSound(type, volume = 0.5) {
+    if (!SOUND_PATHS[type]) return;
+    try {
+        const snd = new Audio(SOUND_PATHS[type]);
+        snd.volume = volume;
+        snd.play().catch(() => {});
+    } catch (e) {}
+}
+
+// Reproduce Clic de forma garantizada y ejecuta un callback al terminar o iniciar
+function playClickAndNavigate(callbackUrl = null) {
+    unlockAudioEngine();
+    
+    try {
+        const clickAudio = new Audio(SOUND_PATHS.click);
+        clickAudio.volume = 0.8;
+
+        // Si hay una redirección, esperamos a que el audio inicie/avance
+        if (callbackUrl) {
+            let navigated = false;
+
+            const goToPage = () => {
+                if (!navigated) {
+                    navigated = true;
+                    window.location.href = callbackUrl;
+                }
+            };
+
+            // Intentar reproducir y dar tiempo al efecto sonoro
+            clickAudio.play().then(() => {
+                setTimeout(goToPage, 180); // 180ms para escuchar la ráfaga del clic
+            }).catch(() => {
+                goToPage(); // Si falla el audio, redirige de todos modos
+            });
+
+            // Respaldo por si el archivo de audio tarda en cargar
+            setTimeout(goToPage, 250);
+        } else {
+            clickAudio.play().catch(() => {});
+        }
+    } catch (e) {
+        if (callbackUrl) window.location.href = callbackUrl;
     }
 }
 
-// Generador de efectos tácticos sintetizados (Garantiza sonido instantáneo de 0ms)
-function playToneSFX(type) {
-    initAudioContext();
-    if (!audioCtx) return;
-
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    const now = audioCtx.currentTime;
-
-    if (type === 'hover') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.04);
-        gain.gain.setValueAtTime(0.05, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
-        osc.start(now);
-        osc.stop(now + 0.04);
-    } else if (type === 'click') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1500, now);
-        osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
-        osc.start(now);
-        osc.stop(now + 0.08);
-    } else if (type === 'section') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(900, now + 0.15);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-        osc.start(now);
-        osc.stop(now + 0.15);
-    }
-}
-
-function playHoverSFX() { playToneSFX('hover'); }
-function playClickSFX() { playToneSFX('click'); }
-function playSectionSFX() { playToneSFX('section'); }
-
-// Desbloqueo al primer contacto del usuario
-['click', 'keydown', 'mousemove'].forEach(evt => {
-    document.addEventListener(evt, () => {
-        initAudioContext();
-    }, { once: true });
-});
+function playHoverSFX() { playDirectSound('hover', 0.25); }
+function playSectionSFX() { playDirectSound('section', 0.5); }
 
 /* --------------------------------------------------------------------------
-   INICIALIZACIÓN Y EVENTOS
+   INICIALIZACIÓN DEL SISTEMA
    -------------------------------------------------------------------------- */
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
@@ -81,42 +94,65 @@ document.addEventListener("DOMContentLoaded", () => {
     conectarWebSocket();
     startMetricsSimulation();
     setupGlobalAudioListeners();
+
+    // Reproduce sections.mp3 SOLO al entrar a un módulo secundario
+    const currentPath = window.location.pathname;
+    const isDashboard = currentPath === "/" || currentPath === "/index.html";
+    
+    if (!isDashboard) {
+        setTimeout(() => {
+            playSectionSFX();
+        }, 150);
+    }
 });
 
 /* --------------------------------------------------------------------------
-   DELEGACIÓN DE AUDIO PERFECTA (HOVER Y CLICK)
+   DELEGACIÓN GLOBAL DE EVENTOS
    -------------------------------------------------------------------------- */
+let currentHoveredElement = null;
+
 function setupGlobalAudioListeners() {
-    // 1. HOVER Instantáneo
+    
+    // 1. HOVER ÚNICO
     document.addEventListener('mouseover', (e) => {
-        const target = e.target.closest('button, a, .card, .module-card, .keyword-card, .hud-btn, input, [onclick]');
-        if (target && !target.dataset.hoverActive) {
-            target.dataset.hoverActive = "true";
-            playHoverSFX();
-            setTimeout(() => delete target.dataset.hoverActive, 100);
-        }
-    });
-
-    // 2. CLIC Instantáneo (Garantizado)
-    document.addEventListener('pointerdown', (e) => {
         const target = e.target.closest('button, a, .card, .module-card, .keyword-card, .hud-btn, .btn-back, [onclick]');
-        if (target) {
-            playClickSFX();
+        
+        if (target && target !== currentHoveredElement) {
+            currentHoveredElement = target;
+            playHoverSFX();
+        } else if (!target) {
+            currentHoveredElement = null;
         }
     });
 
-    // 3. Manejo de enlaces para garantizar que suenen ANTES de cambiar la página
+    document.addEventListener('mouseout', (e) => {
+        const target = e.target.closest('button, a, .card, .module-card, .keyword-card, .hud-btn, .btn-back, [onclick]');
+        if (target && e.relatedTarget && !target.contains(e.relatedTarget)) {
+            currentHoveredElement = null;
+        }
+    });
+
+    // 2. INTERCEPTOR DE CLICS PARA ELEMENTOS QUE NO REDIRIGEN (Botones simples/Inputs)
+    document.addEventListener('pointerdown', (e) => {
+        unlockAudioEngine();
+        const target = e.target.closest('button, .hud-btn, .btn-back, [onclick]');
+        const isLink = e.target.closest('a, .module-card');
+        
+        // Si no es un enlace de módulo, reproducimos el clic simple inmediatamente
+        if (target && !isLink) {
+            playClickAndNavigate(null);
+        }
+    }, true);
+
+    // 3. INTERCEPTOR DE ENLACES Y MÓDULOS (Garantiza reproducir clicks.mp3 antes de irse)
     document.addEventListener('click', (e) => {
         const link = e.target.closest('a');
-        if (link && link.href && !link.href.startsWith('#') && !link.target) {
+        if (link && link.href && !link.href.startsWith('#') && link.target !== '_blank') {
             e.preventDefault();
-            const destination = link.href;
-            playClickSFX();
-            setTimeout(() => {
-                window.location.href = destination;
-            }, 90); // Tiempo suficiente para oír el clic sintetizado
+            e.stopPropagation();
+            playClickAndNavigate(link.href);
         }
-    });
+    }, true);
 }
 
 /* --------------------------------------------------------------------------
@@ -199,7 +235,7 @@ function switchView(vista) {
 }
 
 /* --------------------------------------------------------------------------
-   3. NAVEGACIÓN Y DASHBOARD
+   3. NAVEGACIÓN MÓDULOS
    -------------------------------------------------------------------------- */
 function setupModuleNavigation() {
     const rutasModulos = {
@@ -222,12 +258,9 @@ function setupModuleNavigation() {
         if (card) {
             card.addEventListener("click", (e) => {
                 e.preventDefault();
-                playClickSFX();
+                e.stopPropagation();
                 addLog(`Accediendo al módulo: ${id.replace('btn-', '').toUpperCase()}...`, "system");
-                
-                setTimeout(() => {
-                    window.location.href = url;
-                }, 90);
+                playClickAndNavigate(url);
             });
         }
     });
@@ -353,3 +386,9 @@ function updateLiveBeacon(online) {
         }
     }
 }
+
+let testClick = new Audio(window.location.origin + '/src/Sounds/welcome/clicks.mp3');
+testClick.volume = 1.0;
+testClick.play()
+    .then(() => console.log("✅ EL MP3 SÍ EXISTE Y SÍ SUENA"))
+    .catch(err => console.error("❌ ERROR AL REPRODUCIR:", err));

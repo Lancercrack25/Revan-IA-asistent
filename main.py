@@ -470,7 +470,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-        # --- 7. MÓDULO RED Y DIAGNÓSTICO ---
+  
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
