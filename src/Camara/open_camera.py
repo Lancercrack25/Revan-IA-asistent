@@ -35,8 +35,15 @@ class RevanCameraManager:
         total_pixeles = umbral.shape[0] * umbral.shape[1]
         return (pixeles_cambiados / total_pixeles) * 100
 
-    def abrir_camara(self, voz_ia=None, sincronizar_estado_esfera=None):
-        """Inicia el pipeline visual y la ventana OpenCV."""
+    def abrir_camara(self, voz_ia=None, sincronizar_estado_esfera=None, duracion_preview=None):
+        """Inicia el pipeline visual y la ventana OpenCV.
+
+        duracion_preview: si se especifica (segundos), el hilo de cámara se
+        detiene solo automáticamente tras ese tiempo. Se usa para el modo
+        'un solo disparo' de analizar_camara (vista previa breve + análisis),
+        a diferencia del modo vigilancia, que corre indefinidamente hasta que
+        se lo detiene explícitamente (duracion_preview=None).
+        """
         if self.is_running:
             print("[CAM]: La cámara ya está activa.")
             return False
@@ -44,7 +51,7 @@ class RevanCameraManager:
         self.is_running = True
         self._thread_camera = threading.Thread(
             target=self._bucle_principal, 
-            args=(voz_ia, sincronizar_estado_esfera),
+            args=(voz_ia, sincronizar_estado_esfera, duracion_preview),
             daemon=True
         )
         self._thread_camera.start()
@@ -106,7 +113,7 @@ class RevanCameraManager:
 
         return hud
 
-    def _bucle_principal(self, voz_ia=None, sincronizar_estado_esfera=None):
+    def _bucle_principal(self, voz_ia=None, sincronizar_estado_esfera=None, duracion_preview=None):
         self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if not self.cap.isOpened():
             print("[CAM]: No se pudo abrir el dispositivo de video.")
@@ -116,11 +123,21 @@ class RevanCameraManager:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
+        # --- Warm-up: descarta los primeros frames. La mayoría de webcams
+        # entregan fotogramas oscuros o mal expuestos hasta que el
+        # autoexposure se estabiliza; sin esto tanto el HUD como el análisis
+        # de visión arrancan con una imagen de mala calidad.
+        for _ in range(10):
+            self.cap.read()
+
         ret, frame_inicial = self.cap.read()
         if ret:
             self.frame_referencia = frame_inicial.copy()
+            with self.lock:
+                self.current_frame = frame_inicial.copy()
 
         ultimo_chequeo_vigilancia = time.time()
+        tiempo_inicio_preview = time.time()
 
         while self.is_running and self.cap.isOpened():
             ret, frame = self.cap.read()
@@ -131,6 +148,11 @@ class RevanCameraManager:
                 self.current_frame = frame.copy()
 
             ahora = time.time()
+
+            # Modo 'un solo disparo': se detiene solo tras duracion_preview,
+            # sin necesidad de que alguien presione ESC/'q' ni de vigilancia.
+            if duracion_preview is not None and (ahora - tiempo_inicio_preview) >= duracion_preview:
+                break
 
             # Lógica de Vigilancia
             if self.vigilancia_activa and (ahora - ultimo_chequeo_vigilancia >= self.intervalo_seg):
@@ -188,7 +210,13 @@ class RevanCameraManager:
         print(f"[CAM]: Vigilancia {'ACTIVADA' if activar else 'DESACTIVADA'}.")
 
     def analizar_ahora(self, voz_ia=None, sincronizar_estado_esfera=None):
-        """Responde a la orden manual por voz/chat: 'REVAN, ¿qué ves?'."""
+        """
+        Análisis 'fire-and-forget': dispara el análisis en un hilo aparte y
+        responde de inmediato sin esperar. Pensado para cuando la vigilancia
+        ya está corriendo y solo quieres forzar un análisis manual sin
+        interrumpir el feed en vivo (la respuesta hablada llega después,
+        de forma asíncrona, vía voz_ia dentro de _ejecutar_analisis_llava).
+        """
         with self.lock:
             if self.current_frame is None:
                 return "No hay señal de cámara activa."
@@ -200,6 +228,64 @@ class RevanCameraManager:
             daemon=True
         ).start()
         return "Analizando imagen táctica..."
+
+    def capturar_y_analizar(self, duracion_segundos: float = 3.0,
+                             voz_ia=None, sincronizar_estado_esfera=None) -> str:
+        """
+        Punto de entrada ÚNICO para 'REVAN, ¿qué ves?' / 'enciende la cámara
+        y dime qué ves'. Es BLOQUEANTE: espera el resultado real de la API de
+        visión y lo retorna como texto, para que quien la invoque (la tool
+        'analizar_camara' de NimClient) lo hable una sola vez.
+
+        - Si la cámara YA está activa (vigilancia u otro preview en curso),
+          reutiliza el feed en vivo que ya se está mostrando: solo toma el
+          frame actual y lo analiza, sin abrir una segunda ventana.
+        - Si la cámara está apagada, la abre, muestra el HUD en vivo durante
+          'duracion_segundos' (dando tiempo a que el autoexposure se
+          estabilice y a que el usuario vea lo que se está capturando), toma
+          el último frame estable y cierra la cámara automáticamente al
+          terminar — igual que se comportaba antes de tener vigilancia.
+
+        ANTES: existían dos pipelines de cámara desconectados (este
+        RevanCameraManager con HUD/vigilancia, y una captura simple y sin
+        preview en os_service.py). 'Qué ves' usaba la segunda, que no tenía
+        ventana en vivo ni warm-up de frames. Ahora ambos casos de uso pasan
+        por esta misma clase.
+        """
+        camara_ya_activa = self.is_running
+
+        if not camara_ya_activa:
+            self.abrir_camara(
+                voz_ia=voz_ia,
+                sincronizar_estado_esfera=sincronizar_estado_esfera,
+                duracion_preview=duracion_segundos,
+            )
+            # Espera a que el hilo de la cámara termine su ventana de preview
+            # (más un margen de seguridad para el warm-up interno).
+            tiempo_limite = time.time() + duracion_segundos + 3.0
+            while (
+                self._thread_camera
+                and self._thread_camera.is_alive()
+                and time.time() < tiempo_limite
+            ):
+                time.sleep(0.05)
+        else:
+            # Ya hay feed en vivo (vigilancia activa): un pequeño respiro
+            # para asegurar que current_frame tenga un frame reciente.
+            time.sleep(0.3)
+
+        with self.lock:
+            if self.current_frame is None:
+                return "No logré capturar una imagen estable de la cámara, Señor."
+            snapshot = self.current_frame.copy()
+
+        resultado = _analizar_frame_con_llava(snapshot)
+
+        with self.lock:
+            self.ultimo_resultado_txt = resultado
+            self.tiempo_mostrar_resultado = time.time()
+
+        return resultado
 
     def cerrar_camara(self):
         """Detiene la cámara y limpia la ventana."""
@@ -235,10 +321,17 @@ def vigilancia_activa() -> bool:
     """Verifica si el modo vigilancia o la cámara están corriendo."""
     return revan_cam.vigilancia_activa or revan_cam.is_running
 
-def analizar_que_ve_camara(voz_ia=None, sincronizar_estado_esfera=None) -> str:
-    """Abre la cámara si está apagada y ejecuta la visión instantánea."""
-    if not revan_cam.is_running:
-        revan_cam.abrir_camara(voz_ia=voz_ia, sincronizar_estado_esfera=sincronizar_estado_esfera)
-        time.sleep(0.8)
-    
-    return revan_cam.analizar_ahnnora(voz_ia=voz_ia, sincronizar_estado_esfera=sincronizar_estado_esfera)
+def analizar_que_ve_camara(voz_ia=None, sincronizar_estado_esfera=None, duracion_segundos: float = 3.0) -> str:
+    """
+    Función de conveniencia a nivel de módulo: punto de entrada recomendado
+    para responder '¿qué ves?'. Delega en revan_cam.capturar_y_analizar().
+
+    (Antes esta función llamaba a 'revan_cam.analizar_ahnnora(...)', un
+    nombre de método que no existía -> AttributeError si algo la invocaba.
+    Ya no se usa ese método fire-and-forget aquí, sino el bloqueante nuevo.)
+    """
+    return revan_cam.capturar_y_analizar(
+        duracion_segundos=duracion_segundos,
+        voz_ia=voz_ia,
+        sincronizar_estado_esfera=sincronizar_estado_esfera,
+    )

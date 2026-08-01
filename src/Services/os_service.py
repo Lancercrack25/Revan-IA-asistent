@@ -307,70 +307,8 @@ def _analizar_frame_con_llava(frame) -> str:
         print(f" Error en el módulo de visión API: {e}")
         return f"Error al procesar la imagen con el servicio de visión: {e}"
 
-def analizar_entorno_vision(mostrar_ventana: bool = True, duracion_segundos: float = 3.0) -> str:
-    print("[REVAN Vision]: Activando sensor óptico...")
+def analizar_entorno_vision() -> str:
 
-    # Usar CAP_DSHOW en Windows para apertura instantánea
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)
+    from src.Camara.open_camera import revan_cam
 
-    if not cap.isOpened():
-        return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
-
-    nombre_ventana = "REVAN - Vista en vivo"
-    frame_final = None
-
-    try:
-        # --- Warm-up: descarta los primeros frames antes de mostrar/capturar
-        # nada. Sin esto, el frame inicial suele venir oscuro o con ruido.
-        for _ in range(10):
-            cap.read()
-
-        tiempo_inicio = time.time()
-
-        if mostrar_ventana:
-            cv2.namedWindow(nombre_ventana, cv2.WINDOW_NORMAL)
-
-        while (time.time() - tiempo_inicio) < duracion_segundos:
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                continue
-
-            frame_final = frame  # siempre nos quedamos con el último frame válido
-
-            if mostrar_ventana:
-                segundos_restantes = max(
-                    0, int(duracion_segundos - (time.time() - tiempo_inicio)) + 1
-                )
-                frame_mostrado = frame.copy()
-                cv2.putText(
-                    frame_mostrado,
-                    f"REVAN analizando en {segundos_restantes}s... (ESC para cancelar)",
-                    (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 170),
-                    2,
-                    cv2.LINE_AA,
-                )
-                cv2.imshow(nombre_ventana, frame_mostrado)
-
-                # waitKey es obligatorio para que la ventana refresque.
-                tecla = cv2.waitKey(1) & 0xFF
-                if tecla in (27, ord('q')):  # ESC o 'q' cancela antes de tiempo
-                    break
-
-    finally:
-        cap.release()
-        if mostrar_ventana:
-            try:
-                cv2.destroyWindow(nombre_ventana)
-            except Exception:
-                pass
-            # waitKey adicional para forzar que Windows procese el cierre de
-            # la ventana antes de continuar (evita ventanas "congeladas").
-            cv2.waitKey(1)
-
-    if frame_final is None:
-        return "No logré capturar una imagen estable de la cámara, Señor."
-
-    return _analizar_frame_con_llava(frame_final)
+    return revan_cam.capturar_y_analizar(duracion_segundos=3.0)
