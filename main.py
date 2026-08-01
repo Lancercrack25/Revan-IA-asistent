@@ -70,7 +70,6 @@ def es_intencion_de_comando(texto: str) -> bool:
     return es_orden
 
 def hilo_servidor_web():
-    """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D y el dashboard en un hilo dedicado."""
     try:
         servidor = iniciar_servidor_ui()
         servidor.run()
@@ -78,7 +77,6 @@ def hilo_servidor_web():
         print(f" Error en el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
-    """Envía los estados de voz e IA al loop de la esfera 3D vía WebSocket."""
     try:
         transmitir_desde_hilo_externo(estado, color_hex)
     except Exception as e:
@@ -91,7 +89,6 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
         print(f" Error al sincronizar chat del dashboard: {e}")
 
 def apagar_sistema():
-    """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
     global sistema_activo, esta_hablando
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
@@ -116,9 +113,9 @@ def apagar_sistema():
 def encender_sistemas():
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, titulo, sistema_activo, esta_hablando
     sistema_activo = True
-
     print("Inicializando secuencia de despliegue cronológico...")
     print("[1/2] Desplegando monitores nativos...")
+
     try:
         desplegar_monitores_windows()
     except Exception as e:
@@ -399,7 +396,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_mail:
                 print(f"[Email Error]: {err_mail}")
 
-        # --- 4. MÓDULO AGENDA ---
         es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
         es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
 
