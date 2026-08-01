@@ -240,7 +240,18 @@ def _analizar_frame_con_llava(frame) -> str:
         _, buffer = cv2.imencode('.jpg', frame)
         base64_image = base64.b64encode(buffer).decode('utf-8')
         
-        prompt_texto = "Describe brevemente en español y en una sola frase ejecutiva qué ves en esta imagen frente a la cámara."
+        prompt_texto = (
+            "Estás viendo una imagen capturada por la webcam de una PC de escritorio. "
+            "Describe en español, en una sola frase breve, ÚNICAMENTE lo que puedas "
+            "confirmar con certeza que aparece en la imagen. "
+            "Sé literal y conservador: si la imagen está oscura, borrosa, muestra solo una "
+            "pared o un espacio vacío, o no puedes identificar el contenido con certeza, "
+            "dilo explícitamente (por ejemplo: 'La imagen no muestra nada identificable con "
+            "claridad'). No inventes personas, objetos, ni escenas que no estén realmente "
+            "visibles. No asumas contexto externo: esta es la webcam de una computadora, no "
+            "una cámara de seguridad exterior, así que no describas entradas, calles ni "
+            "repartidores a menos que literalmente se vean en la imagen."
+        )
 
         # INTENTO 1: NVIDIA NIM API (Llama 3.2 11B Vision)
         if nvidia_key and OpenAI:
@@ -296,8 +307,7 @@ def _analizar_frame_con_llava(frame) -> str:
         print(f" Error en el módulo de visión API: {e}")
         return f"Error al procesar la imagen con el servicio de visión: {e}"
 
-def analizar_entorno_vision() -> str:
-    """Captura un fotograma de la webcam (abre y cierra la cámara) y lo analiza con la API."""
+def analizar_entorno_vision(mostrar_ventana: bool = True, duracion_segundos: float = 3.0) -> str:
     print("[REVAN Vision]: Activando sensor óptico...")
 
     # Usar CAP_DSHOW en Windows para apertura instantánea
@@ -306,9 +316,61 @@ def analizar_entorno_vision() -> str:
     if not cap.isOpened():
         return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
 
-    ret, frame = cap.read()
-    cap.release()
+    nombre_ventana = "REVAN - Vista en vivo"
+    frame_final = None
 
-    if not ret or frame is None:
-        return "Error al capturar la imagen de la cámara."
-    return _analizar_frame_con_llava(frame)
+    try:
+        # --- Warm-up: descarta los primeros frames antes de mostrar/capturar
+        # nada. Sin esto, el frame inicial suele venir oscuro o con ruido.
+        for _ in range(10):
+            cap.read()
+
+        tiempo_inicio = time.time()
+
+        if mostrar_ventana:
+            cv2.namedWindow(nombre_ventana, cv2.WINDOW_NORMAL)
+
+        while (time.time() - tiempo_inicio) < duracion_segundos:
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                continue
+
+            frame_final = frame  # siempre nos quedamos con el último frame válido
+
+            if mostrar_ventana:
+                segundos_restantes = max(
+                    0, int(duracion_segundos - (time.time() - tiempo_inicio)) + 1
+                )
+                frame_mostrado = frame.copy()
+                cv2.putText(
+                    frame_mostrado,
+                    f"REVAN analizando en {segundos_restantes}s... (ESC para cancelar)",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 170),
+                    2,
+                    cv2.LINE_AA,
+                )
+                cv2.imshow(nombre_ventana, frame_mostrado)
+
+                # waitKey es obligatorio para que la ventana refresque.
+                tecla = cv2.waitKey(1) & 0xFF
+                if tecla in (27, ord('q')):  # ESC o 'q' cancela antes de tiempo
+                    break
+
+    finally:
+        cap.release()
+        if mostrar_ventana:
+            try:
+                cv2.destroyWindow(nombre_ventana)
+            except Exception:
+                pass
+            # waitKey adicional para forzar que Windows procese el cierre de
+            # la ventana antes de continuar (evita ventanas "congeladas").
+            cv2.waitKey(1)
+
+    if frame_final is None:
+        return "No logré capturar una imagen estable de la cámara, Señor."
+
+    return _analizar_frame_con_llava(frame_final)

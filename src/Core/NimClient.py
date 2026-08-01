@@ -29,6 +29,8 @@ from src.Automation.System_commands import (
 )
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
+from src.Core.text_utils import limpiar_texto_para_voz
+from src.Emails.email_control import contar_correos_sin_leer, leer_ultimos_correos
 
 HERRAMIENTAS = [
     {
@@ -220,6 +222,39 @@ HERRAMIENTAS = [
                 "required": ["destinatario", "mensaje"],
             },
         },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "contar_correos_no_leidos",
+            "description": (
+                "Consulta por IMAP la cantidad EXACTA de correos sin leer en la bandeja de "
+                "entrada. Úsala SIEMPRE que el usuario pregunte cuántos correos tiene "
+                "pendientes, sin leer, o por revisar. NUNCA inventes un número de correos: "
+                "si no puedes usar esta herramienta, di que no pudiste verificarlo."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "leer_correos_recientes",
+            "description": (
+                "Consulta por IMAP el remitente y asunto de los últimos correos recibidos "
+                "en la bandeja de entrada. Úsala cuando el usuario pida revisar, leer o ver "
+                "sus correos recientes. NUNCA inventes remitentes ni asuntos."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cantidad": {
+                        "type": "integer",
+                        "description": "Cuántos correos recientes traer. Por defecto 3.",
+                    }
+                },
+            },
+        },
     }
 ]
 
@@ -244,15 +279,20 @@ class NimClient:
             "- Tienes herramientas (functions/tools) integradas para controlar la PC.\n"
             "- Cuando el usuario te pida abrir, lanzar o ejecutar un juego o aplicación (ej. 'Abre Minecraft', 'Abre Discord'), NUNCA le des instrucciones de cómo hacerlo él mismo.\n"
             "- DEBES invocar inmediatamente la herramienta correspondiente (lanzar_videojuego o abrir_aplicacion por ejemplo).\n"
+            "- PROHIBIDO INVENTAR DATOS: para cantidad de correos, contenido de correos, o "
+            "cualquier dato verificable, SIEMPRE usa la herramienta correspondiente "
+            "(contar_correos_no_leidos, leer_correos_recientes, etc.). Si la herramienta falla "
+            "o no existe una herramienta para lo que te piden, dilo explícitamente. Nunca "
+            "generes un número o dato inventado para sonar útil.\n"
         )
 
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
     def _limpiar_para_voz(self, texto: str) -> str:
-        if not texto: return ""
-        texto = re.sub(r'[A-Za-z]:\\[^ \n]+', 'su equipo', texto)
-        texto = texto.replace("_", " ").replace("%", " por ciento")
-        return texto.strip()
+        # Delegado al limpiador centralizado (src/Core/text_utils.py), que ahora
+        # también se aplica al resto de módulos (Network, etc.) desde main.py.
+        # Se mantiene este método por compatibilidad con el resto de la clase.
+        return limpiar_texto_para_voz(texto)
 
     def _guardar_nota(self, clave: str, contenido: str) -> str:
         if not clave or not contenido:
@@ -363,6 +403,26 @@ class NimClient:
                 mensaje = argumentos.get("mensaje", "")
                 resultado = preparar_envio_inteligente(destinatario, mensaje)
                 registrar_accion_sistema(f"whatsapp({destinatario})", resultado, "WHATSAPP")
+                return resultado
+
+            elif nombre == "contar_correos_no_leidos":
+                cantidad = contar_correos_sin_leer()
+                if cantidad >= 0:
+                    resultado = f"Tiene {cantidad} correos sin leer en su bandeja de entrada."
+                else:
+                    resultado = "No pude verificar la cantidad de correos sin leer. Revise sus credenciales de acceso."
+                registrar_accion_sistema("contar_correos_no_leidos", resultado, "EMAIL_CONTEO")
+                return resultado
+
+            elif nombre == "leer_correos_recientes":
+                cantidad = argumentos.get("cantidad", 3)
+                try:
+                    cantidad = max(1, min(int(cantidad), 10))
+                except (TypeError, ValueError):
+                    cantidad = 3
+                resumenes = leer_ultimos_correos(max_resultados=cantidad)
+                resultado = " ".join(resumenes)
+                registrar_accion_sistema(f"leer_correos_recientes({cantidad})", resultado, "EMAIL_LECTURA")
                 return resultado
 
             else:
