@@ -36,14 +36,7 @@ class RevanCameraManager:
         return (pixeles_cambiados / total_pixeles) * 100
 
     def abrir_camara(self, voz_ia=None, sincronizar_estado_esfera=None, duracion_preview=None):
-        """Inicia el pipeline visual y la ventana OpenCV.
-
-        duracion_preview: si se especifica (segundos), el hilo de cámara se
-        detiene solo automáticamente tras ese tiempo. Se usa para el modo
-        'un solo disparo' de analizar_camara (vista previa breve + análisis),
-        a diferencia del modo vigilancia, que corre indefinidamente hasta que
-        se lo detiene explícitamente (duracion_preview=None).
-        """
+        """Inicia la cámara en un hilo separado y muestra el HUD cibernético."""
         if self.is_running:
             print("[CAM]: La cámara ya está activa.")
             return False
@@ -210,13 +203,6 @@ class RevanCameraManager:
         print(f"[CAM]: Vigilancia {'ACTIVADA' if activar else 'DESACTIVADA'}.")
 
     def analizar_ahora(self, voz_ia=None, sincronizar_estado_esfera=None):
-        """
-        Análisis 'fire-and-forget': dispara el análisis en un hilo aparte y
-        responde de inmediato sin esperar. Pensado para cuando la vigilancia
-        ya está corriendo y solo quieres forzar un análisis manual sin
-        interrumpir el feed en vivo (la respuesta hablada llega después,
-        de forma asíncrona, vía voz_ia dentro de _ejecutar_analisis_llava).
-        """
         with self.lock:
             if self.current_frame is None:
                 return "No hay señal de cámara activa."
@@ -231,27 +217,6 @@ class RevanCameraManager:
 
     def capturar_y_analizar(self, duracion_segundos: float = 3.0,
                              voz_ia=None, sincronizar_estado_esfera=None) -> str:
-        """
-        Punto de entrada ÚNICO para 'REVAN, ¿qué ves?' / 'enciende la cámara
-        y dime qué ves'. Es BLOQUEANTE: espera el resultado real de la API de
-        visión y lo retorna como texto, para que quien la invoque (la tool
-        'analizar_camara' de NimClient) lo hable una sola vez.
-
-        - Si la cámara YA está activa (vigilancia u otro preview en curso),
-          reutiliza el feed en vivo que ya se está mostrando: solo toma el
-          frame actual y lo analiza, sin abrir una segunda ventana.
-        - Si la cámara está apagada, la abre, muestra el HUD en vivo durante
-          'duracion_segundos' (dando tiempo a que el autoexposure se
-          estabilice y a que el usuario vea lo que se está capturando), toma
-          el último frame estable y cierra la cámara automáticamente al
-          terminar — igual que se comportaba antes de tener vigilancia.
-
-        ANTES: existían dos pipelines de cámara desconectados (este
-        RevanCameraManager con HUD/vigilancia, y una captura simple y sin
-        preview en os_service.py). 'Qué ves' usaba la segunda, que no tenía
-        ventana en vivo ni warm-up de frames. Ahora ambos casos de uso pasan
-        por esta misma clase.
-        """
         camara_ya_activa = self.is_running
 
         if not camara_ya_activa:
@@ -322,14 +287,6 @@ def vigilancia_activa() -> bool:
     return revan_cam.vigilancia_activa or revan_cam.is_running
 
 def analizar_que_ve_camara(voz_ia=None, sincronizar_estado_esfera=None, duracion_segundos: float = 3.0) -> str:
-    """
-    Función de conveniencia a nivel de módulo: punto de entrada recomendado
-    para responder '¿qué ves?'. Delega en revan_cam.capturar_y_analizar().
-
-    (Antes esta función llamaba a 'revan_cam.analizar_ahnnora(...)', un
-    nombre de método que no existía -> AttributeError si algo la invocaba.
-    Ya no se usa ese método fire-and-forget aquí, sino el bloqueante nuevo.)
-    """
     return revan_cam.capturar_y_analizar(
         duracion_segundos=duracion_segundos,
         voz_ia=voz_ia,
