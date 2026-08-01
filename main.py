@@ -12,6 +12,7 @@ from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
+from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
 from src.Interfaces.servidor import (iniciar_servidor_ui, transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo, registrar_manejador_comando_texto,)
 from src.Database.init import inicializar_base_datos
@@ -251,6 +252,9 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion, esta_hablando
         
+        # El dashboard SÍ recibe el texto completo (con IPs, nombres de archivo, etc.),
+        # solo la voz pasa por el limpiador -> se ve todo el detalle pero no se
+        # escuchan pronunciaciones raras de IPs, rutas o nombres de archivo.
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
@@ -262,7 +266,8 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             
             if voz_ia:
                 try:
-                    voz_ia.hablar(texto_respuesta)
+                    texto_voz = limpiar_texto_para_voz(texto_respuesta)
+                    voz_ia.hablar(texto_voz)
                 except Exception as err_voz:
                     print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
             
