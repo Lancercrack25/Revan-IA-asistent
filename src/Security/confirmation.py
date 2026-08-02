@@ -1,5 +1,37 @@
+"""
+Gestor genérico de 'acciones pendientes de confirmación', con expiración
+(TTL).
+
+Este patrón ya existía duplicado de forma ad-hoc en
+src/Phone/whatsapp_service.py (variable global ACCION_PENDIENTE). Se
+extrajo aquí para que CUALQUIER módulo que vaya a ejecutar una acción
+potencialmente irreversible -el futuro Coder_agent ejecutando código
+generado por IA, borrar archivos, enviar mensajes, etc.- pueda exigir
+confirmación explícita del usuario sin reimplementar la misma lógica de
+TTL y de coincidencia de frases cada vez (y sin repetir el bug que tuvo
+whatsapp_service.py: interpretar "si"/"no" como substring en cualquier
+parte de una frase no relacionada).
+
+Uso típico:
+
+    gestor = GestorConfirmacion(ttl_segundos=60)
+
+    def _ejecutar():
+        return hacer_la_accion_real()
+
+    texto_para_hablar = gestor.solicitar(
+        descripcion="Voy a ejecutar 'borrar_temporales.py' en su equipo.",
+        callback_confirmar=_ejecutar,
+    )
+    # ... más tarde, con la siguiente orden del usuario:
+    respuesta = gestor.procesar_respuesta(orden_usuario)
+    if respuesta:
+        # el usuario confirmó o canceló, 'respuesta' ya trae el resultado
+        ...
+"""
 import time
 from typing import Callable, Optional
+from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
 FRASES_CONFIRMAR = {
     "confirma", "confirmar", "confirmalo", "confírmalo", "procede", "adelante",
@@ -12,6 +44,7 @@ FRASES_CANCELAR = {
 }
 
 _MAX_PALABRAS_RESPUESTA_CORTA = 4
+
 
 class GestorConfirmacion:
     def __init__(self, ttl_segundos: int = 60):
@@ -35,6 +68,12 @@ class GestorConfirmacion:
             "cancelar": callback_cancelar,
             "timestamp": time.time(),
         }
+        registrar_evento(
+            modulo="confirmacion",
+            accion="solicitar",
+            resultado=f"Acción pendiente registrada: {descripcion}",
+            nivel=NIVEL_INFO,
+        )
         return (
             f"Señor, esto es lo que voy a hacer:\n» {descripcion}\n\n"
             f"¿Confirmo? Responda 'confirma' o 'cancela'."
