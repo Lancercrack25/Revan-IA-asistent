@@ -3,6 +3,7 @@ import sys
 import webbrowser
 import subprocess
 import urllib.parse
+from src.Security.sanitizador import sanitizar_o_rechazar, EntradaNoSeguraError
 
 sys.dont_write_bytecode = True
 
@@ -10,7 +11,9 @@ sys.dont_write_bytecode = True
 def desplegar_monitores_windows() -> bool:
     """Despliega la configuración de monitores nativos en Windows."""
     try:
-        subprocess.Popen("displayswitch.exe /extend", shell=True)
+        # Lista de argumentos, sin shell=True: displayswitch.exe /extend no
+        # necesita ningún shell para ejecutarse.
+        subprocess.Popen(["displayswitch.exe", "/extend"], shell=False)
         print("[SystemCommands]: Monitores de Windows configurados correctamente.")
         return True
     except Exception as e:
@@ -88,14 +91,22 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
     if not nombre_clean:
         return "Señor, no se especificó el nombre de ninguna aplicación."
 
+    # Primera línea de defensa: si el nombre trae caracteres que no pintan
+    # nada en un nombre de app legítimo (&, |, ;, backticks, etc.), se
+    # rechaza aquí mismo, antes de intentar abrir nada.
+    try:
+        nombre = sanitizar_o_rechazar(nombre, contexto="nombre de aplicación")
+    except EntradaNoSeguraError as err_sanit:
+        return f"Señor, no puedo procesar ese nombre de aplicación: {err_sanit}"
+
     try:
         # 1. Aplicaciones conocidas / URIs / Protocolos
         if any(k in nombre_clean for k in ["calc", "calculadora"]):
-            subprocess.Popen("calc.exe")
+            subprocess.Popen(["calc.exe"], shell=False)
             return "Calculadora abierta, Señor."
 
         elif any(k in nombre_clean for k in ["bloc", "notepad", "notas"]):
-            subprocess.Popen("notepad.exe")
+            subprocess.Popen(["notepad.exe"], shell=False)
             return "Bloc de notas abierto, Señor."
 
         elif any(k in nombre_clean for k in ["brave", "chrome", "navegador", "internet"]):
@@ -103,20 +114,25 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
             return "Navegador abierto, Señor."
 
         elif "discord" in nombre_clean:
-            # Comando nativo exacto para Discord en Windows
-            subprocess.Popen(r'start "" "%LocalAppData%\Discord\Update.exe" --processStart Discord.exe', shell=True)
+            # os.startfile no soporta pasar argumentos extra, así que aquí
+            # sí necesitamos subprocess -pero como LISTA de argumentos, sin
+            # pasar nunca por un shell que interprete '&', '|', etc.
+            discord_exe = os.path.expandvars(r"%LocalAppData%\Discord\Update.exe")
+            subprocess.Popen([discord_exe, "--processStart", "Discord.exe"], shell=False)
             return "Desplegando Discord, Señor."
 
         elif "whatsapp" in nombre_clean:
-            subprocess.Popen("start whatsapp:", shell=True)
+            # os.startfile invoca ShellExecute directamente, sin pasar por
+            # cmd.exe -es la forma más segura de abrir un protocolo/URI.
+            os.startfile("whatsapp:")
             return "Desplegando WhatsApp, Señor."
 
         elif "steam" in nombre_clean:
-            subprocess.Popen("start steam:", shell=True)
+            os.startfile("steam:")
             return "Iniciando Steam, Señor."
 
         elif "xbox" in nombre_clean:
-            subprocess.Popen("start xbox:", shell=True)
+            os.startfile("xbox:")
             return "Iniciando xbox, Señor."
 
         # 2. Búsqueda automática de accesos directos (.lnk) en el Menú Inicio de Windows
@@ -135,44 +151,62 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
                             os.startfile(ruta_completa)
                             return f"Ejecutando {nombre} desde su sistema, Señor."
 
-        # 3. Intento de fallback mediante 'start' nativo
-        res = os.system(f'start "" "{nombre}"')
-        if res == 0:
+        # 3. Intento de fallback: os.startfile invoca ShellExecute
+        # directamente (sin pasar por cmd.exe/shell), a diferencia de
+        # os.system('start ...') que sí interpreta la cadena con un shell.
+        try:
+            os.startfile(nombre)
             return f"Ejecutando {nombre}, Señor."
-
-        return f"No se encontró la aplicación {nombre} en el equipo, Señor."
+        except OSError:
+            return f"No se encontró la aplicación {nombre} en el equipo, Señor."
 
     except Exception as e:
         return f"Error al lanzar la aplicación {nombre}: {e}"
 
 def lanzar_videojuego(nombre_juego: str) -> str:
+    try:
+        nombre_juego = sanitizar_o_rechazar(nombre_juego, contexto="nombre de videojuego")
+    except EntradaNoSeguraError as err_sanit:
+        return f"Señor, no puedo procesar ese nombre de juego: {err_sanit}"
+
     nombre = nombre_juego.lower().strip()
     try:
         if "minecraft" in nombre:
-            os.system("start minecraft:")
+            os.startfile("minecraft:")
             return "Iniciando Minecraft."
         else:
-            os.system(f"start {nombre_juego}")
-            return f"Iniciando {nombre_juego}."
+            try:
+                os.startfile(nombre_juego)
+                return f"Iniciando {nombre_juego}."
+            except OSError:
+                return f"No se encontró el juego {nombre_juego}, Señor."
     except Exception as e:
         return f"Error al intentar abrir el juego: {e}"
 
 def ejecutar_aplicacion_office(app: str) -> str:
     """Abre aplicaciones de la suite Microsoft Office."""
+    try:
+        app = sanitizar_o_rechazar(app, contexto="nombre de aplicación de Office")
+    except EntradaNoSeguraError as err_sanit:
+        return f"Señor, no puedo procesar esa entrada: {err_sanit}"
+
     nombre = app.lower().strip()
     try:
         if "word" in nombre:
-            subprocess.Popen("winword.exe")
+            subprocess.Popen(["winword.exe"], shell=False)
             return "Microsoft Word iniciado."
         elif "excel" in nombre:
-            subprocess.Popen("excel.exe")
+            subprocess.Popen(["excel.exe"], shell=False)
             return "Microsoft Excel iniciado."
         elif "powerpoint" in nombre or "ppt" in nombre:
-            subprocess.Popen("powerpnt.exe")
+            subprocess.Popen(["powerpnt.exe"], shell=False)
             return "Microsoft PowerPoint iniciado."
         else:
-            os.system(f"start {app}")
-            return f"Ejecutando {app}."
+            try:
+                os.startfile(app)
+                return f"Ejecutando {app}."
+            except OSError:
+                return f"No se encontró la aplicación de Office '{app}', Señor."
     except Exception as e:
         return f"Error al abrir la aplicación de Office '{app}': {e}"
 
