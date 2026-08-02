@@ -25,7 +25,6 @@ ejecutar_codigo_python(), pasa el código generado por el modelo por
 GestorConfirmacion (src/Security/confirmacion.py) para que el usuario
 apruebe explícitamente qué se va a correr.
 """
-
 import os
 import subprocess
 import tempfile
@@ -97,10 +96,6 @@ def ejecutar_codigo_python(codigo: str, timeout_segundos: int = TIMEOUT_SEGUNDOS
 
 def ejecutar_comando_sistema(comando: list, timeout_segundos: int = TIMEOUT_SEGUNDOS_DEFAULT) -> ResultadoSandbox:
     """
-    Ejecuta un comando de sistema como LISTA de argumentos — nunca como
-    string con shell=True. Cada argumento pasa por el validador de
-    sanitizador.py antes de construir el comando.
-
     Uso correcto:
         ejecutar_comando_sistema(["git", "status"])
 

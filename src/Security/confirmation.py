@@ -91,21 +91,11 @@ class GestorConfirmacion:
         return self._pendiente["descripcion"] if self.hay_pendiente() else None
 
     def procesar_respuesta(self, texto_respuesta: str) -> Optional[str]:
-        """
-        Devuelve el resultado de confirmar/cancelar si 'texto_respuesta' es
-        una respuesta corta y exacta a una de las frases reconocidas.
-        Devuelve None si no hay nada pendiente, si expiró, o si la respuesta
-        es en realidad una orden distinta no relacionada con la
-        confirmación (en cuyo caso NO se toca la acción pendiente, sigue
-        esperando).
-        """
         if not self.hay_pendiente():
             return None
 
         respuesta = (texto_respuesta or "").lower().strip().rstrip(".!¡¿?")
 
-        # Respuestas largas = el usuario está pidiendo otra cosa, no
-        # confirmando ni cancelando. No interceptamos.
         if len(respuesta.split()) > _MAX_PALABRAS_RESPUESTA_CORTA:
             return None
 

@@ -107,7 +107,6 @@ def apagar_sistema():
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
-
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
@@ -121,7 +120,6 @@ def encender_sistemas():
         desplegar_monitores_windows()
     except Exception as e:
         print(f"Aviso al desplegar monitores nativos: {e}")
-
     time.sleep(0.4)
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
 
@@ -173,10 +171,8 @@ def procesar_ciclo_voz():
         if esta_hablando:
             time.sleep(0.2)
             return
-
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         print("\n[REVAN]: Escuchando...")
-
         orden_sucia = oidos_ia.escuchar()
 
         if esta_hablando:
@@ -185,11 +181,9 @@ def procesar_ciclo_voz():
         if not orden_sucia or not orden_sucia.strip():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
-
         orden_minusculas = orden_sucia.lower().strip()
         orden_busqueda = quitar_acentos(orden_minusculas)
         print(f"[Captura]: '{orden_minusculas}'")
-
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
@@ -220,9 +214,7 @@ def procesar_ciclo_voz():
             threading.Thread(target=responder_listo, daemon=True).start()
             ultima_interaccion = time.time()
             return
-
         ejecutar_orden(orden_limpia, orden_mostrar=orden_sucia)
-
     except Exception as e:
         print(f"Error en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -244,17 +236,12 @@ def procesar_comando_texto(texto: str):
 
 def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     global cerebro_ia, gemini_ia, voz_ia, ultima_interaccion, esta_hablando
-
     orden_mostrar = orden_mostrar if orden_mostrar is not None else orden_limpia
     orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
 
     def _hablar_y_mostrar(texto_respuesta: str):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion, esta_hablando
-        
-        # El dashboard SÍ recibe el texto completo (con IPs, nombres de archivo, etc.),
-        # solo la voz pasa por el limpiador -> se ve todo el detalle pero no se
-        # escuchan pronunciaciones raras de IPs, rutas o nombres de archivo.
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
@@ -278,7 +265,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         threading.Thread(target=tarea_sincronizada_voz, daemon=True).start()
         ultima_interaccion = time.time()
-
     try:
         # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
@@ -295,7 +281,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             apagar_sistema()
             return
 
-        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
             "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
@@ -304,16 +289,11 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
             reproducir_sfx("modules", "Sonidos")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            
-            # Avisa por voz de forma limpia antes de ponerse a escuchar
             hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
-            
-            # Ejecuta la captura por Loopback y la consulta en Shazam
             respuesta_musica = identificar_y_abrir_cancion()
             
             _hablar_y_mostrar(respuesta_musica)
             return
-
         # --- 3. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
@@ -362,10 +342,9 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             prompt_redaccion = f"Redacta un correo profesional basado en esta solicitud del usuario: '{orden_limpia}'. Devuelve únicamente el asunto y el cuerpo del mensaje bien formateados."
-            
             cuerpo_generado = cerebro_ia.generar_respuesta(prompt_redaccion) if cerebro_ia else "No fue posible generar la redacción automáticamente."
-            
             destinatario = "correo_por_defecto@ejemplo.com"
+
             if " a " in orden_limpia:
                 partes = orden_limpia.split(" a ", 1)
                 destinatario = partes[1].split()[0].strip()
@@ -431,7 +410,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             )
             _hablar_y_mostrar(resultado_agendado)
             return
-
         # --- 5. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
@@ -443,7 +421,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             resultado = confirmar_envio_inteligente()
             _hablar_y_mostrar(resultado)
             return
-
+        
         if es_cancelacion:
             reproducir_sfx("modules", "whats")
             resultado = cancelar_envio_pendiente()
@@ -465,7 +443,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
-
         # --- 6. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
