@@ -10,6 +10,15 @@ debería rechazarla antes de que llegue tan lejos. No reemplaza usar
 subprocess sin shell=True (eso sigue siendo obligatorio); es una capa
 adicional, no la única.
 """
+
+# Caracteres sin motivo legítimo en un nombre de aplicación/archivo, y que
+# SÍ tienen significado especial para shells y parsers de línea de comandos
+# (cmd.exe, PowerShell, bash): encadenar comandos, redirección, sustitución.
+from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
+# Caracteres sin motivo legítimo en un nombre de aplicación/archivo, y que
+# SÍ tienen significado especial para shells y parsers de línea de comandos
+# (cmd.exe, PowerShell, bash): encadenar comandos, redirección, sustitución.
 _CARACTERES_PELIGROSOS = set('&|;`$()<>^\n\r"\'')
 
 _LONGITUD_MAXIMA = 120
@@ -22,6 +31,7 @@ class EntradaNoSeguraError(ValueError):
     """
     pass
 
+
 def es_entrada_segura(texto: str) -> bool:
     """Chequeo booleano rápido, sin lanzar excepción."""
     if not texto or not isinstance(texto, str):
@@ -31,6 +41,7 @@ def es_entrada_segura(texto: str) -> bool:
     if any(c in _CARACTERES_PELIGROSOS for c in texto):
         return False
     return True
+
 
 def sanitizar_o_rechazar(texto: str, contexto: str = "entrada") -> str:
     """
@@ -50,6 +61,15 @@ def sanitizar_o_rechazar(texto: str, contexto: str = "entrada") -> str:
 
     if not es_entrada_segura(texto):
         fragmento = texto[:50]
+        # Todo rechazo queda en el log de auditoría: un intento repetido de
+        # colar caracteres peligrosos es justo el tipo de patrón que quieres
+        # poder revisar después.
+        registrar_evento(
+            modulo="sanitizador",
+            accion=f"rechazo({contexto})",
+            resultado=f"Entrada rechazada por caracteres no permitidos o longitud excesiva: '{fragmento}'",
+            nivel=NIVEL_ADVERTENCIA,
+        )
         raise EntradaNoSeguraError(
             f"{contexto}: '{fragmento}' contiene caracteres no permitidos "
             f"o excede el largo máximo de {_LONGITUD_MAXIMA} caracteres."
