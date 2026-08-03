@@ -161,7 +161,6 @@ def encender_sistemas():
         desplegar_monitores_windows()
     except Exception as e:
         print(f"Aviso al desplegar monitores nativos: {e}")
-
     time.sleep(0.4)
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
 
@@ -295,7 +294,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         def tarea_sincronizada_voz():
             global esta_hablando
             esta_hablando = True
-            
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             
             if voz_ia:
@@ -343,7 +341,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
             respuesta_musica = identificar_y_abrir_cancion()
-            
             _hablar_y_mostrar(respuesta_musica)
             return
         
@@ -606,7 +603,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "redes")
             _hablar_y_mostrar(analizar_red())
             return
-
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
