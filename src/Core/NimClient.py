@@ -9,19 +9,28 @@ except ImportError:
     print("Falta la librería 'openai'. Instálala con: pip install openai")
     raise
 
-from src.Services.os_service import (analizar_entorno_vision,abrir_carpeta_sistema, crear_carpeta_sistema,obtener_ruta_actual,
+from src.Services.os_service import (
+    analizar_entorno_vision,
+    abrir_carpeta_sistema,
+    crear_carpeta_sistema,
+    obtener_ruta_actual,
     registrar_accion_sistema,
     ejecutar_limpieza_sistema,
     obtener_diagnostico_hardware,
 )
-from src.Automation.System_commands import (buscar_en_navegador_sistema,reproducir_video_brave,lanzar_aplicacion_usuario,
+from src.Automation.System_commands import (
+    buscar_en_navegador_sistema,
+    reproducir_video_brave,
+    lanzar_aplicacion_usuario,
     lanzar_videojuego,
     desplegar_monitores_windows,
     ejecutar_aplicacion_office,
     crear_y_abrir_documento_word,
+    crear_y_abrir_hoja_excel,
 )
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
+from src.Security.rate_limiter import permitir_accion
 from src.Core.text_utils import limpiar_texto_para_voz
 from src.Emails.email_control import contar_correos_sin_leer, leer_ultimos_correos
 from src.Security.proteccion_contenido import envolver_contenido_externo
@@ -59,15 +68,58 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "crear_documento_word",
-            "description": "Crea un archivo de Word (.docx) redactando información sobre una temática solicitada.",
+            "description": (
+                "Crea un archivo de Word (.docx) con contenido YA REDACTADO por ti sobre lo "
+                "que te pidieron (investigación, resumen, informe, etc.) y lo abre. NO pases "
+                "solo un tema suelto: escribe el contenido completo y bien estructurado tú "
+                "mismo antes de llamar a esta tool."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "nombre_archivo": {"type": "string", "description": "Nombre del archivo"},
-                    "contenido_o_tema": {"type": "string", "description": "Texto o tema dentro del archivo Word."},
-                    "carpeta_destino": {"type": "string", "description": "Carpeta destino."}
+                    "contenido": {
+                        "type": "string",
+                        "description": (
+                            "El contenido COMPLETO ya redactado, con estructura simple: usa "
+                            "'# Título' para encabezados principales, '## Subtítulo' para "
+                            "secundarios, '- ' al inicio de línea para viñetas, y líneas en "
+                            "blanco entre párrafos."
+                        ),
+                    },
+                    "carpeta_destino": {"type": "string", "description": "Carpeta destino (opcional)."}
                 },
-                "required": ["nombre_archivo", "contenido_o_tema"],
+                "required": ["nombre_archivo", "contenido"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "crear_hoja_excel",
+            "description": (
+                "Crea un archivo de Excel (.xlsx) con una tabla de datos YA PREPARADA por ti "
+                "(comparaciones, listas, cálculos, etc.) y lo abre. Tú generas los encabezados "
+                "y las filas de datos reales, no un resumen en texto."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre_archivo": {"type": "string", "description": "Nombre del archivo"},
+                    "titulo": {"type": "string", "description": "Título de la hoja/tabla"},
+                    "encabezados": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Nombres de columna, ej. ['Producto', 'Precio Tienda A', 'Precio Tienda B']",
+                    },
+                    "filas": {
+                        "type": "array",
+                        "items": {"type": "array", "items": {"type": "string"}},
+                        "description": "Filas de datos, cada una una lista alineada con 'encabezados'.",
+                    },
+                    "carpeta_destino": {"type": "string", "description": "Carpeta destino (opcional)."}
+                },
+                "required": ["nombre_archivo", "encabezados", "filas"],
             },
         },
     },
@@ -318,7 +370,30 @@ class NimClient:
         finally:
             liberar_conexion(conn)
 
+    _CATEGORIA_RATE_LIMIT = {
+        "enviar_whatsapp": "whatsapp",
+        "analizar_camara": "camara",
+        "crear_carpeta": "carpeta",
+        "limpiar_sistema": "limpieza_sistema",
+        "abrir_aplicacion": "comando_sistema",
+        "lanzar_aplicacion_usuario": "comando_sistema",
+        "lanzar_videojuego": "comando_sistema",
+        "abrir_office": "comando_sistema",
+        "crear_documento_word": "documentos",
+        "crear_hoja_excel": "documentos",
+        "contar_correos_no_leidos": "correo",
+        "leer_correos_recientes": "correo",
+    }
+
     def _ejecutar_herramienta(self, nombre: str, argumentos: dict) -> str:
+        categoria = self._CATEGORIA_RATE_LIMIT.get(nombre, "default")
+        if not permitir_accion(categoria):
+            return (
+                f"Señor, alcancé el límite de acciones de tipo '{categoria}' en el último "
+                f"minuto. Espere un momento antes de volver a intentarlo -esto es para "
+                f"evitar que un error se convierta en un bucle descontrolado-."
+            )
+
         try:
             if nombre == "buscar_en_navegador":
                 consulta = argumentos.get("consulta", "")
@@ -334,10 +409,20 @@ class NimClient:
 
             elif nombre == "crear_documento_word":
                 nombre_doc = argumentos.get("nombre_archivo", "Documento.docx")
-                tema = argumentos.get("contenido_o_tema", "Información general.")
+                contenido_doc = argumentos.get("contenido", argumentos.get("contenido_o_tema", ""))
                 carpeta = argumentos.get("carpeta_destino", "")
-                resultado = crear_y_abrir_documento_word(nombre_doc, tema, carpeta)
+                resultado = crear_y_abrir_documento_word(nombre_doc, contenido_doc, carpeta)
                 registrar_accion_sistema(f"word({nombre_doc})", resultado, "WORD")
+                return resultado
+
+            elif nombre == "crear_hoja_excel":
+                nombre_xlsx = argumentos.get("nombre_archivo", "Hoja.xlsx")
+                titulo_xlsx = argumentos.get("titulo", "")
+                encabezados = argumentos.get("encabezados", [])
+                filas = argumentos.get("filas", [])
+                carpeta = argumentos.get("carpeta_destino", "")
+                resultado = crear_y_abrir_hoja_excel(nombre_xlsx, titulo_xlsx, encabezados, filas, carpeta)
+                registrar_accion_sistema(f"excel({nombre_xlsx})", resultado, "EXCEL")
                 return resultado
 
             elif nombre == "lanzar_videojuego":
@@ -429,6 +514,7 @@ class NimClient:
             return f"Error ejecutando '{nombre}': {e}"
 
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
+        # 1. INTERCEPTACIÓN PRIORITARIA DE CONFIRMACIONES (Evita llamadas innecesarias a la API)
         respuesta_confirmacion = procesar_confirmacion(orden_usuario)
         if respuesta_confirmacion:
             self.historial.append({"role": "user", "content": orden_usuario})

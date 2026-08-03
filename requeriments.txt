@@ -2,7 +2,7 @@
 # Generado escaneando los imports reales de todo el proyecto (no es una
 # lista genérica). Instalar con:
 #   pip install -r requirements.txt
-
+#
 # Nota: varias librerías (opencv, mediapipe, pygame, sounddevice) requieren
 # que el sistema tenga las dependencias nativas correspondientes (drivers de
 # audio/video). Si algo falla al instalar, primero revisa el mensaje de error
@@ -34,6 +34,7 @@ shazamio==0.7.0
 
 # --- Documentos ---
 python-docx==1.1.2
+openpyxl==3.1.5
 
 # --- Correo ---
 python-dotenv==1.0.1           # carga de variables de entorno (.env)
