@@ -153,6 +153,14 @@ def _sanear_nombre_carpeta(nombre: str) -> str:
     return limpio or "Contenedor_Táctico"
 
 
+def _es_ruta_base_segura(ruta_absoluta: str) -> bool:
+    """Delegado a src/Security/sanitizador.py -una sola fuente de verdad
+    para 'qué ruta es segura para escribir archivos', reutilizada también
+    por System_commands.py."""
+    from src.Security.sanitizador import es_ruta_segura
+    return es_ruta_segura(ruta_absoluta)
+
+
 def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") -> str:
     """
     Crea una carpeta física.
@@ -160,7 +168,8 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
       - "actual"    -> dentro del foco de trabajo activo (última ruta usada, en PostgreSQL)
       - algo que contenga "escritorio" / "desktop" -> directo en el Escritorio
       - algo que contenga "documento" -> directo en Documentos
-      - cualquier otra ruta absoluta -> se usa tal cual
+      - una ruta absoluta DENTRO del directorio del usuario -> se usa tal cual
+      - una ruta absoluta FUERA del directorio del usuario -> se rechaza
     """
     nombre_nueva_carpeta = _sanear_nombre_carpeta(nombre_nueva_carpeta)
     base = (ruta_base or "actual").lower().strip()
@@ -171,6 +180,19 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     elif base in ("", "actual"):
         ruta_padre = obtener_ruta_actual()
     elif os.path.isabs(ruta_base):
+        if not _es_ruta_base_segura(ruta_base):
+            from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+            registrar_evento(
+                modulo="os_service",
+                accion="crear_carpeta_sistema",
+                resultado=f"Ruta rechazada por estar fuera del directorio del usuario: '{ruta_base}'",
+                nivel=NIVEL_ADVERTENCIA,
+            )
+            return (
+                f"Señor, no voy a crear nada en '{ruta_base}' porque está fuera de su "
+                f"carpeta de usuario. Dígame que la cree en Escritorio, Documentos, o en "
+                f"la carpeta actual."
+            )
         ruta_padre = ruta_base
     else:
         ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
@@ -311,13 +333,6 @@ def analizar_entorno_vision() -> str:
     """
     Punto de entrada usado por la tool 'analizar_camara' de NimClient
     (comando de voz/texto: 'qué ves', 'enciende la cámara y dime qué ves').
-
-    ANTES: esta función tenía su propia lógica de apertura de cámara,
-    duplicando -de forma más simple y sin ventana en vivo- lo que ya existía
-    en src/Camara/open_camera.py (RevanCameraManager), que es el módulo que
-    también maneja el modo vigilancia. Eran dos pipelines de cámara
-    desconectados entre sí.
-
     AHORA: delega en RevanCameraManager.capturar_y_analizar(), que:
       1. Si la cámara ya está activa (p. ej. vigilancia corriendo), reutiliza
          ese mismo feed en vivo sin abrir una segunda ventana.

@@ -14,6 +14,8 @@ adicional, no la única.
 # Caracteres sin motivo legítimo en un nombre de aplicación/archivo, y que
 # SÍ tienen significado especial para shells y parsers de línea de comandos
 # (cmd.exe, PowerShell, bash): encadenar comandos, redirección, sustitución.
+import os
+
 from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
 
 # Caracteres sin motivo legítimo en un nombre de aplicación/archivo, y que
@@ -76,3 +78,23 @@ def sanitizar_o_rechazar(texto: str, contexto: str = "entrada") -> str:
         )
 
     return texto
+
+
+def es_ruta_segura(ruta_absoluta: str) -> bool:
+    """
+    Solo considera segura una ruta absoluta que quede DENTRO del directorio
+    del usuario (~). Se resuelve la ruta real (sin '..' ni symlinks
+    engañosos) antes de comparar.
+
+    Esta función es compartida por cualquier módulo que escriba archivos a
+    partir de una ruta que decide el LLM (crear_carpeta_sistema en
+    os_service.py, crear_y_abrir_documento_word / crear_y_abrir_hoja_excel
+    en System_commands.py) -antes cada uno tenía o no tenía esta
+    validación por separado; ahora es una sola fuente de verdad.
+    """
+    try:
+        home = os.path.realpath(os.path.expanduser("~"))
+        destino = os.path.realpath(ruta_absoluta)
+        return os.path.commonpath([destino, home]) == home
+    except Exception:
+        return False
