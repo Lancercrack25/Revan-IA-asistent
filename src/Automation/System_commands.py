@@ -3,6 +3,7 @@ import sys
 import webbrowser
 import subprocess
 import urllib.parse
+
 from src.Security.sanitizador import sanitizar_o_rechazar, EntradaNoSeguraError
 
 sys.dont_write_bytecode = True
@@ -45,40 +46,156 @@ def reproducir_video_brave(busqueda: str) -> str:
         return f"Error al abrir YouTube: {e}"
 
 
-def crear_y_abrir_documento_word(nombre_archivo: str, tema_o_contenido: str, carpeta_destino: str = None) -> str:
-    """Crea un archivo .docx REAL con contenido sobre el tema solicitado y lo abre en Microsoft Word."""
+def _resolver_ruta_destino_segura(nombre_archivo: str, carpeta_destino: str, extension: str):
+    """
+    Lógica compartida por los generadores de Word/Excel: sanea el nombre
+    de archivo, resuelve la carpeta destino, y RECHAZA cualquier ruta
+    absoluta fuera del directorio del usuario (antes esto se aceptaba tal
+    cual, sin ningún control -mismo hueco que se cerró en
+    crear_carpeta_sistema, ahora también aquí-).
+
+    Devuelve (ruta_completa, None) si todo bien, o (None, mensaje_error) si
+    se rechazó.
+    """
+    from src.Security.sanitizador import es_ruta_segura
+
+    nombre_archivo = "".join(c for c in nombre_archivo if c not in '<>:"/\\|?*').strip() or "Documento"
+    if not nombre_archivo.endswith(extension):
+        nombre_archivo += extension
+
+    if carpeta_destino and os.path.isabs(carpeta_destino):
+        if not es_ruta_segura(carpeta_destino):
+            return None, (
+                f"Señor, no voy a crear nada en '{carpeta_destino}' porque está fuera de su "
+                f"carpeta de usuario. Dígame que lo cree en Escritorio, Documentos, o "
+                f"déjeme usar la ubicación por defecto."
+            )
+        ruta_dir = carpeta_destino
+    elif carpeta_destino:
+        ruta_dir = os.path.join(os.path.expanduser("~"), "Desktop", carpeta_destino)
+    else:
+        ruta_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+
+    os.makedirs(ruta_dir, exist_ok=True)
+    return os.path.join(ruta_dir, nombre_archivo), None
+
+
+def crear_y_abrir_documento_word(nombre_archivo: str, contenido: str, carpeta_destino: str = None) -> str:
+    """
+    Crea un archivo .docx REAL con contenido ya redactado (no un tema
+    suelto) y lo abre en Microsoft Word.
+
+    'contenido' se espera ya escrito por el LLM, con esta convención
+    simple de estructura (no es markdown completo, solo lo mínimo para
+    dar formato real en vez de un solo párrafo plano):
+      - Una línea que empiece con "# " se convierte en encabezado (H1).
+      - Una línea que empiece con "## " se convierte en encabezado (H2).
+      - Líneas en blanco separan párrafos.
+      - Líneas que empiecen con "- " se convierten en viñetas.
+    """
     try:
-        if carpeta_destino and os.path.isabs(carpeta_destino):
-            ruta_dir = carpeta_destino
-        elif carpeta_destino:
-            ruta_dir = os.path.join(os.path.expanduser("~"), "Desktop", carpeta_destino)
-        else:
-            ruta_dir = os.path.join(os.path.expanduser("~"), "Desktop")
-
-        os.makedirs(ruta_dir, exist_ok=True)
-
-        if not nombre_archivo.endswith(".docx"):
-            nombre_archivo += ".docx"
-
-        ruta_completa = os.path.join(ruta_dir, nombre_archivo)
+        ruta_completa, error = _resolver_ruta_destino_segura(nombre_archivo, carpeta_destino, ".docx")
+        if error:
+            return error
 
         try:
             import docx
             doc = docx.Document()
-            doc.add_heading(nombre_archivo.replace(".docx", ""), level=1)
-            doc.add_paragraph(f"Documento generado por REVAN sobre la temática: {tema_o_contenido}\n")
-            doc.add_paragraph(tema_o_contenido)
+
+            for linea in (contenido or "").split("\n"):
+                linea_limpia = linea.rstrip()
+                if not linea_limpia.strip():
+                    continue
+                if linea_limpia.startswith("## "):
+                    doc.add_heading(linea_limpia[3:].strip(), level=2)
+                elif linea_limpia.startswith("# "):
+                    doc.add_heading(linea_limpia[2:].strip(), level=1)
+                elif linea_limpia.startswith("- "):
+                    doc.add_paragraph(linea_limpia[2:].strip(), style="List Bullet")
+                else:
+                    doc.add_paragraph(linea_limpia.strip())
+
             doc.save(ruta_completa)
         except ImportError:
-            with open(ruta_completa.replace(".docx", ".txt"), "w", encoding="utf-8") as f:
-                f.write(f"--- {nombre_archivo} ---\n\nTema: {tema_o_contenido}")
             ruta_completa = ruta_completa.replace(".docx", ".txt")
+            with open(ruta_completa, "w", encoding="utf-8") as f:
+                f.write(contenido or "")
 
         os.startfile(ruta_completa)
-        return f"Archivo '{nombre_archivo}' creado con éxito con la información sobre '{tema_o_contenido}' y abierto en pantalla."
+        return f"Documento '{os.path.basename(ruta_completa)}' creado y abierto en pantalla, Señor."
 
     except Exception as e:
         return f"Error al crear el documento: {e}"
+
+
+def crear_y_abrir_hoja_excel(nombre_archivo: str, titulo: str, encabezados: list,
+                              filas: list, carpeta_destino: str = None) -> str:
+    """
+    Crea un archivo .xlsx REAL con una tabla de datos (encabezados en
+    negrita + filas), lo formatea con ancho de columna razonable, y lo
+    abre en Excel.
+
+    encabezados: lista de strings, ej. ["Producto", "Precio A", "Precio B"]
+    filas: lista de listas, ej. [["Laptop X", "18000", "17500"], ...]
+    """
+    try:
+        ruta_completa, error = _resolver_ruta_destino_segura(nombre_archivo, carpeta_destino, ".xlsx")
+        if error:
+            return error
+
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Datos"
+
+            fila_actual = 1
+            if titulo:
+                ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(1, len(encabezados)))
+                celda_titulo = ws.cell(row=1, column=1, value=titulo)
+                celda_titulo.font = Font(bold=True, size=14)
+                celda_titulo.alignment = Alignment(horizontal="center")
+                fila_actual = 3
+
+            for col_idx, encabezado in enumerate(encabezados or [], start=1):
+                celda = ws.cell(row=fila_actual, column=col_idx, value=encabezado)
+                celda.font = Font(bold=True, color="FFFFFF")
+                celda.fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
+                celda.alignment = Alignment(horizontal="center")
+
+            for offset_fila, fila_datos in enumerate(filas or [], start=1):
+                for col_idx, valor in enumerate(fila_datos, start=1):
+                    ws.cell(row=fila_actual + offset_fila, column=col_idx, value=valor)
+
+            # Ancho de columna aproximado según el contenido más largo
+            for col_idx, encabezado in enumerate(encabezados or [], start=1):
+                letra_col = openpyxl.utils.get_column_letter(col_idx)
+                largo_max = len(str(encabezado))
+                for fila_datos in (filas or []):
+                    if col_idx <= len(fila_datos):
+                        largo_max = max(largo_max, len(str(fila_datos[col_idx - 1])))
+                ws.column_dimensions[letra_col].width = min(largo_max + 4, 40)
+
+            wb.save(ruta_completa)
+        except ImportError:
+            # Sin openpyxl instalado: CSV como respaldo, para que igual
+            # obtengas los datos aunque sin el formato visual de Excel.
+            import csv
+            ruta_completa = ruta_completa.replace(".xlsx", ".csv")
+            with open(ruta_completa, "w", encoding="utf-8", newline="") as f:
+                writer = csv.writer(f)
+                if encabezados:
+                    writer.writerow(encabezados)
+                for fila_datos in (filas or []):
+                    writer.writerow(fila_datos)
+
+        os.startfile(ruta_completa)
+        return f"Hoja de cálculo '{os.path.basename(ruta_completa)}' creada y abierta en pantalla, Señor."
+
+    except Exception as e:
+        return f"Error al crear la hoja de cálculo: {e}"
 
 def lanzar_aplicacion_usuario(nombre_app: str) -> str:
     """Lanza aplicaciones populares, accesos directos o ejecutables de Windows."""
@@ -122,8 +239,6 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
             return "Desplegando Discord, Señor."
 
         elif "whatsapp" in nombre_clean:
-            # os.startfile invoca ShellExecute directamente, sin pasar por
-            # cmd.exe -es la forma más segura de abrir un protocolo/URI.
             os.startfile("whatsapp:")
             return "Desplegando WhatsApp, Señor."
 
