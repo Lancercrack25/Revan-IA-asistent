@@ -36,7 +36,14 @@ class RevanCameraManager:
         return (pixeles_cambiados / total_pixeles) * 100
 
     def abrir_camara(self, voz_ia=None, sincronizar_estado_esfera=None, duracion_preview=None):
-        """Inicia la cámara en un hilo separado y muestra el HUD cibernético."""
+        """Inicia el pipeline visual y la ventana OpenCV.
+
+        duracion_preview: si se especifica (segundos), el hilo de cámara se
+        detiene solo automáticamente tras ese tiempo. Se usa para el modo
+        'un solo disparo' de analizar_camara (vista previa breve + análisis),
+        a diferencia del modo vigilancia, que corre indefinidamente hasta que
+        se lo detiene explícitamente (duracion_preview=None).
+        """
         if self.is_running:
             print("[CAM]: La cámara ya está activa.")
             return False
@@ -58,19 +65,14 @@ class RevanCameraManager:
         long = 35
         grosor = 2
         pad = 20
-        # Top-Left
         cv2.line(hud, (pad, pad), (pad + long, pad), color_hud, grosor)
         cv2.line(hud, (pad, pad), (pad, pad + long), color_hud, grosor)
-        # Top-Right
         cv2.line(hud, (w - pad, pad), (w - pad - long, pad), color_hud, grosor)
         cv2.line(hud, (w - pad, pad), (w - pad, pad + long), color_hud, grosor)
-        # Bottom-Left
         cv2.line(hud, (pad, h - pad), (pad + long, h - pad), color_hud, grosor)
         cv2.line(hud, (pad, h - pad), (pad, h - pad - long), color_hud, grosor)
-        # Bottom-Right
         cv2.line(hud, (w - pad, h - pad), (w - pad - long, h - pad), color_hud, grosor)
         cv2.line(hud, (w - pad, h - pad), (w - pad, h - pad - long), color_hud, grosor)
-
         # 2. BANNER DE ESTADO SUPERIOR
         estado_txt = "MODO VIGILANCIA [ACTIVO]" if self.vigilancia_activa else "VISION DIRECTA"
         cv2.rectangle(hud, (pad, pad), (320, pad + 30), (15, 15, 15), -1)
@@ -84,7 +86,6 @@ class RevanCameraManager:
             overlay = hud.copy()
             caja_y1 = h - 110
             caja_y2 = h - pad
-
             # Caja de vidrio oscuro
             cv2.rectangle(overlay, (pad, caja_y1), (w - pad, caja_y2), (10, 10, 15), -1)
             cv2.rectangle(overlay, (pad, caja_y1), (w - pad, caja_y2), (0, 255, 136), 1)
@@ -92,7 +93,6 @@ class RevanCameraManager:
             # Título del reporte
             cv2.putText(overlay, "INFORME VISUAL // NVIDIA NIM & GEMINI API", (pad + 15, caja_y1 + 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 136), 1)
-
             # Texto del reporte
             texto_clean = self.ultimo_resultado_txt.replace("Según mi sensor óptico: ", "")
             if len(texto_clean) > 85:
@@ -100,7 +100,6 @@ class RevanCameraManager:
 
             cv2.putText(overlay, texto_clean, (pad + 15, caja_y1 + 55),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-
             # Fusionar capa con transparencia
             cv2.addWeighted(overlay, 0.85, hud, 0.15, 0, hud)
 
@@ -115,11 +114,6 @@ class RevanCameraManager:
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
-        # --- Warm-up: descarta los primeros frames. La mayoría de webcams
-        # entregan fotogramas oscuros o mal expuestos hasta que el
-        # autoexposure se estabiliza; sin esto tanto el HUD como el análisis
-        # de visión arrancan con una imagen de mala calidad.
         for _ in range(10):
             self.cap.read()
 
@@ -141,9 +135,6 @@ class RevanCameraManager:
                 self.current_frame = frame.copy()
 
             ahora = time.time()
-
-            # Modo 'un solo disparo': se detiene solo tras duracion_preview,
-            # sin necesidad de que alguien presione ESC/'q' ni de vigilancia.
             if duracion_preview is not None and (ahora - tiempo_inicio_preview) >= duracion_preview:
                 break
 
@@ -174,7 +165,6 @@ class RevanCameraManager:
             # Salida manual con tecla ESC o 'q'
             if cv2.waitKey(1) & 0xFF in (ord('q'), 27):
                 break
-
         self.cerrar_camara()
 
     def _ejecutar_analisis_llava(self, frame, voz_ia, sincronizar_estado_esfera):
@@ -225,8 +215,6 @@ class RevanCameraManager:
                 sincronizar_estado_esfera=sincronizar_estado_esfera,
                 duracion_preview=duracion_segundos,
             )
-            # Espera a que el hilo de la cámara termine su ventana de preview
-            # (más un margen de seguridad para el warm-up interno).
             tiempo_limite = time.time() + duracion_segundos + 3.0
             while (
                 self._thread_camera
@@ -235,16 +223,50 @@ class RevanCameraManager:
             ):
                 time.sleep(0.05)
         else:
-            # Ya hay feed en vivo (vigilancia activa): un pequeño respiro
-            # para asegurar que current_frame tenga un frame reciente.
             time.sleep(0.3)
 
         with self.lock:
             if self.current_frame is None:
                 return "No logré capturar una imagen estable de la cámara, Señor."
             snapshot = self.current_frame.copy()
+        resultado_contenedor = {}
 
-        resultado = _analizar_frame_con_llava(snapshot)
+        def _tarea_analisis():
+            resultado_contenedor["texto"] = _analizar_frame_con_llava(snapshot)
+
+        hilo_analisis = threading.Thread(target=_tarea_analisis, daemon=True)
+        hilo_analisis.start()
+
+        if not camara_ya_activa:
+            nombre_ventana = "REVAN - CAMERA & VISION CENTER"
+            cv2.namedWindow(nombre_ventana, cv2.WINDOW_NORMAL)
+            contador_animacion = 0
+            while hilo_analisis.is_alive():
+                frame_mostrado = snapshot.copy()
+                puntos = "." * ((contador_animacion // 8) % 4)
+                cv2.putText(
+                    frame_mostrado,
+                    f"REVAN analizando{puntos}",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 170),
+                    2,
+                    cv2.LINE_AA,
+                )
+                cv2.imshow(nombre_ventana, frame_mostrado)
+                cv2.waitKey(30)
+                contador_animacion += 1
+
+            try:
+                cv2.destroyWindow(nombre_ventana)
+            except Exception:
+                pass
+            cv2.waitKey(1)
+        else:
+            hilo_analisis.join()
+
+        resultado = resultado_contenedor.get("texto", "No se pudo completar el análisis de visión, Señor.")
 
         with self.lock:
             self.ultimo_resultado_txt = resultado
