@@ -308,7 +308,28 @@ def _analizar_frame_con_llava(frame) -> str:
         return f"Error al procesar la imagen con el servicio de visión: {e}"
 
 def analizar_entorno_vision() -> str:
+    """
+    Punto de entrada usado por la tool 'analizar_camara' de NimClient
+    (comando de voz/texto: 'qué ves', 'enciende la cámara y dime qué ves').
 
+    ANTES: esta función tenía su propia lógica de apertura de cámara,
+    duplicando -de forma más simple y sin ventana en vivo- lo que ya existía
+    en src/Camara/open_camera.py (RevanCameraManager), que es el módulo que
+    también maneja el modo vigilancia. Eran dos pipelines de cámara
+    desconectados entre sí.
+
+    AHORA: delega en RevanCameraManager.capturar_y_analizar(), que:
+      1. Si la cámara ya está activa (p. ej. vigilancia corriendo), reutiliza
+         ese mismo feed en vivo sin abrir una segunda ventana.
+      2. Si está apagada, la abre, muestra el HUD con video en tiempo real
+         durante unos segundos (con warm-up de frames para evitar imágenes
+         oscuras/mal expuestas), toma el último frame estable, y la cierra
+         automáticamente al terminar.
+
+    El import es local (no a nivel de módulo) para evitar un import
+    circular: open_camera.py ya importa _analizar_frame_con_llava desde
+    este mismo archivo.
+    """
     from src.Camara.open_camera import revan_cam
 
     return revan_cam.capturar_y_analizar(duracion_segundos=3.0)

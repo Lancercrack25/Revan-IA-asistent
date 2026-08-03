@@ -9,19 +9,12 @@ except ImportError:
     print("Falta la librería 'openai'. Instálala con: pip install openai")
     raise
 
-from src.Services.os_service import (
-    analizar_entorno_vision,
-    abrir_carpeta_sistema,
-    crear_carpeta_sistema,
-    obtener_ruta_actual,
+from src.Services.os_service import (analizar_entorno_vision,abrir_carpeta_sistema, crear_carpeta_sistema,obtener_ruta_actual,
     registrar_accion_sistema,
     ejecutar_limpieza_sistema,
     obtener_diagnostico_hardware,
 )
-from src.Automation.System_commands import (
-    buscar_en_navegador_sistema,
-    reproducir_video_brave,
-    lanzar_aplicacion_usuario,
+from src.Automation.System_commands import (buscar_en_navegador_sistema,reproducir_video_brave,lanzar_aplicacion_usuario,
     lanzar_videojuego,
     desplegar_monitores_windows,
     ejecutar_aplicacion_office,
@@ -427,7 +420,7 @@ class NimClient:
                 resumenes = leer_ultimos_correos(max_resultados=cantidad)
                 resultado = " ".join(resumenes)
                 registrar_accion_sistema(f"leer_correos_recientes({cantidad})", resultado, "EMAIL_LECTURA")
-                return envolver_contenido_externo(resultado, fuente="correo electrónico")
+                return resultado
 
             else:
                 return f"La herramienta '{nombre}' no está configurada."
@@ -436,7 +429,6 @@ class NimClient:
             return f"Error ejecutando '{nombre}': {e}"
 
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
-        # 1. INTERCEPTACIÓN PRIORITARIA DE CONFIRMACIONES (Evita llamadas innecesarias a la API)
         respuesta_confirmacion = procesar_confirmacion(orden_usuario)
         if respuesta_confirmacion:
             self.historial.append({"role": "user", "content": orden_usuario})
@@ -457,7 +449,7 @@ class NimClient:
                 tools=HERRAMIENTAS,
                 tool_choice="auto",
                 temperature=0.1,
-                max_tokens=200,
+                max_tokens=250,
             )
             print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
         except Exception as e:
@@ -470,6 +462,7 @@ class NimClient:
             self.historial.append(mensaje)
 
             resultados = []
+            nombres_ejecutados = []
             for tool_call in mensaje.tool_calls:
                 nombre_herramienta = tool_call.function.name
                 try:
@@ -480,9 +473,14 @@ class NimClient:
                 print(f"[NimClient] Ejecutando Herramienta -> {nombre_herramienta}({argumentos})")
                 res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
                 resultados.append(res)
+                nombres_ejecutados.append(nombre_herramienta)
             
             respuesta_directa = self._limpiar_para_voz(resultados[0])
-            self.historial.append({"role": "assistant", "content": respuesta_directa})
+            texto_para_historial = respuesta_directa
+            if nombres_ejecutados and nombres_ejecutados[0] == "leer_correos_recientes":
+                texto_para_historial = envolver_contenido_externo(resultados[0], fuente="correo electrónico")
+
+            self.historial.append({"role": "assistant", "content": texto_para_historial})
             return respuesta_directa
 
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
