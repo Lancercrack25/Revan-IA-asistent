@@ -50,14 +50,23 @@ def _resolver_ruta_destino_segura(nombre_archivo: str, carpeta_destino: str, ext
     """
     Lógica compartida por los generadores de Word/Excel: sanea el nombre
     de archivo, resuelve la carpeta destino, y RECHAZA cualquier ruta
-    absoluta fuera del directorio del usuario (antes esto se aceptaba tal
-    cual, sin ningún control -mismo hueco que se cerró en
-    crear_carpeta_sistema, ahora también aquí-).
+    absoluta fuera del directorio del usuario.
+
+    ANTES: usaba os.path.join(home, "Desktop") a lo bruto. Si el Escritorio
+    real del usuario está redirigido por OneDrive (muy común en Windows 11
+    con cuenta Microsoft: el Escritorio real vive en
+    "OneDrive\\Escritorio", no en "Desktop"), los archivos terminaban en
+    una carpeta "Desktop" que el usuario nunca ve -mientras que
+    crear_carpeta_sistema en os_service.py sí detectaba esto
+    correctamente con obtener_ruta_escritorio()-. Ahora reutiliza esa
+    misma función, una sola fuente de verdad para "dónde está el
+    Escritorio de verdad".
 
     Devuelve (ruta_completa, None) si todo bien, o (None, mensaje_error) si
     se rechazó.
     """
     from src.Security.sanitizador import es_ruta_segura
+    from src.Services.os_service import obtener_ruta_escritorio, normalizar_si_apunta_a_escritorio
 
     nombre_archivo = "".join(c for c in nombre_archivo if c not in '<>:"/\\|?*').strip() or "Documento"
     if not nombre_archivo.endswith(extension):
@@ -70,11 +79,15 @@ def _resolver_ruta_destino_segura(nombre_archivo: str, carpeta_destino: str, ext
                 f"carpeta de usuario. Dígame que lo cree en Escritorio, Documentos, o "
                 f"déjeme usar la ubicación por defecto."
             )
-        ruta_dir = carpeta_destino
+        # Si la ruta absoluta que armó el modelo apunta a una carpeta
+        # 'Desktop'/'Escritorio' literal, se redirige a la ubicación REAL
+        # (que puede estar en OneDrive) en vez de crear una carpeta
+        # huérfana con ese nombre.
+        ruta_dir = normalizar_si_apunta_a_escritorio(carpeta_destino)
     elif carpeta_destino:
-        ruta_dir = os.path.join(os.path.expanduser("~"), "Desktop", carpeta_destino)
+        ruta_dir = os.path.join(obtener_ruta_escritorio(), carpeta_destino)
     else:
-        ruta_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+        ruta_dir = obtener_ruta_escritorio()
 
     os.makedirs(ruta_dir, exist_ok=True)
     return os.path.join(ruta_dir, nombre_archivo), None
@@ -128,17 +141,38 @@ def crear_y_abrir_documento_word(nombre_archivo: str, contenido: str, carpeta_de
         return f"Error al crear el documento: {e}"
 
 
-def crear_y_abrir_hoja_excel(nombre_archivo: str, titulo: str, encabezados: list,
-                              filas: list, carpeta_destino: str = None) -> str:
+def crear_y_abrir_hoja_excel(nombre_archivo: str, titulo: str, datos_csv: str,
+                              carpeta_destino: str = None) -> str:
     """
-    Crea un archivo .xlsx REAL con una tabla de datos (encabezados en
-    negrita + filas), lo formatea con ancho de columna razonable, y lo
-    abre en Excel.
+    Crea un archivo .xlsx REAL a partir de datos en formato CSV simple
+    (una fila por línea, valores separados por comas, primera línea =
+    encabezados), lo formatea con encabezados en negrita y ancho de
+    columna automático, y lo abre en Excel.
 
-    encabezados: lista de strings, ej. ["Producto", "Precio A", "Precio B"]
-    filas: lista de listas, ej. [["Laptop X", "18000", "17500"], ...]
+    ANTES: recibía 'encabezados' y 'filas' como parámetros separados,
+    'filas' siendo una lista de listas (JSON anidado). Un modelo de
+    function-calling chico (Llama 3.1 8B) es notablemente menos confiable
+    generando arrays anidados correctamente -en la práctica, la tool
+    fallaba en silencio o el modelo ni la invocaba-. Un solo string en
+    formato CSV es tan simple de generar como el 'contenido' de Word (que
+    sí funciona bien), así que se unificó a ese patrón.
+
+    Ejemplo de datos_csv esperado:
+        "Producto,Precio Tienda A,Precio Tienda B
+Laptop X,18000,17500
+Mouse Y,350,400"
     """
     try:
+        import csv
+        import io
+
+        filas_parseadas = list(csv.reader(io.StringIO(datos_csv or "")))
+        if not filas_parseadas:
+            return "Señor, no recibí datos utilizables para construir la hoja de cálculo."
+
+        encabezados = filas_parseadas[0]
+        filas = filas_parseadas[1:]
+
         ruta_completa, error = _resolver_ruta_destino_segura(nombre_archivo, carpeta_destino, ".xlsx")
         if error:
             return error
@@ -146,6 +180,7 @@ def crear_y_abrir_hoja_excel(nombre_archivo: str, titulo: str, encabezados: list
         try:
             import openpyxl
             from openpyxl.styles import Font, PatternFill, Alignment
+            from openpyxl.utils import get_column_letter
 
             wb = openpyxl.Workbook()
             ws = wb.active
@@ -159,37 +194,31 @@ def crear_y_abrir_hoja_excel(nombre_archivo: str, titulo: str, encabezados: list
                 celda_titulo.alignment = Alignment(horizontal="center")
                 fila_actual = 3
 
-            for col_idx, encabezado in enumerate(encabezados or [], start=1):
+            for col_idx, encabezado in enumerate(encabezados, start=1):
                 celda = ws.cell(row=fila_actual, column=col_idx, value=encabezado)
                 celda.font = Font(bold=True, color="FFFFFF")
                 celda.fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
                 celda.alignment = Alignment(horizontal="center")
 
-            for offset_fila, fila_datos in enumerate(filas or [], start=1):
+            for offset_fila, fila_datos in enumerate(filas, start=1):
                 for col_idx, valor in enumerate(fila_datos, start=1):
                     ws.cell(row=fila_actual + offset_fila, column=col_idx, value=valor)
 
-            # Ancho de columna aproximado según el contenido más largo
-            for col_idx, encabezado in enumerate(encabezados or [], start=1):
-                letra_col = openpyxl.utils.get_column_letter(col_idx)
+            for col_idx, encabezado in enumerate(encabezados, start=1):
+                letra_col = get_column_letter(col_idx)
                 largo_max = len(str(encabezado))
-                for fila_datos in (filas or []):
+                for fila_datos in filas:
                     if col_idx <= len(fila_datos):
                         largo_max = max(largo_max, len(str(fila_datos[col_idx - 1])))
                 ws.column_dimensions[letra_col].width = min(largo_max + 4, 40)
 
             wb.save(ruta_completa)
         except ImportError:
-            # Sin openpyxl instalado: CSV como respaldo, para que igual
-            # obtengas los datos aunque sin el formato visual de Excel.
-            import csv
             ruta_completa = ruta_completa.replace(".xlsx", ".csv")
             with open(ruta_completa, "w", encoding="utf-8", newline="") as f:
                 writer = csv.writer(f)
-                if encabezados:
-                    writer.writerow(encabezados)
-                for fila_datos in (filas or []):
-                    writer.writerow(fila_datos)
+                writer.writerow(encabezados)
+                writer.writerows(filas)
 
         os.startfile(ruta_completa)
         return f"Hoja de cálculo '{os.path.basename(ruta_completa)}' creada y abierta en pantalla, Señor."
@@ -239,6 +268,8 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
             return "Desplegando Discord, Señor."
 
         elif "whatsapp" in nombre_clean:
+            # os.startfile invoca ShellExecute directamente, sin pasar por
+            # cmd.exe -es la forma más segura de abrir un protocolo/URI.
             os.startfile("whatsapp:")
             return "Desplegando WhatsApp, Señor."
 

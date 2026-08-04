@@ -38,6 +38,41 @@ def obtener_ruta_escritorio() -> str:
     return ruta_normal
 
 
+def normalizar_si_apunta_a_escritorio(ruta_absoluta: str) -> str:
+    """
+    Si una ruta absoluta apunta a una subcarpeta llamada literalmente
+    'Desktop' o 'Escritorio' justo debajo del home del usuario, la
+    redirige a la ubicación REAL del escritorio (obtener_ruta_escritorio,
+    que sabe si está redirigido por OneDrive), preservando cualquier
+    subcarpeta que venga después.
+
+    Por qué existe: si el modelo arma él mismo una ruta absoluta como
+    'C:\\Users\\Nombre\\Desktop\\Carpeta_X' (en vez de solo decir
+    "Carpeta_X" y dejar que el código resuelva la ubicación), esa ruta
+    pasa la validación de "está dentro del home" sin problema, pero
+    apunta a una carpeta 'Desktop' que puede no ser el escritorio que el
+    usuario realmente ve (si su escritorio está redirigido por OneDrive).
+    Esto se aplica DESPUÉS de confirmar que la ruta es segura (dentro del
+    home), no la reemplaza.
+    """
+    home = os.path.realpath(os.path.expanduser("~"))
+    ruta_resuelta = os.path.realpath(ruta_absoluta)
+
+    if not ruta_resuelta.startswith(home):
+        return ruta_absoluta
+
+    resto = ruta_resuelta[len(home):].lstrip(os.sep)
+    partes = resto.split(os.sep) if resto else []
+
+    if partes and partes[0].lower() in ("desktop", "escritorio"):
+        subcarpetas_extra = partes[1:]
+        if subcarpetas_extra:
+            return os.path.join(obtener_ruta_escritorio(), *subcarpetas_extra)
+        return obtener_ruta_escritorio()
+
+    return ruta_absoluta
+
+
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
@@ -194,6 +229,7 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
                 f"la carpeta actual."
             )
         ruta_padre = ruta_base
+        ruta_padre = normalizar_si_apunta_a_escritorio(ruta_padre)
     else:
         ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
 
@@ -333,6 +369,13 @@ def analizar_entorno_vision() -> str:
     """
     Punto de entrada usado por la tool 'analizar_camara' de NimClient
     (comando de voz/texto: 'qué ves', 'enciende la cámara y dime qué ves').
+
+    ANTES: esta función tenía su propia lógica de apertura de cámara,
+    duplicando -de forma más simple y sin ventana en vivo- lo que ya existía
+    en src/Camara/open_camera.py (RevanCameraManager), que es el módulo que
+    también maneja el modo vigilancia. Eran dos pipelines de cámara
+    desconectados entre sí.
+
     AHORA: delega en RevanCameraManager.capturar_y_analizar(), que:
       1. Si la cámara ya está activa (p. ej. vigilancia corriendo), reutiliza
          ese mismo feed en vivo sin abrir una segunda ventana.
