@@ -14,6 +14,7 @@ from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
+from src.Automation.work_apps_actions import abrir_teams, abrir_outlook, abrir_vscode, abrir_google_meet, abrir_google_drive
 from src.Interfaces.servidor import (iniciar_servidor_ui, transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo, registrar_manejador_comando_texto,)
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
@@ -66,7 +67,8 @@ def es_intencion_de_comando(texto: str) -> bool:
     if es_orden:
         print("Clasificado localmente -> ORDEN")
     else:
-        print("Clasificado localmente -> CONVERSACIÓN")   
+        print("Clasificado localmente -> CONVERSACIÓN")
+        
     return es_orden
 
 def hilo_servidor_web():
@@ -89,7 +91,18 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
         print(f" Error al sincronizar chat del dashboard: {e}")
 
 def activar_kill_switch() -> str:
+    """
+    Comando de pánico: cancela cualquier acción pendiente de confirmación
+    (WhatsApp, correo) y detiene cualquier módulo activo que use recursos
+    del sistema (vigilancia de cámara, control de esfera por mano), sin
+    importar en qué estado se encuentre cada uno.
+
+    Pensado para poder decir "REVAN, para todo" y quedar en un estado
+    limpio y conocido de inmediato -especialmente importante antes de que
+    exista Coder_agent ejecutando cosas en el sandbox-.
+    """
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
     acciones_detenidas = []
 
     try:
@@ -131,6 +144,7 @@ def activar_kill_switch() -> str:
         return "Alto total, Señor. " + "; ".join(acciones_detenidas) + "."
     return "Alto total, Señor. No había ninguna acción pendiente ni módulo activo que detener."
 
+
 def apagar_sistema():
     global sistema_activo, esta_hablando
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
@@ -163,6 +177,7 @@ def encender_sistemas():
         desplegar_monitores_windows()
     except Exception as e:
         print(f"Aviso al desplegar monitores nativos: {e}")
+
     time.sleep(0.4)
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
 
@@ -217,7 +232,9 @@ def procesar_ciclo_voz():
 
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         print("\n[REVAN]: Escuchando...")
+
         orden_sucia = oidos_ia.escuchar()
+
         if esta_hablando:
             return
 
@@ -290,12 +307,17 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     def _hablar_y_mostrar(texto_respuesta: str):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion, esta_hablando
+        
+        # El dashboard SÍ recibe el texto completo (con IPs, nombres de archivo, etc.),
+        # solo la voz pasa por el limpiador -> se ve todo el detalle pero no se
+        # escuchan pronunciaciones raras de IPs, rutas o nombres de archivo.
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
         def tarea_sincronizada_voz():
             global esta_hablando
             esta_hablando = True
+            
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
             
             if voz_ia:
@@ -314,6 +336,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         ultima_interaccion = time.time()
 
     try:
+        # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
             "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
@@ -328,11 +351,32 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             apagar_sistema()
             return
 
+        # --- KILL-SWITCH: máxima prioridad, antes que cualquier otro módulo ---
+        # Frases deliberadamente distintas de "cancela"/"detente" a secas
+        # (esas ya se usan para cancelar UNA acción puntual de WhatsApp o
+        # correo) para que no haya ambigüedad: esto detiene TODO de golpe.
         palabras_kill_switch = ["para todo", "alto total", "detente todo", "cancela todo", "emergencia"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
             _hablar_y_mostrar(activar_kill_switch())
             return
 
+        # --- MÓDULO APPS DE TRABAJO: frases fijas, sin pasar por el LLM ---
+        if "hora de la junta" in orden_limpia_sin_acentos:
+            reproducir_sfx("modules", "redes")
+            _hablar_y_mostrar(abrir_teams())
+            return
+
+        if "hora del checkeo" in orden_limpia_sin_acentos or "hora del checo" in orden_limpia_sin_acentos:
+            reproducir_sfx("modules", "emails")
+            _hablar_y_mostrar(abrir_outlook())
+            return
+
+        if "hora de trabajar" in orden_limpia_sin_acentos:
+            reproducir_sfx("modules", "redes")
+            _hablar_y_mostrar(abrir_vscode())
+            return
+
+        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
             "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
@@ -341,11 +385,17 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
             reproducir_sfx("modules", "Sonidos")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            
+            # Avisa por voz de forma limpia antes de ponerse a escuchar
             hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
+            
+            # Ejecuta la captura por Loopback y la consulta en Shazam
             respuesta_musica = identificar_y_abrir_cancion()
+            
             _hablar_y_mostrar(respuesta_musica)
             return
-        
+
+        # --- 3. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
             p in orden_limpia_sin_acentos for p in [
@@ -400,6 +450,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             if " a " in orden_limpia:
                 partes = orden_limpia.split(" a ", 1)
                 destinatario = partes[1].split()[0].strip()
+
             respuesta_preparada = preparar_borrador_correo(destinatario, "Notificación Generada por REVAN", cuerpo_generado)
             _hablar_y_mostrar(respuesta_preparada)
             return
@@ -460,6 +511,11 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 duracion_minutos=60
             )
             if not fecha_reconocida:
+                # No se detectó ninguna fecha explícita en la orden (ej. un
+                # día de la semana no reconocido, o directamente ninguna
+                # referencia de fecha): antes esto agendaba en silencio
+                # para HOY. Ahora se avisa explícitamente para que el
+                # usuario pueda corregirlo si no era lo que quería.
                 resultado_agendado += (
                     " Aviso, Señor: no reconocí una fecha explícita en su orden, "
                     "así que agendé el evento para HOY. Si quería otro día, "
@@ -469,6 +525,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             _hablar_y_mostrar(resultado_agendado)
             return
 
+        # --- 5. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
@@ -502,6 +559,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
 
+        # --- 6. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
@@ -541,6 +599,8 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
+
+        # --- 7. MÓDULO REDES ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
@@ -552,6 +612,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "seguridad de mi red", "mi red es segura",
         ])
         es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
+        
         es_consulta_red = (
             not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
             and ("red" in palabras_lista or "ip" in palabras_lista or
@@ -603,6 +664,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "redes")
             _hablar_y_mostrar(analizar_red())
             return
+
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
@@ -643,7 +705,9 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
+
         _hablar_y_mostrar(respuesta_final)
+
     except Exception as e:
         print(f"Error al ejecutar la orden: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -651,6 +715,15 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 def main():
     global oidos_ia, sistema_activo, titulo
     print("[REVAN]: Inicializando infraestructura base...")
+
+    try:
+        from src.Security.verificacion_permisos import verificar_archivos_sensibles
+        avisos = verificar_archivos_sensibles()
+        for aviso in avisos:
+            print(f"[Seguridad - Aviso de arranque]: {aviso}")
+    except Exception as e:
+        print(f"Aviso al verificar archivos sensibles: {e}")
+
     try:
         inicializar_base_datos()
     except Exception as e:

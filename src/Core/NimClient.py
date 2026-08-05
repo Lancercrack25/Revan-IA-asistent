@@ -28,6 +28,13 @@ from src.Automation.System_commands import (
     crear_y_abrir_documento_word,
     crear_y_abrir_hoja_excel,
 )
+from src.Automation.work_apps_actions import (
+    abrir_teams,
+    abrir_outlook,
+    abrir_vscode,
+    abrir_google_meet,
+    abrir_google_drive,
+)
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
 from src.Security.rate_limiter import permitir_accion
@@ -99,27 +106,26 @@ HERRAMIENTAS = [
             "name": "crear_hoja_excel",
             "description": (
                 "Crea un archivo de Excel (.xlsx) con una tabla de datos YA PREPARADA por ti "
-                "(comparaciones, listas, cálculos, etc.) y lo abre. Tú generas los encabezados "
-                "y las filas de datos reales, no un resumen en texto."
+                "(comparaciones, listas, cálculos, etc.) y lo abre."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "nombre_archivo": {"type": "string", "description": "Nombre del archivo"},
                     "titulo": {"type": "string", "description": "Título de la hoja/tabla"},
-                    "encabezados": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Nombres de columna, ej. ['Producto', 'Precio Tienda A', 'Precio Tienda B']",
-                    },
-                    "filas": {
-                        "type": "array",
-                        "items": {"type": "array", "items": {"type": "string"}},
-                        "description": "Filas de datos, cada una una lista alineada con 'encabezados'.",
+                    "datos_csv": {
+                        "type": "string",
+                        "description": (
+                            "TODOS los datos en un solo string con formato CSV: una fila por "
+                            "línea (separadas por salto de línea \\n), valores separados por "
+                            "comas. La PRIMERA línea son los encabezados de columna. Ejemplo: "
+                            "'Producto,Precio Tienda A,Precio Tienda B\\nLaptop X,18000,17500\\n"
+                            "Mouse Y,350,400'"
+                        ),
                     },
                     "carpeta_destino": {"type": "string", "description": "Carpeta destino (opcional)."}
                 },
-                "required": ["nombre_archivo", "encabezados", "filas"],
+                "required": ["nombre_archivo", "datos_csv"],
             },
         },
     },
@@ -301,6 +307,27 @@ HERRAMIENTAS = [
                 },
             },
         },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abrir_aplicacion_trabajo",
+            "description": (
+                "Abre una aplicación o sitio relacionado con el trabajo: Microsoft Teams, "
+                "Outlook de escritorio, Visual Studio Code, Google Meet, o Google Drive."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "app": {
+                        "type": "string",
+                        "enum": ["teams", "outlook", "vscode", "meet", "drive"],
+                        "description": "Cuál aplicación/sitio abrir.",
+                    }
+                },
+                "required": ["app"],
+            },
+        },
     }
 ]
 
@@ -341,6 +368,9 @@ class NimClient:
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
     def _limpiar_para_voz(self, texto: str) -> str:
+        # Delegado al limpiador centralizado (src/Core/text_utils.py), que ahora
+        # también se aplica al resto de módulos (Network, etc.) desde main.py.
+        # Se mantiene este método por compatibilidad con el resto de la clase.
         return limpiar_texto_para_voz(texto)
 
     def _guardar_nota(self, clave: str, contenido: str) -> str:
@@ -370,6 +400,8 @@ class NimClient:
         finally:
             liberar_conexion(conn)
 
+    # Mapa de tool -> categoría de rate limiting. Las tools no listadas
+    # aquí caen en "default" (10 acciones / 60s, ver rate_limiter.py).
     _CATEGORIA_RATE_LIMIT = {
         "enviar_whatsapp": "whatsapp",
         "analizar_camara": "camara",
@@ -379,6 +411,7 @@ class NimClient:
         "lanzar_aplicacion_usuario": "comando_sistema",
         "lanzar_videojuego": "comando_sistema",
         "abrir_office": "comando_sistema",
+        "abrir_aplicacion_trabajo": "comando_sistema",
         "crear_documento_word": "documentos",
         "crear_hoja_excel": "documentos",
         "contar_correos_no_leidos": "correo",
@@ -418,10 +451,9 @@ class NimClient:
             elif nombre == "crear_hoja_excel":
                 nombre_xlsx = argumentos.get("nombre_archivo", "Hoja.xlsx")
                 titulo_xlsx = argumentos.get("titulo", "")
-                encabezados = argumentos.get("encabezados", [])
-                filas = argumentos.get("filas", [])
+                datos_csv = argumentos.get("datos_csv", "")
                 carpeta = argumentos.get("carpeta_destino", "")
-                resultado = crear_y_abrir_hoja_excel(nombre_xlsx, titulo_xlsx, encabezados, filas, carpeta)
+                resultado = crear_y_abrir_hoja_excel(nombre_xlsx, titulo_xlsx, datos_csv, carpeta)
                 registrar_accion_sistema(f"excel({nombre_xlsx})", resultado, "EXCEL")
                 return resultado
 
@@ -468,6 +500,9 @@ class NimClient:
                 return resultado
 
             elif nombre == "limpiar_sistema":
+                # Igual que crear_carpeta: sin confirmación. Son archivos
+                # temporales -de por sí diseñados para borrarse-, acción
+                # local y de bajo riesgo real.
                 resultado = ejecutar_limpieza_sistema()
                 registrar_accion_sistema("limpiar_sistema", resultado, "LIMPIEZA")
                 return resultado
@@ -505,6 +540,21 @@ class NimClient:
                 resumenes = leer_ultimos_correos(max_resultados=cantidad)
                 resultado = " ".join(resumenes)
                 registrar_accion_sistema(f"leer_correos_recientes({cantidad})", resultado, "EMAIL_LECTURA")
+                return resultado
+
+            elif nombre == "abrir_aplicacion_trabajo":
+                app = (argumentos.get("app") or "").strip().lower()
+                mapa_apps = {
+                    "teams": abrir_teams,
+                    "outlook": abrir_outlook,
+                    "vscode": abrir_vscode,
+                    "meet": abrir_google_meet,
+                    "drive": abrir_google_drive,
+                }
+                if app not in mapa_apps:
+                    return f"Señor, no reconozco la aplicación de trabajo '{app}'."
+                resultado = mapa_apps[app]()
+                registrar_accion_sistema(f"abrir_app_trabajo({app})", resultado, "APPS_TRABAJO")
                 return resultado
 
             else:
