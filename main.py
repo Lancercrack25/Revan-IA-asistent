@@ -307,10 +307,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     def _hablar_y_mostrar(texto_respuesta: str):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion, esta_hablando
-        
-        # El dashboard SÍ recibe el texto completo (con IPs, nombres de archivo, etc.),
-        # solo la voz pasa por el limpiador -> se ve todo el detalle pero no se
-        # escuchan pronunciaciones raras de IPs, rutas o nombres de archivo.
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
@@ -350,11 +346,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
-
-        # --- KILL-SWITCH: máxima prioridad, antes que cualquier otro módulo ---
-        # Frases deliberadamente distintas de "cancela"/"detente" a secas
-        # (esas ya se usan para cancelar UNA acción puntual de WhatsApp o
-        # correo) para que no haya ambigüedad: esto detiene TODO de golpe.
+        
         palabras_kill_switch = ["para todo", "alto total", "detente todo", "cancela todo", "emergencia"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
             _hablar_y_mostrar(activar_kill_switch())
@@ -362,17 +354,17 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         # --- MÓDULO APPS DE TRABAJO: frases fijas, sin pasar por el LLM ---
         if "hora de la junta" in orden_limpia_sin_acentos:
-            reproducir_sfx("modules", "redes")
+            reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_teams())
             return
 
         if "hora del checkeo" in orden_limpia_sin_acentos or "hora del checo" in orden_limpia_sin_acentos:
-            reproducir_sfx("modules", "emails")
+            reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_outlook())
             return
 
         if "hora de trabajar" in orden_limpia_sin_acentos:
-            reproducir_sfx("modules", "redes")
+            reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_vscode())
             return
 
@@ -511,11 +503,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 duracion_minutos=60
             )
             if not fecha_reconocida:
-                # No se detectó ninguna fecha explícita en la orden (ej. un
-                # día de la semana no reconocido, o directamente ninguna
-                # referencia de fecha): antes esto agendaba en silencio
-                # para HOY. Ahora se avisa explícitamente para que el
-                # usuario pueda corregirlo si no era lo que quería.
                 resultado_agendado += (
                     " Aviso, Señor: no reconocí una fecha explícita en su orden, "
                     "así que agendé el evento para HOY. Si quería otro día, "
@@ -666,6 +653,9 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
 
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+        palabras_abrir_app = ["abre", "abrir", "inicia", "iniciar", "lanza", "lanzar"]
+        if any(p in orden_limpia_sin_acentos.split() for p in palabras_abrir_app):
+            reproducir_sfx("modules", "Open")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             reproducir_sfx("modules", "Cam")
