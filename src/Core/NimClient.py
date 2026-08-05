@@ -591,20 +591,17 @@ class NimClient:
             return f"Error ejecutando '{nombre}': {e}"
 
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
-        # 1. INTERCEPTACIÓN PRIORITARIA DE CONFIRMACIONES (Evita llamadas innecesarias a la API)
         respuesta_confirmacion = procesar_confirmacion(orden_usuario)
         if respuesta_confirmacion:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion})
             return respuesta_confirmacion
 
-        # 1b. Igual, pero para código pendiente de confirmar (Coder_agent)
         respuesta_confirmacion_codigo = procesar_confirmacion_codigo(orden_usuario)
         if respuesta_confirmacion_codigo:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion_codigo})
             return respuesta_confirmacion_codigo
-
         # 2. Si no hay confirmación pendiente, se procesa la solicitud mediante LLM
         self.historial.append({"role": "user", "content": orden_usuario})
 

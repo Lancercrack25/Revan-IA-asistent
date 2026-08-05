@@ -296,10 +296,6 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
                             ruta_completa = os.path.join(root, file)
                             os.startfile(ruta_completa)
                             return f"Ejecutando {nombre} desde su sistema, Señor."
-
-        # 3. Intento de fallback: os.startfile invoca ShellExecute
-        # directamente (sin pasar por cmd.exe/shell), a diferencia de
-        # os.system('start ...') que sí interpreta la cadena con un shell.
         try:
             os.startfile(nombre)
             return f"Ejecutando {nombre}, Señor."

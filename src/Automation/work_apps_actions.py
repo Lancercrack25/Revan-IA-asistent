@@ -4,7 +4,6 @@ import os
 import subprocess
 import webbrowser
 
-
 def abrir_teams() -> str:
     """Abre Microsoft Teams vía su protocolo registrado; si no está
     registrado, intenta el ejecutable directo como respaldo."""
@@ -33,9 +32,6 @@ def abrir_outlook() -> str:
 
 
 def abrir_vscode() -> str:
-    """Abre Visual Studio Code. Intenta el comando 'code' (si está en el
-    PATH, que es la instalación por defecto), y si no, la ruta típica de
-    instalación por usuario en Windows."""
     try:
         subprocess.Popen(["code"], shell=False)
         return "Abriendo Visual Studio Code, Señor."
@@ -49,12 +45,10 @@ def abrir_vscode() -> str:
 
 
 def abrir_google_meet() -> str:
-    """Abre una reunión nueva de Google Meet en el navegador por defecto."""
     webbrowser.open("https://meet.google.com/new")
     return "Abriendo una nueva reunión de Google Meet, Señor."
 
 
 def abrir_google_drive() -> str:
-    """Abre Google Drive en el navegador por defecto."""
     webbrowser.open("https://drive.google.com")
     return "Abriendo Google Drive, Señor."
