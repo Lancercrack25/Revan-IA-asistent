@@ -40,14 +40,11 @@ import re
 import os
 import time
 from openai import OpenAI
-
 from src.Security.sandbox import ejecutar_codigo_python
-from src.Security.confirmacion import GestorConfirmacion
+from src.Security.confirmation import GestorConfirmacion
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
-# Patrones que, si aparecen en código PYTHON, lo marcan como "toca
-# archivos/red/hardware" -> requiere confirmación antes de ejecutarse.
 _PATRONES_RIESGO = {
     "archivos": [r'\bopen\s*\(', r'\bos\.remove\b', r'\bos\.rmdir\b', r'\bshutil\.', r'\bos\.rename\b', r'\bos\.replace\b'],
     "red": [r'\bsocket\.', r'\brequests\.', r'\burllib\.', r'\bhttp\.client\b', r'\bftplib\b'],
@@ -55,16 +52,8 @@ _PATRONES_RIESGO = {
     "subprocesos": [r'\bsubprocess\.', r'\bos\.system\b', r'\bos\.popen\b'],
 }
 
-# Firma típica de un sketch de Arduino/ESP32: ambas funciones son
-# obligatorias en todo sketch válido, así que su presencia conjunta es
-# una señal confiable de que el código es C++ para un microcontrolador,
-# no Python.
 _PATRON_ARDUINO = (re.compile(r'\bvoid\s+setup\s*\('), re.compile(r'\bvoid\s+loop\s*\('))
-
-# Confirmación con TTL más largo que WhatsApp (90s en vez de 60s): revisar
-# código toma más tiempo que decidir si mandar un mensaje.
 _gestor_confirmacion_codigo = GestorConfirmacion(ttl_segundos=90)
-
 _SYSTEM_PROMPT_CODER = (
     "Eres el módulo de programación de REVAN, un asistente de IA. Tu trabajo es escribir "
     "código funcional y bien comentado para lo que te pida el usuario -sobre todo apoyo de "
@@ -100,6 +89,15 @@ def _limpiar_codigo_generado(texto: str) -> str:
 
 def generar_codigo(descripcion_tarea: str, api_key: str = None,
                     modelo: str = "meta/llama-3.1-70b-instruct") -> str:
+    """
+    Genera código a partir de una descripción en lenguaje natural (Python
+    o Arduino C++, según lo que pida la tarea -ver _SYSTEM_PROMPT_CODER-).
+    Usa el mismo endpoint de NVIDIA NIM que el resto de REVAN (NimClient),
+    pero con un modelo más grande por defecto (70b en vez del 8b
+    conversacional) porque generar código correcto exige más capacidad de
+    razonamiento que responder una pregunta casual. Si tu cuenta de NIM no
+    tiene acceso al 70b, pasa 'modelo="meta/llama-3.1-8b-instruct"'.
+    """
     api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
     if not api_key:
         raise ValueError("Falta la API key de NVIDIA NIM.")
@@ -135,6 +133,12 @@ def detectar_riesgo(codigo: str):
 
 
 def detectar_formato(codigo: str):
+    """
+    Heurística sobre el código YA GENERADO (más confiable que adivinar
+    por la descripción de la tarea): si tiene la firma típica de un
+    sketch de Arduino (setup()/loop()), se trata como Arduino C++.
+    Cualquier otra cosa se asume Python. Devuelve (formato, extension).
+    """
     patron_setup, patron_loop = _PATRON_ARDUINO
     if patron_setup.search(codigo) and patron_loop.search(codigo):
         return "arduino_cpp", ".ino"
@@ -144,6 +148,7 @@ def detectar_formato(codigo: str):
 def _slug_desde_tarea(descripcion_tarea: str) -> str:
     slug = re.sub(r'[^a-zA-Z0-9]+', '_', descripcion_tarea.strip().lower())
     return slug.strip('_')[:40] or "tarea"
+
 
 def guardar_codigo_generado(codigo: str, descripcion_tarea: str, extension: str) -> str:
     from src.Services.os_service import obtener_ruta_escritorio
@@ -176,15 +181,6 @@ def _ejecutar_y_formatear(codigo: str, ruta_guardado: str) -> str:
 
 
 def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
-    """
-    Punto de entrada principal: genera código para la tarea pedida,
-    SIEMPRE guarda una copia permanente, y:
-      - si es Arduino C++: no lo ejecuta (no tiene sentido en esta PC),
-        solo avisa dónde quedó guardado para subirlo con el IDE de Arduino.
-      - si es Python de bajo riesgo: se ejecuta directo en el sandbox.
-      - si es Python que toca archivos/red/hardware: pide confirmación
-        antes de ejecutar.
-    """
     if not permitir_accion("coder_agent"):
         return (
             "Señor, alcancé el límite de generación de código en el último minuto. "
@@ -253,9 +249,4 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
     return _ejecutar_y_formatear(codigo, ruta_guardado)
 
 def procesar_confirmacion_codigo(texto_respuesta: str):
-    """
-    Debe llamarse desde NimClient.generar_respuesta ANTES de procesar
-    cualquier otra cosa, igual que ya se hace con procesar_confirmacion()
-    de WhatsApp -mismo patrón, pieza de confirmación distinta-.
-    """
     return _gestor_confirmacion_codigo.procesar_respuesta(texto_respuesta)
