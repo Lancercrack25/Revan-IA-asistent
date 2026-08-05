@@ -2,14 +2,18 @@
 # Generado escaneando los imports reales de todo el proyecto (no es una
 # lista genérica). Instalar con:
 #   pip install -r requirements.txt
+#
 # Nota: varias librerías (opencv, mediapipe, pygame, sounddevice) requieren
 # que el sistema tenga las dependencias nativas correspondientes (drivers de
 # audio/video). Si algo falla al instalar, primero revisa el mensaje de error
 # de pip -suele indicar qué falta a nivel de sistema operativo, no de Python.
 
 # --- Núcleo / LLM ---
-openai==1.51.2                 # cliente usado contra los endpoints de NVIDIA NIM (NimClient)
-google-genai==0.3.0            # opcional: solo si activas el bloque de respaldo con Gemini real en os_service.py
+openai==1.51.2                 # cliente usado contra los endpoints de NVIDIA NIM (NimClient y Coder_agent)
+google-genai==0.3.0             # opcional: solo si activas el bloque de respaldo con Gemini real en os_service.py
+
+# --- Coder_agent / Electrónica ---
+pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
 
 # --- Servidor web / dashboard ---
 fastapi==0.115.0

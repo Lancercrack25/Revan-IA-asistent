@@ -35,6 +35,7 @@ from src.Automation.work_apps_actions import (
     abrir_google_meet,
     abrir_google_drive,
 )
+from src.Coder_agent.coder_agent import ejecutar_tarea_codigo, procesar_confirmacion_codigo
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
 from src.Security.rate_limiter import permitir_accion
@@ -328,6 +329,28 @@ HERRAMIENTAS = [
                 "required": ["app"],
             },
         },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generar_y_ejecutar_codigo",
+            "description": (
+                "Escribe código Python para una tarea de programación (scripts, utilidades, "
+                "apoyo para electrónica/Arduino/ESP32/sensores por puerto serial, cálculos, "
+                "análisis, etc.) y lo ejecuta. Úsala cuando te pidan programar, escribir un "
+                "script, automatizar algo con código, o ayuda técnica de programación."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "descripcion_tarea": {
+                        "type": "string",
+                        "description": "Descripción clara y completa de qué debe hacer el código.",
+                    }
+                },
+                "required": ["descripcion_tarea"],
+            },
+        },
     }
 ]
 
@@ -368,9 +391,6 @@ class NimClient:
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
     def _limpiar_para_voz(self, texto: str) -> str:
-        # Delegado al limpiador centralizado (src/Core/text_utils.py), que ahora
-        # también se aplica al resto de módulos (Network, etc.) desde main.py.
-        # Se mantiene este método por compatibilidad con el resto de la clase.
         return limpiar_texto_para_voz(texto)
 
     def _guardar_nota(self, clave: str, contenido: str) -> str:
@@ -400,8 +420,6 @@ class NimClient:
         finally:
             liberar_conexion(conn)
 
-    # Mapa de tool -> categoría de rate limiting. Las tools no listadas
-    # aquí caen en "default" (10 acciones / 60s, ver rate_limiter.py).
     _CATEGORIA_RATE_LIMIT = {
         "enviar_whatsapp": "whatsapp",
         "analizar_camara": "camara",
@@ -412,6 +430,7 @@ class NimClient:
         "lanzar_videojuego": "comando_sistema",
         "abrir_office": "comando_sistema",
         "abrir_aplicacion_trabajo": "comando_sistema",
+        "generar_y_ejecutar_codigo": "coder_agent",
         "crear_documento_word": "documentos",
         "crear_hoja_excel": "documentos",
         "contar_correos_no_leidos": "correo",
@@ -557,6 +576,14 @@ class NimClient:
                 registrar_accion_sistema(f"abrir_app_trabajo({app})", resultado, "APPS_TRABAJO")
                 return resultado
 
+            elif nombre == "generar_y_ejecutar_codigo":
+                descripcion_tarea = argumentos.get("descripcion_tarea", "")
+                if not descripcion_tarea.strip():
+                    return "Señor, necesito una descripción de qué debe hacer el código."
+                resultado = ejecutar_tarea_codigo(descripcion_tarea)
+                registrar_accion_sistema(f"coder_agent({descripcion_tarea[:60]})", resultado, "CODER_AGENT")
+                return resultado
+
             else:
                 return f"La herramienta '{nombre}' no está configurada."
 
@@ -570,6 +597,13 @@ class NimClient:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion})
             return respuesta_confirmacion
+
+        # 1b. Igual, pero para código pendiente de confirmar (Coder_agent)
+        respuesta_confirmacion_codigo = procesar_confirmacion_codigo(orden_usuario)
+        if respuesta_confirmacion_codigo:
+            self.historial.append({"role": "user", "content": orden_usuario})
+            self.historial.append({"role": "assistant", "content": respuesta_confirmacion_codigo})
+            return respuesta_confirmacion_codigo
 
         # 2. Si no hay confirmación pendiente, se procesa la solicitud mediante LLM
         self.historial.append({"role": "user", "content": orden_usuario})
