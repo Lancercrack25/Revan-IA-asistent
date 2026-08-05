@@ -28,6 +28,7 @@ LIMITES_POR_DEFECTO = {
     "camara": (10, 60),
     "carpeta": (10, 60),
     "documentos": (8, 60),
+    "coder_agent": (5, 60),
     "limpieza_sistema": (3, 60),
     "comando_sistema": (10, 60),
     "default": (10, 60),

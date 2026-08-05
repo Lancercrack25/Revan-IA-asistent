@@ -1,7 +1,28 @@
+"""
+Coder_agent: el módulo de programación de REVAN.
+
+Genera código Python a partir de una descripción en lenguaje natural y lo
+ejecuta en el sandbox de src/Security/sandbox.py. Pensado sobre todo para
+apoyar con programación del módulo de Electronics (Arduino/ESP32/sensores
+vía puerto serial), pero sirve para cualquier tarea de scripting.
+
+REGLA DE AUTONOMÍA (decidida explícitamente, no asumida):
+  - Si el código generado NO toca archivos, red, ni hardware (puertos
+    serie/USB, GPIO) -> se ejecuta DIRECTO en el sandbox, sin pedir
+    confirmación. Es sandbox aislado + timeout + rate limit, ya es
+    suficiente fricción invisible para algo de bajo riesgo real.
+  - Si el código SÍ toca archivos, red, o hardware -> se pide confirmación
+    explícita, mostrando el código completo ANTES de ejecutar nada.
+
+Esto se decide con un análisis estático simple del texto del código (no es
+un sandbox perfecto contra código adversario deliberadamente ofuscado),
+pero el sandbox subyacente sigue aplicando sus propias protecciones
+(timeout, subprocess aislado, sin shell) incluso si la detección de riesgo
+se equivoca en algún caso límite.
+"""
 import re
 import os
 from openai import OpenAI
-
 from src.Security.sandbox import ejecutar_codigo_python
 from src.Security.confirmation import GestorConfirmacion
 from src.Security.rate_limiter import permitir_accion
@@ -13,7 +34,6 @@ _PATRONES_RIESGO = {
     "hardware (serial/GPIO)": [r'\bserial\.', r'\bSerial\s*\(', r'\bpyserial\b', r'\bsmbus\b', r'\bRPi\.GPIO\b', r'\bboard\.', r'\bbusio\.'],
     "subprocesos": [r'\bsubprocess\.', r'\bos\.system\b', r'\bos\.popen\b'],
 }
-
 _gestor_confirmacion_codigo = GestorConfirmacion(ttl_segundos=90)
 
 _SYSTEM_PROMPT_CODER = (
@@ -146,7 +166,7 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
             descripcion=descripcion_para_confirmar,
             callback_confirmar=lambda: _ejecutar_y_formatear(codigo),
         )
-    
+
     return _ejecutar_y_formatear(codigo)
 
 def procesar_confirmacion_codigo(texto_respuesta: str):
