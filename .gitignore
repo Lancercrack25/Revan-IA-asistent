@@ -2,3 +2,4 @@
 /test
 src/Database/.env
 src/Phone/.env
+/logs

@@ -309,10 +309,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     def _hablar_y_mostrar(texto_respuesta: str):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion, esta_hablando
-        
-        # El dashboard SÍ recibe el texto completo (con IPs, nombres de archivo, etc.),
-        # solo la voz pasa por el limpiador -> se ve todo el detalle pero no se
-        # escuchan pronunciaciones raras de IPs, rutas o nombres de archivo.
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
@@ -353,15 +349,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             apagar_sistema()
             return
 
-        # --- KILL-SWITCH: máxima prioridad, antes que cualquier otro módulo ---
-        # Frases deliberadamente distintas de "cancela"/"detente" a secas
-        # (esas ya se usan para cancelar UNA acción puntual de WhatsApp o
-        # correo) para que no haya ambigüedad: esto detiene TODO de golpe.
         palabras_kill_switch = ["para todo", "alto total", "detente todo", "cancela todo", "emergencia"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
             _hablar_y_mostrar(activar_kill_switch())
             return
-
         # --- MÓDULO APPS DE TRABAJO: frases fijas, sin pasar por el LLM ---
         if "hora de la junta" in orden_limpia_sin_acentos:
             reproducir_sfx("modules", "Automation")
@@ -437,9 +428,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             prompt_redaccion = f"Redacta un correo profesional basado en esta solicitud del usuario: '{orden_limpia}'. Devuelve únicamente el asunto y el cuerpo del mensaje bien formateados."
-            
             cuerpo_generado = cerebro_ia.generar_respuesta(prompt_redaccion) if cerebro_ia else "No fue posible generar la redacción automáticamente."
-            
             destinatario = "correo_por_defecto@ejemplo.com"
             if " a " in orden_limpia:
                 partes = orden_limpia.split(" a ", 1)
@@ -546,7 +535,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
-
         # --- 6. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
@@ -587,7 +575,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-
         # --- 7. MÓDULO REDES ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
@@ -600,7 +587,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "seguridad de mi red", "mi red es segura",
         ])
         es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
-        
         es_consulta_red = (
             not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
             and ("red" in palabras_lista or "ip" in palabras_lista or
