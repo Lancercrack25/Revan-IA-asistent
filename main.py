@@ -49,7 +49,9 @@ PALABRAS_CLAVE_ACCION = [
     "corre", "prende", "enciende", "investiga", "recuerda", "guarda", "analiza",
     "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar",
     "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
-    "cancion", "musica", "adivina", "reconoce", "identifica", "sonando"
+    "cancion", "musica", "adivina", "reconoce", "identifica", "sonando",
+    "programa", "programar", "codigo", "script", "arduino", "esp32", "sensor",
+    "teams", "outlook", "vscode", "meet", "drive", "trabajo"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -307,6 +309,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     def _hablar_y_mostrar(texto_respuesta: str):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion, esta_hablando
+        
+        # El dashboard SÍ recibe el texto completo (con IPs, nombres de archivo, etc.),
+        # solo la voz pasa por el limpiador -> se ve todo el detalle pero no se
+        # escuchan pronunciaciones raras de IPs, rutas o nombres de archivo.
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
@@ -346,7 +352,11 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
             apagar_sistema()
             return
-        
+
+        # --- KILL-SWITCH: máxima prioridad, antes que cualquier otro módulo ---
+        # Frases deliberadamente distintas de "cancela"/"detente" a secas
+        # (esas ya se usan para cancelar UNA acción puntual de WhatsApp o
+        # correo) para que no haya ambigüedad: esto detiene TODO de golpe.
         palabras_kill_switch = ["para todo", "alto total", "detente todo", "cancela todo", "emergencia"]
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
             _hablar_y_mostrar(activar_kill_switch())
@@ -367,7 +377,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_vscode())
             return
-
         # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
@@ -377,17 +386,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
             reproducir_sfx("modules", "Sonidos")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            
-            # Avisa por voz de forma limpia antes de ponerse a escuchar
             hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
-            
-            # Ejecuta la captura por Loopback y la consulta en Shazam
             respuesta_musica = identificar_y_abrir_cancion()
-            
             _hablar_y_mostrar(respuesta_musica)
             return
-
-        # --- 3. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
             p in orden_limpia_sin_acentos for p in [
@@ -511,6 +513,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 )
             _hablar_y_mostrar(resultado_agendado)
             return
+
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
@@ -543,6 +546,8 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
+
+        # --- 6. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 
@@ -583,6 +588,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
 
+        # --- 7. MÓDULO REDES ---
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
@@ -651,6 +657,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         palabras_abrir_app = ["abre", "abrir", "inicia", "iniciar", "lanza", "lanzar"]
         if any(p in orden_limpia_sin_acentos.split() for p in palabras_abrir_app):
             reproducir_sfx("modules", "Open")
+
+        palabras_coder_agent = ["programa", "programar", "codigo", "script", "arduino", "esp32"]
+        if any(p in orden_limpia_sin_acentos.split() for p in palabras_coder_agent):
+            reproducir_sfx("modules", "Agente programador")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             reproducir_sfx("modules", "Cam")
