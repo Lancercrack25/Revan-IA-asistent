@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REVAN // CODER AGENT</title>
+    <!-- Fuentes Sci-Fi / HUD -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles/coder.css">
+</head>
+<body>
+    <div id="particles-js"></div>
+    <div class="cyber-overlay"></div>
+
+    <div class="hud-frame">
+        <!-- HEADER HUD -->
+        <header class="hud-header">
+            <div class="brand-core">
+                <div class="reactor-icon cyan-pulse"><div class="core-pulse"></div></div>
+                <div class="title-group">
+                    <h1 class="glitch-text">CODER AGENT</h1>
+                    <span class="sub-text">MODULE_V1.0 // AUTOMATED IDE & COMPILER</span>
+                </div>
+            </div>
+
+            <!-- BOTONES DE CAMBIO DE VENTANA (3 VENTANAS) -->
+            <nav class="hud-switcher">
+                <button class="nav-btn back-btn" onclick="window.location.href='/'">
+                    <i class="fa-solid fa-arrow-left"></i> DASHBOARD
+                </button>
+                <button class="nav-btn active" id="tab-ide" onclick="switchCoderTab('ide')">
+                    <i class="fa-solid fa-code"></i> 1. CONSOLA IDE
+                </button>
+                <button class="nav-btn" id="tab-manual" onclick="switchCoderTab('manual')">
+                    <i class="fa-solid fa-book-bookmark"></i> 2. MANUAL OPERATIVO
+                </button>
+                <button class="nav-btn" id="tab-ultron" onclick="switchCoderTab('ultron')">
+                    <i class="fa-solid fa-atom"></i> 3. NÚCLEO ULTRON 3D
+                </button>
+            </nav>
+        </header>
+
+        <!-- ÁREA PRINCIPAL DE CONTENIDO -->
+        <main class="hud-main">
+            
+            <!-- VENTANA 1: CONSOLA IDE & TERMINAL -->
+            <div id="view-ide" class="coder-tab-panel active">
+                <div class="ide-container">
+                    <div class="ide-editor-window">
+                        <div class="window-bar">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                            <span class="window-title"><i class="fa-solid fa-file-code"></i> script_execution_core.py</span>
+                        </div>
+                        <textarea id="code-editor" class="code-area" spellcheck="false" placeholder="# Escribe o genera tu código de automatización aquí...
+import sys
+import os
+
+def run_agent():
+    print('[+] Coder Agent listo. Compilando instrucciones...')
+
+if __name__ == '__main__':
+    run_agent()"></textarea>
+                    </div>
+
+                    <div class="ide-terminal-window">
+                        <div class="window-bar">
+                            <span class="window-title"><i class="fa-solid fa-terminal"></i> CONSOLA SALIDA / TELEMETRÍA</span>
+                            <button class="clear-btn" onclick="clearTerminal()"><i class="fa-solid fa-trash-can"></i> LIMPIAR</button>
+                        </div>
+                        <div id="terminal-output" class="terminal-box">
+                            <div class="term-line success">> [SYS_INIT]: Coder Agent vinculado con éxito al núcleo REVAN.</div>
+                            <div class="term-line system">> [COMPILER]: Entorno Python / C++ listo para ejecución sintáctica.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VENTANA 2: MANUAL OPERATIVO -->
+            <div id="view-manual" class="coder-tab-panel">
+                <div class="manual-container">
+                    <div class="manual-card">
+                        <h2><i class="fa-solid fa-book-open-reader"></i> PROTOCOLOS DE COMPILACIÓN</h2>
+                        <hr class="cyber-hr">
+                        <h3>1. Sintaxis e Instrucciones Directas</h3>
+                        <p>El Agente Coder analiza peticiones en lenguaje natural para estructurar scripts Python, Node.js y Bash orientados a control de sistema.</p>
+                        
+                        <h3>2. Auto-Depuración y Corrección (Self-Healing)</h3>
+                        <p>Si el script arroja una excepción en la terminal de salida, el agente detecta el stack trace y reescribe la solución automáticamente.</p>
+                        
+                        <h3>3. Modos de Ejecución Táctica</h3>
+                        <ul>
+                            <li><strong>MODO SANDBOX:</strong> Prueba aislada dentro del contenedor virtual.</li>
+                            <li><strong>MODO ACCESO ROOT:</strong> Ejecución de directivas con permisos del sistema local.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VENTANA 3: NÚCLEO ULTRON 3D -->
+            <div id="view-ultron" class="coder-tab-panel">
+                <div class="ultron-wrapper">
+                    <iframe id="iframe-ultron" src="/esfera" frameborder="0"></iframe>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- BARRA DE COMANDO / EJECUCIÓN -->
+        <footer class="hud-footer">
+            <div class="input-container">
+                <i class="fa-solid fa-terminal prompt-icon"></i>
+                <input type="text" id="coder-cmd" placeholder="Escribe instrucciones de código para el Coder Agent..." autocomplete="off">
+                <button id="btn-compile" onclick="runCoderCommand()">
+                    <i class="fa-solid fa-play"></i> EJECUTAR SCRIPT
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="/static/coder_agent.js"></script>
+</body>
+</html>
