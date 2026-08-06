@@ -236,10 +236,6 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
     nombre_clean = nombre.lower().strip()
     if not nombre_clean:
         return "Señor, no se especificó el nombre de ninguna aplicación."
-
-    # Primera línea de defensa: si el nombre trae caracteres que no pintan
-    # nada en un nombre de app legítimo (&, |, ;, backticks, etc.), se
-    # rechaza aquí mismo, antes de intentar abrir nada.
     try:
         nombre = sanitizar_o_rechazar(nombre, contexto="nombre de aplicación")
     except EntradaNoSeguraError as err_sanit:
@@ -260,16 +256,11 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
             return "Navegador abierto, Señor."
 
         elif "discord" in nombre_clean:
-            # os.startfile no soporta pasar argumentos extra, así que aquí
-            # sí necesitamos subprocess -pero como LISTA de argumentos, sin
-            # pasar nunca por un shell que interprete '&', '|', etc.
             discord_exe = os.path.expandvars(r"%LocalAppData%\Discord\Update.exe")
             subprocess.Popen([discord_exe, "--processStart", "Discord.exe"], shell=False)
             return "Desplegando Discord, Señor."
 
         elif "whatsapp" in nombre_clean:
-            # os.startfile invoca ShellExecute directamente, sin pasar por
-            # cmd.exe -es la forma más segura de abrir un protocolo/URI.
             os.startfile("whatsapp:")
             return "Desplegando WhatsApp, Señor."
 
@@ -296,10 +287,6 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
                             ruta_completa = os.path.join(root, file)
                             os.startfile(ruta_completa)
                             return f"Ejecutando {nombre} desde su sistema, Señor."
-
-        # 3. Intento de fallback: os.startfile invoca ShellExecute
-        # directamente (sin pasar por cmd.exe/shell), a diferencia de
-        # os.system('start ...') que sí interpreta la cadena con un shell.
         try:
             os.startfile(nombre)
             return f"Ejecutando {nombre}, Señor."

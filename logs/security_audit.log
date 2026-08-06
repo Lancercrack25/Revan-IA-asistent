@@ -1,2 +1,4 @@
 {"timestamp": "2026-08-04 20:00:02", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
 {"timestamp": "2026-08-04 20:30:03", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
+{"timestamp": "2026-08-04 22:46:30", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
+{"timestamp": "2026-08-05 17:22:58", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}

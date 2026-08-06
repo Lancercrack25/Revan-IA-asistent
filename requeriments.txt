@@ -8,8 +8,11 @@
 # de pip -suele indicar qué falta a nivel de sistema operativo, no de Python.
 
 # --- Núcleo / LLM ---
-openai==1.51.2                 # cliente usado contra los endpoints de NVIDIA NIM (NimClient)
-google-genai==0.3.0            # opcional: solo si activas el bloque de respaldo con Gemini real en os_service.py
+openai==1.51.2                 # cliente usado contra los endpoints de NVIDIA NIM (NimClient y Coder_agent)
+google-genai==0.3.0             # opcional: solo si activas el bloque de respaldo con Gemini real en os_service.py
+
+# --- Coder_agent / Electrónica ---
+pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
 
 # --- Servidor web / dashboard ---
 fastapi==0.115.0
@@ -49,13 +52,6 @@ psutil==6.0.0
 # --- Ciencia / gráficos (Inspector_asistent) ---
 scipy==1.14.1
 matplotlib==3.9.2
-
-# --- GUI legada (Gui/Dashboard.py) ---
-# Descomenta esta línea SOLO si sigues usando la GUI de escritorio antigua
-# (Gui/Dashboard.py). Ya no está conectada a main.py -ver el hallazgo de
-# código muerto de la revisión anterior-, así que si la vas a borrar, no
-# hace falta instalar esto.
-# customtkinter==5.2.2
 
 # --- Librerías de la librería estándar de Python que NO van aquí ---
 # (no requieren instalación, ya vienen con Python): os, sys, time, json,

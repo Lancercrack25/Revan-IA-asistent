@@ -42,10 +42,6 @@ def _registrar_aviso(accion: str, mensaje: str) -> None:
 
 
 def verificar_archivos_sensibles(directorio_base: str = ".") -> list[str]:
-    """
-    Revisa cada archivo sensible conocido y devuelve la lista de avisos
-    encontrados. No lanza excepciones ni detiene nada -es informativo-.
-    """
     base = Path(directorio_base)
     avisos: list[str] = []
 

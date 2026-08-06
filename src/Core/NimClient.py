@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import re
 
 try:
     from openai import OpenAI
@@ -35,6 +34,8 @@ from src.Automation.work_apps_actions import (
     abrir_google_meet,
     abrir_google_drive,
 )
+from src.Coder_agent.coder_agent import ejecutar_tarea_codigo, procesar_confirmacion_codigo
+from src.Creative_agent.creative_agent import generar_imagen
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
 from src.Security.rate_limiter import permitir_accion
@@ -328,6 +329,53 @@ HERRAMIENTAS = [
                 "required": ["app"],
             },
         },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generar_y_ejecutar_codigo",
+            "description": (
+                "Escribe código Python para una tarea de programación (scripts, utilidades, "
+                "apoyo para electrónica/Arduino/ESP32/sensores por puerto serial, cálculos, "
+                "análisis, etc.) y lo ejecuta. Úsala cuando te pidan programar, escribir un "
+                "script, automatizar algo con código, o ayuda técnica de programación."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "descripcion_tarea": {
+                        "type": "string",
+                        "description": "Descripción clara y completa de qué debe hacer el código.",
+                    }
+                },
+                "required": ["descripcion_tarea"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generar_imagen_ia",
+            "description": (
+                "Genera una imagen a partir de una descripción en texto usando IA generativa. "
+                "Úsala cuando te pidan crear, dibujar, generar o hacer una imagen/ilustración."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": (
+                            "Descripción detallada de la imagen a generar, en inglés si es "
+                            "posible (los modelos de imagen suelen dar mejores resultados con "
+                            "prompts en inglés), traducida y enriquecida a partir de lo que "
+                            "pidió el usuario."
+                        ),
+                    }
+                },
+                "required": ["prompt"],
+            },
+        },
     }
 ]
 
@@ -368,9 +416,6 @@ class NimClient:
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
     def _limpiar_para_voz(self, texto: str) -> str:
-        # Delegado al limpiador centralizado (src/Core/text_utils.py), que ahora
-        # también se aplica al resto de módulos (Network, etc.) desde main.py.
-        # Se mantiene este método por compatibilidad con el resto de la clase.
         return limpiar_texto_para_voz(texto)
 
     def _guardar_nota(self, clave: str, contenido: str) -> str:
@@ -399,9 +444,6 @@ class NimClient:
             return f"Error guardando nota: {e}"
         finally:
             liberar_conexion(conn)
-
-    # Mapa de tool -> categoría de rate limiting. Las tools no listadas
-    # aquí caen en "default" (10 acciones / 60s, ver rate_limiter.py).
     _CATEGORIA_RATE_LIMIT = {
         "enviar_whatsapp": "whatsapp",
         "analizar_camara": "camara",
@@ -412,6 +454,8 @@ class NimClient:
         "lanzar_videojuego": "comando_sistema",
         "abrir_office": "comando_sistema",
         "abrir_aplicacion_trabajo": "comando_sistema",
+        "generar_y_ejecutar_codigo": "coder_agent",
+        "generar_imagen_ia": "creative_agent",
         "crear_documento_word": "documentos",
         "crear_hoja_excel": "documentos",
         "contar_correos_no_leidos": "correo",
@@ -500,9 +544,6 @@ class NimClient:
                 return resultado
 
             elif nombre == "limpiar_sistema":
-                # Igual que crear_carpeta: sin confirmación. Son archivos
-                # temporales -de por sí diseñados para borrarse-, acción
-                # local y de bajo riesgo real.
                 resultado = ejecutar_limpieza_sistema()
                 registrar_accion_sistema("limpiar_sistema", resultado, "LIMPIEZA")
                 return resultado
@@ -557,6 +598,22 @@ class NimClient:
                 registrar_accion_sistema(f"abrir_app_trabajo({app})", resultado, "APPS_TRABAJO")
                 return resultado
 
+            elif nombre == "generar_y_ejecutar_codigo":
+                descripcion_tarea = argumentos.get("descripcion_tarea", "")
+                if not descripcion_tarea.strip():
+                    return "Señor, necesito una descripción de qué debe hacer el código."
+                resultado = ejecutar_tarea_codigo(descripcion_tarea)
+                registrar_accion_sistema(f"coder_agent({descripcion_tarea[:60]})", resultado, "CODER_AGENT")
+                return resultado
+
+            elif nombre == "generar_imagen_ia":
+                prompt = argumentos.get("prompt", "")
+                if not prompt.strip():
+                    return "Señor, necesito una descripción de qué imagen generar."
+                resultado = generar_imagen(prompt)
+                registrar_accion_sistema(f"generar_imagen({prompt[:60]})", resultado, "CREATIVE_AGENT")
+                return resultado
+
             else:
                 return f"La herramienta '{nombre}' no está configurada."
 
@@ -570,13 +627,16 @@ class NimClient:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion})
             return respuesta_confirmacion
-
-        # 2. Si no hay confirmación pendiente, se procesa la solicitud mediante LLM
+        # 1b. Igual, pero para código pendiente de confirmar (Coder_agent)
+        respuesta_confirmacion_codigo = procesar_confirmacion_codigo(orden_usuario)
+        if respuesta_confirmacion_codigo:
+            self.historial.append({"role": "user", "content": orden_usuario})
+            self.historial.append({"role": "assistant", "content": respuesta_confirmacion_codigo})
+            return respuesta_confirmacion_codigo
         self.historial.append({"role": "user", "content": orden_usuario})
 
         if len(self.historial) > 16:
             self.historial = [self.historial[0]] + self.historial[-15:]
-
         try:
             t0 = time.time()
             respuesta = self.client.chat.completions.create(
@@ -610,12 +670,10 @@ class NimClient:
                 res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
                 resultados.append(res)
                 nombres_ejecutados.append(nombre_herramienta)
-            
             respuesta_directa = self._limpiar_para_voz(resultados[0])
             texto_para_historial = respuesta_directa
             if nombres_ejecutados and nombres_ejecutados[0] == "leer_correos_recientes":
                 texto_para_historial = envolver_contenido_externo(resultados[0], fuente="correo electrónico")
-
             self.historial.append({"role": "assistant", "content": texto_para_historial})
             return respuesta_directa
 
