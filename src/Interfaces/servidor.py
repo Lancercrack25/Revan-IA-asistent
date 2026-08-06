@@ -64,6 +64,16 @@ async def obtener_coder():
 async def obtener_creative():
     return servir_html_modulo("creative_interface.html")
 
+@app.get("/coder_interface.html")
+async def obtener_coder_interface():
+    """Ruta del Agente Coder"""
+    return servir_html_modulo("coder_interface.html")
+
+@app.get("/creative_interface.html")
+async def obtener_creative_interface():
+    """Ruta del Agente Creativo"""
+    return servir_html_modulo("creative_interface.html")
+
 # --- RUTAS DE INFORMACIÓN DE MÓDULOS ---
 @app.get("/modulos/camera")
 async def info_camera():

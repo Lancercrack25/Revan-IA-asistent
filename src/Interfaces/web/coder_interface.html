@@ -4,10 +4,112 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REVAN // CODER AGENT</title>
+    
     <!-- Fuentes Sci-Fi / HUD -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Estilos montados desde FastAPI -->
+    <link rel="stylesheet" href="/styles/dashboard.css">
     <link rel="stylesheet" href="/styles/coder.css">
+
+    <!-- REGLAS DE RESCATE: Mantiene la estructura visible y adaptable sin importar el CSS externo -->
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #050811;
+        }
+
+        .hud-frame {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            box-sizing: border-box;
+        }
+
+        .hud-main {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 !important;
+            height: calc(100vh - 140px) !important;
+            position: relative;
+            overflow: hidden;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        /* Control estricto de Pestañas */
+        .coder-tab-panel {
+            display: none !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .coder-tab-panel.active {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 !important;
+        }
+
+        /* Estructura del IDE (Editor a la izquierda, Terminal a la derecha) */
+        .ide-container {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 15px !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .ide-editor-window, .ide-terminal-window {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 !important;
+            height: 100% !important;
+            background: rgba(8, 12, 22, 0.9) !important;
+            border: 1px solid #00ffcc !important;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2) !important;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .code-area, .terminal-box {
+            flex: 1 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: transparent !important;
+            color: #00ffcc !important;
+            font-family: 'Share Tech Mono', monospace !important;
+            font-size: 14px;
+            border: none !important;
+            padding: 12px !important;
+            box-sizing: border-box !important;
+            resize: none !important;
+            outline: none !important;
+            overflow-y: auto !important;
+        }
+
+        .ultron-wrapper {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ultron-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .manual-card {
+            color: #00ffcc;
+            font-family: 'Rajdhani', sans-serif;
+            padding: 20px;
+        }
+    </style>
 </head>
 <body>
     <div id="particles-js"></div>
@@ -24,7 +126,7 @@
                 </div>
             </div>
 
-            <!-- BOTONES DE CAMBIO DE VENTANA (3 VENTANAS) -->
+            <!-- BOTONES DE CAMBIO DE VENTANA -->
             <nav class="hud-switcher">
                 <button class="nav-btn back-btn" onclick="window.location.href='/'">
                     <i class="fa-solid fa-arrow-left"></i> DASHBOARD
@@ -71,8 +173,8 @@ if __name__ == '__main__':
                             <button class="clear-btn" onclick="clearTerminal()"><i class="fa-solid fa-trash-can"></i> LIMPIAR</button>
                         </div>
                         <div id="terminal-output" class="terminal-box">
-                            <div class="term-line success">> [SYS_INIT]: Coder Agent vinculado con éxito al núcleo REVAN.</div>
-                            <div class="term-line system">> [COMPILER]: Entorno Python / C++ listo para ejecución sintáctica.</div>
+                            <div class="term-line success" style="color: #00ff88;">> [SYS_INIT]: Coder Agent vinculado con éxito al núcleo REVAN.</div>
+                            <div class="term-line system" style="color: #00ffcc;">> [COMPILER]: Entorno Python / C++ listo para ejecución sintáctica.</div>
                         </div>
                     </div>
                 </div>
@@ -83,7 +185,7 @@ if __name__ == '__main__':
                 <div class="manual-container">
                     <div class="manual-card">
                         <h2><i class="fa-solid fa-book-open-reader"></i> PROTOCOLOS DE COMPILACIÓN</h2>
-                        <hr class="cyber-hr">
+                        <hr class="cyber-hr" style="border-color: #00ffcc;">
                         <h3>1. Sintaxis e Instrucciones Directas</h3>
                         <p>El Agente Coder analiza peticiones en lenguaje natural para estructurar scripts Python, Node.js y Bash orientados a control de sistema.</p>
                         
@@ -120,8 +222,76 @@ if __name__ == '__main__':
         </footer>
     </div>
 
-    <!-- Scripts -->
+    <!-- Script Autónomo y Limpio de Control -->
+    <script>
+        function switchCoderTab(tabName) {
+            // Quitar clase activa de todos los paneles y botones
+            document.querySelectorAll('.coder-tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.hud-switcher .nav-btn:not(.back-btn)').forEach(b => b.classList.remove('active'));
+
+            // Asignar clase activa a la seleccionada
+            const targetPanel = document.getElementById(`view-${tabName}`);
+            const targetBtn = document.getElementById(`tab-${tabName}`);
+
+            if (targetPanel) targetPanel.classList.add('active');
+            if (targetBtn) targetBtn.classList.add('active');
+        }
+
+        function clearTerminal() {
+            const terminal = document.getElementById('terminal-output');
+            if (terminal) terminal.innerHTML = '';
+        }
+
+        function runCoderCommand() {
+            const input = document.getElementById('coder-cmd');
+            const terminal = document.getElementById('terminal-output');
+            if (!input || !terminal) return;
+
+            const cmdText = input.value.trim();
+            if (!cmdText) return;
+
+            const cmdLine = document.createElement('div');
+            cmdLine.className = 'term-line system';
+            cmdLine.style.color = '#00ffcc';
+            cmdLine.innerHTML = `> [EXEC_CMD]: ${cmdText}`;
+            terminal.appendChild(cmdLine);
+            terminal.scrollTop = terminal.scrollHeight;
+
+            setTimeout(() => {
+                const respLine = document.createElement('div');
+                respLine.className = 'term-line success';
+                respLine.style.color = '#00ff88';
+                respLine.innerHTML = `> [CODER_RESP]: Procesando script... Código verificado sin errores sintácticos.`;
+                terminal.appendChild(respLine);
+                terminal.scrollTop = terminal.scrollHeight;
+            }, 600);
+
+            input.value = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const coderInput = document.getElementById('coder-cmd');
+            if (coderInput) {
+                coderInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') runCoderCommand();
+                });
+            }
+        });
+    </script>
+
+    <!-- Partículas Script -->
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
-    <script src="/static/coder_agent.js"></script>
+    <script>
+        if (typeof particlesJS !== 'undefined') {
+            particlesJS('particles-js', {
+                "particles": {
+                    "number": { "value": 40 },
+                    "color": { "value": "#00ffcc" },
+                    "line_linked": { "enable": true, "distance": 150, "color": "#00ffcc", "opacity": 0.2, "width": 1 },
+                    "move": { "enable": true, "speed": 1.5 }
+                }
+            });
+        }
+    </script>
 </body>
 </html>

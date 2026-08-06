@@ -1,37 +1,43 @@
+// ==========================================
+// REVAN // CODER AGENT - CORE LOGIC
+// ==========================================
+
 // Manejo de Cambio de Pestañas / Ventanas Tácticas
 function switchCoderTab(tabName) {
     // Ocultar todos los paneles
     const panels = document.querySelectorAll('.coder-tab-panel');
     panels.forEach(p => p.classList.remove('active'));
 
-    // Quitar activo de botones
+    // Quitar estado activo de los botones de navegación
     const buttons = document.querySelectorAll('.hud-switcher .nav-btn:not(.back-btn)');
     buttons.forEach(b => b.classList.remove('active'));
 
     // Activar pestaña requerida
     if (tabName === 'ide') {
-        document.getElementById('view-ide').classList.add('active');
-        document.getElementById('tab-ide').classList.add('active');
+        document.getElementById('view-ide')?.classList.add('active');
+        document.getElementById('tab-ide')?.classList.add('active');
     } else if (tabName === 'manual') {
-        document.getElementById('view-manual').classList.add('active');
-        document.getElementById('tab-manual').classList.add('active');
+        document.getElementById('view-manual')?.classList.add('active');
+        document.getElementById('tab-manual')?.classList.add('active');
     } else if (tabName === 'ultron') {
-        document.getElementById('view-ultron').classList.add('active');
-        document.getElementById('tab-ultron').classList.add('active');
+        document.getElementById('view-ultron')?.classList.add('active');
+        document.getElementById('tab-ultron')?.classList.add('active');
     }
 }
 
 // Limpiar salida de la terminal
 function clearTerminal() {
-    document.getElementById('terminal-output').innerHTML = '';
+    const terminal = document.getElementById('terminal-output');
+    if (terminal) terminal.innerHTML = '';
 }
 
 // Ejecución/Compilación simulada en consola
 function runCoderCommand() {
     const input = document.getElementById('coder-cmd');
     const terminal = document.getElementById('terminal-output');
-    const cmdText = input.value.trim();
+    if (!input || !terminal) return;
 
+    const cmdText = input.value.trim();
     if (!cmdText) return;
 
     // Agregar comando a la terminal
@@ -39,6 +45,7 @@ function runCoderCommand() {
     cmdLine.className = 'term-line system';
     cmdLine.innerHTML = `> [EXEC_CMD]: ${cmdText}`;
     terminal.appendChild(cmdLine);
+    terminal.scrollTop = terminal.scrollHeight;
 
     // Simulación de respuesta del compilador
     setTimeout(() => {
@@ -52,7 +59,20 @@ function runCoderCommand() {
     input.value = '';
 }
 
-// Inicializar Partículas Sci-Fi en el fondo
+// Escuchar eventos al cargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    // Permitir ejecutar enviando Enter desde el input de comandos
+    const coderInput = document.getElementById('coder-cmd');
+    if (coderInput) {
+        coderInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                runCoderCommand();
+            }
+        });
+    }
+});
+
+// Inicializar Partículas Sci-Fi Cyan en el fondo
 if (typeof particlesJS !== 'undefined') {
     particlesJS('particles-js', {
         "particles": {

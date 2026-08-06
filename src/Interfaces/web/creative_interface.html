@@ -7,6 +7,9 @@
     <!-- Fuentes Sci-Fi / HUD -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Estilos base y estilos específicos del Creative Agent -->
+    <link rel="stylesheet" href="/styles/dashboard.css">
     <link rel="stylesheet" href="/styles/creative.css">
 </head>
 <body>
@@ -101,7 +104,7 @@
             </div>
 
             <!-- VENTANA 2: MANUAL OPERATIVO -->
-            <div id="view-manual" class="creative-tab-panel">
+            <div id="view-manual" class="creative-tab-panel" style="display: none;">
                 <div class="manual-container">
                     <div class="manual-card">
                         <h2><i class="fa-solid fa-book-open-reader"></i> MANUAL CREATIVO & PROMPTING</h2>
@@ -122,7 +125,7 @@
             </div>
 
             <!-- VENTANA 3: NÚCLEO ULTRON 3D -->
-            <div id="view-ultron" class="creative-tab-panel">
+            <div id="view-ultron" class="creative-tab-panel" style="display: none;">
                 <div class="ultron-wrapper">
                     <iframe id="iframe-ultron" src="/esfera" frameborder="0"></iframe>
                 </div>
@@ -142,7 +145,35 @@
         </footer>
     </div>
 
-    <!-- Scripts -->
+    <!-- Script Inline para alternar entre las 3 Pestañas del Agente Creativo -->
+    <script>
+        function switchCreativeTab(tabName) {
+            // Ocultar todas las pestañas
+            const panels = document.querySelectorAll('.creative-tab-panel');
+            panels.forEach(panel => {
+                panel.classList.remove('active');
+                panel.style.display = 'none';
+            });
+
+            // Desactivar botones de navegación
+            const buttons = document.querySelectorAll('.hud-switcher .nav-btn:not(.back-btn)');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // Activar la pestaña seleccionada
+            const targetPanel = document.getElementById(`view-${tabName}`);
+            const targetBtn = document.getElementById(`tab-${tabName}`);
+
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+                targetPanel.style.display = 'block';
+            }
+            if (targetBtn) {
+                targetBtn.classList.add('active');
+            }
+        }
+    </script>
+
+    <!-- Scripts externos -->
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="/static/creative.js"></script>
 </body>
