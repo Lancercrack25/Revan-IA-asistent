@@ -7,11 +7,6 @@ NimClient para el LLM -NVIDIA_NIM_API_KEY-, no hace falta una cuenta
 nueva). Si por algún motivo NVIDIA no está disponible pero sí tienes una
 key de Hugging Face configurada, cae a ese proveedor como respaldo.
 
-Sin confirmación, a propósito: es una acción local y reversible -genera
-un archivo de imagen y lo abre-, mismo criterio que ya se aplicó a
-carpetas/Word/Excel (la confirmación se reserva para lo irreversible y
-externo, como WhatsApp o correo).
-
 *** AVISO HONESTO ***
 El formato exacto del endpoint de NVIDIA NIM para imágenes se armó según
 la documentación pública (https://docs.api.nvidia.com/nim/reference/
@@ -27,7 +22,6 @@ import re
 import time
 import base64
 import requests
-
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 

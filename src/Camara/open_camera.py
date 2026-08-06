@@ -12,9 +12,7 @@ class RevanCameraManager:
         # Frames en memoria
         self.current_frame = None
         self.frame_referencia = None
-        # Hilos
         self._thread_camera = None
-        # Configuración de vigilancia
         self.sensibilidad_pct = 8.0
         self.cooldown_seg = 10.0
         self.intervalo_seg = 1.5
@@ -36,14 +34,6 @@ class RevanCameraManager:
         return (pixeles_cambiados / total_pixeles) * 100
 
     def abrir_camara(self, voz_ia=None, sincronizar_estado_esfera=None, duracion_preview=None):
-        """Inicia el pipeline visual y la ventana OpenCV.
-
-        duracion_preview: si se especifica (segundos), el hilo de cámara se
-        detiene solo automáticamente tras ese tiempo. Se usa para el modo
-        'un solo disparo' de analizar_camara (vista previa breve + análisis),
-        a diferencia del modo vigilancia, que corre indefinidamente hasta que
-        se lo detiene explícitamente (duracion_preview=None).
-        """
         if self.is_running:
             print("[CAM]: La cámara ya está activa.")
             return False
@@ -111,12 +101,10 @@ class RevanCameraManager:
             print("[CAM]: No se pudo abrir el dispositivo de video.")
             self.is_running = False
             return
-
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         for _ in range(10):
             self.cap.read()
-
         ret, frame_inicial = self.cap.read()
         if ret:
             self.frame_referencia = frame_inicial.copy()
@@ -282,7 +270,6 @@ class RevanCameraManager:
             self.cap.release()
         cv2.destroyAllWindows()
         print("[CAM]: Sistema de cámara liberado.")
-
 # Instancia Global del Módulo
 revan_cam = RevanCameraManager()
 

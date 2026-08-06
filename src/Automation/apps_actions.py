@@ -3,8 +3,6 @@ import subprocess
 from src.Services.os_service import obtener_ruta_escritorio
 from src.Automation.games_actions import _normalizar, _listar_accesos, _buscar_mejor_coincidencia
 
-# Protocolos o comandos nativos directos de Windows (UWP / URIs)
-# No poner nombres de accesos directos (.lnk) aquí; esos los escanea la carpeta Plataformas.
 APPS_PROTOCOLO_ESPECIAL = {
     "discord": r'start "" "%LocalAppData%\Discord\Update.exe" --processStart Discord.exe',
     "whatsapp": "start whatsapp:",      

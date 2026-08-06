@@ -18,7 +18,6 @@ def abrir_carpeta_sistema(nombre_carpeta):
     try:
         carpeta = nombre_carpeta.lower().strip()
         escritorio = obtener_ruta_escritorio()
-        
         # Mapeo exacto de las carpetas que tienes en tu Escritorio
         mapeo_carpetas = {
             "codigos": "Codigos programacion",
