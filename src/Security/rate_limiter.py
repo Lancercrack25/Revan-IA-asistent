@@ -32,12 +32,6 @@ LIMITES_POR_DEFECTO = {
 }
 
 def permitir_accion(categoria: str) -> bool:
-    """
-    Devuelve True si la acción puede proceder, False si ya se alcanzó el
-    límite para esa categoría en la ventana de tiempo configurada. Cada
-    rechazo queda registrado en auditoría, para poder revisar después si
-    hubo un patrón de uso anormal.
-    """
     limite, ventana = LIMITES_POR_DEFECTO.get(categoria, LIMITES_POR_DEFECTO["default"])
     ahora = time.time()
 

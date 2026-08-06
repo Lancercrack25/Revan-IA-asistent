@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import re
 
 try:
     from openai import OpenAI
@@ -417,9 +416,6 @@ class NimClient:
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
     def _limpiar_para_voz(self, texto: str) -> str:
-        # Delegado al limpiador centralizado (src/Core/text_utils.py), que ahora
-        # también se aplica al resto de módulos (Network, etc.) desde main.py.
-        # Se mantiene este método por compatibilidad con el resto de la clase.
         return limpiar_texto_para_voz(texto)
 
     def _guardar_nota(self, clave: str, contenido: str) -> str:
@@ -470,10 +466,6 @@ class NimClient:
     }
 
     def _ejecutar_herramienta(self, nombre: str, argumentos: dict) -> str:
-        # Un solo punto de control para TODAS las tools: si el LLM entra en
-        # un loop (o algo externo lo empuja a repetir la misma acción una y
-        # otra vez), esto pone un techo duro antes de que llegue a
-        # ejecutarse nada.
         categoria = self._CATEGORIA_RATE_LIMIT.get(nombre, "default")
         if not permitir_accion(categoria):
             return (
@@ -527,11 +519,6 @@ class NimClient:
             elif nombre == "crear_carpeta":
                 nombre_c = (argumentos.get("nombre") or "Nueva_Carpeta").strip()
                 ruta_c = argumentos.get("ruta", "escritorio")
-                # Sin confirmación a propósito: es una acción local y
-                # reversible (se borra si no era lo que querías), ya
-                # protegida por saneo de nombre + restricción de ruta al
-                # home del usuario + rate limiting + auditoría. Pedir
-                # "¿confirmo?" para esto sería fricción sin beneficio real.
                 resultado = crear_carpeta_sistema(nombre_c, ruta_c)
                 registrar_accion_sistema(f"crear_carpeta({nombre_c})", resultado, "CREAR_CARPETA")
                 return resultado
@@ -649,7 +636,6 @@ class NimClient:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion_codigo})
             return respuesta_confirmacion_codigo
-        # 2. Si no hay confirmación pendiente, se procesa la solicitud mediante LLM
         self.historial.append({"role": "user", "content": orden_usuario})
 
         if len(self.historial) > 16:
