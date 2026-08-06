@@ -94,16 +94,6 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
         print(f" Error al sincronizar chat del dashboard: {e}")
 
 def activar_kill_switch() -> str:
-    """
-    Comando de pánico: cancela cualquier acción pendiente de confirmación
-    (WhatsApp, correo) y detiene cualquier módulo activo que use recursos
-    del sistema (vigilancia de cámara, control de esfera por mano), sin
-    importar en qué estado se encuentre cada uno.
-
-    Pensado para poder decir "REVAN, para todo" y quedar en un estado
-    limpio y conocido de inmediato -especialmente importante antes de que
-    exista Coder_agent ejecutando cosas en el sandbox-.
-    """
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
 
     acciones_detenidas = []
@@ -370,9 +360,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
             reproducir_sfx("modules", "Sonidos")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            # Avisa por voz de forma limpia antes de ponerse a escuchar
             hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
-            # Ejecuta la captura por Loopback y la consulta en Shazam
             respuesta_musica = identificar_y_abrir_cancion()
             _hablar_y_mostrar(respuesta_musica)
             return
@@ -642,7 +630,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         palabras_coder_agent = ["programa", "programar", "codigo", "script", "arduino", "esp32"]
         if any(p in orden_limpia_sin_acentos.split() for p in palabras_coder_agent):
             reproducir_sfx("modules", "Agente programador")
-
         palabras_creative_agent = ["imagen", "dibuja", "dibujar", "ilustracion", "ilustra"]
         if any(p in orden_limpia_sin_acentos.split() for p in palabras_creative_agent):
             reproducir_sfx("modules", "Creative_asisstent")
