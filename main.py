@@ -664,7 +664,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
         _hablar_y_mostrar(respuesta_final)
-
     except Exception as e:
         print(f"Error al ejecutar la orden: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -685,7 +684,6 @@ def main():
         inicializar_base_datos()
     except Exception as e:
         print(f"Alerta al desplegar base de datos: {e}")
-
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
@@ -707,6 +705,6 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         apagar_sistema()
-
+        
 if __name__ == "__main__":
     main()
