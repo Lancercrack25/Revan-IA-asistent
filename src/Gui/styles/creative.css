@@ -1,78 +1,121 @@
+/* REVAN CREATIVE AGENT STYLES */
 html, body {
-    margin: 0; padding: 0;
-    width: 100vw; height: 100vh;
-    overflow: hidden; background-color: #0a030d;
-    color: #ff007f; font-family: 'Share Tech Mono', monospace;
+    margin: 0; padding: 0; width: 100vw; height: 100vh;
+    overflow: hidden; background-color: #050103;
+    color: #ff0055; font-family: 'Share Tech Mono', monospace;
 }
 
-.scanline-magenta {
-    width: 100%; height: 120px;
-    z-index: 99; background: linear-gradient(0deg, rgba(255, 0, 127, 0) 0%, rgba(255, 0, 127, 0.05) 50%, rgba(255, 0, 127, 0) 100%);
-    opacity: 0.7; position: absolute; top: 0; left: 0;
-    pointer-events: none; animation: scanlineAnim 6s linear infinite;
+.scanline-revan {
+    width: 100%; height: 120px; z-index: 99;
+    background: linear-gradient(0deg, rgba(255, 0, 85, 0) 0%, rgba(255, 0, 85, 0.08) 50%, rgba(255, 0, 85, 0) 100%);
+    opacity: 0.8; position: absolute; top: 0; left: 0;
+    pointer-events: none; animation: scanlineAnim 5s linear infinite;
 }
-
 @keyframes scanlineAnim { 0% { top: -120px; } 100% { top: 100%; } }
 
-.hud-frame { display: flex !important; flex-direction: column !important; width: 100vw !important; height: 100vh !important; }
+.hud-frame { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
 
-/* HEADER & WAVEFORM */
-.creative-header { border-bottom: 2px solid #ff007f !important; box-shadow: 0 0 20px rgba(255,0,127,0.3) !important; }
-.magenta-icon { border-color: #ff007f !important; }
-.magenta-pulse { background: #ff007f !important; }
-.magenta-text { color: #ff007f !important; }
-.magenta-sub { color: #ff77be !important; }
-.magenta-hr { border-color: #ff007f !important; }
+.revan-header {
+    height: 70px; background: rgba(12, 2, 6, 0.95);
+    border-bottom: 2px solid #ff0055; box-shadow: 0 0 25px rgba(255, 0, 85, 0.35);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 25px;
+}
 
-.hud-waveform { display: flex; gap: 4px; align-items: center; height: 20px; }
-.hud-waveform .bar { width: 4px; height: 100%; background: #ff007f; animation: wave 1s infinite ease-in-out; }
-.hud-waveform .bar:nth-child(2) { animation-delay: 0.2s; }
-.hud-waveform .bar:nth-child(3) { animation-delay: 0.4s; }
-.hud-waveform .bar:nth-child(4) { animation-delay: 0.6s; }
-.hud-waveform .bar:nth-child(5) { animation-delay: 0.8s; }
-@keyframes wave { 0%, 100% { height: 4px; } 50% { height: 20px; } }
+.sith-icon { border-color: #ff0055; box-shadow: 0 0 10px #ff0055; }
+.sith-pulse { background: #ff0055; box-shadow: 0 0 12px #ff0055; }
+.sith-text { color: #ff0055; text-shadow: 0 0 12px rgba(255, 0, 85, 0.7); }
+.sith-sub { color: #ff6699; }
+.sith-hr { border: none; height: 1px; background: linear-gradient(90deg, #ff0055, transparent); margin: 15px 0; }
 
-.hud-main { display: flex !important; flex-direction: column !important; flex: 1 !important; height: calc(100vh - 130px) !important; padding: 20px; box-sizing: border-box; }
+.sith-waveform { display: flex; gap: 4px; align-items: center; height: 20px; }
+.sith-waveform .bar { width: 3px; height: 100%; background: #ff0055; box-shadow: 0 0 6px #ff0055; animation: waveSith 1.2s infinite ease-in-out; }
+.sith-waveform .bar:nth-child(2) { animation-delay: 0.15s; }
+.sith-waveform .bar:nth-child(3) { animation-delay: 0.3s; }
+.sith-waveform .bar:nth-child(4) { animation-delay: 0.45s; }
+.sith-waveform .bar:nth-child(5) { animation-delay: 0.6s; }
+.sith-waveform .bar:nth-child(6) { animation-delay: 0.75s; }
+@keyframes waveSith { 0%, 100% { height: 3px; } 50% { height: 22px; } }
 
-.creative-view { display: none !important; width: 100% !important; height: 100% !important; }
-.creative-view.active { display: flex !important; flex-direction: column !important; flex: 1 !important; }
+.sith-btn {
+    background: rgba(255, 0, 85, 0.1); border: 1px solid #ff0055; color: #ff0055;
+    font-family: 'Orbitron'; font-size: 0.8rem; padding: 8px 16px; cursor: pointer; transition: all 0.3s;
+}
+.sith-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 15px #ff0055; }
+.sith-btn-back { border-color: rgba(255, 0, 85, 0.4); color: #ff6699; }
 
-/* GRILLA TARJETAS MAGENTA OVERWATCH */
+.hud-main { display: flex; flex-direction: column; flex: 1; height: calc(100vh - 130px); padding: 25px; box-sizing: border-box; }
+
+.creative-view { display: none; width: 100%; height: 100%; }
+.creative-view.active { display: flex; flex-direction: column; flex: 1; }
+
+.section-title { font-family: 'Orbitron'; font-size: 1.1rem; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+
 .epic-modules-grid {
-    display: grid !important; grid-template-columns: repeat(3, 1fr) !important;
-    gap: 25px !important; width: 100% !important; height: calc(100% - 40px) !important; align-items: center;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 25px; width: 100%; height: calc(100% - 40px); align-items: center;
 }
 
-.epic-card.magenta-epic {
-    background: rgba(20, 6, 26, 0.85); border: 1px solid rgba(255, 0, 127, 0.3);
-    box-shadow: inset 0 0 15px rgba(255, 0, 127, 0.05), 0 0 20px rgba(0, 0, 0, 0.9);
+.revan-card {
+    position: relative; background: rgba(18, 3, 9, 0.88);
+    border: 1px solid rgba(255, 0, 85, 0.35); border-radius: 4px; padding: 25px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    height: 300px; cursor: pointer; transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.05), 0 0 25px rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(12px); overflow: hidden;
 }
 
-.epic-card.magenta-epic:hover {
-    border-color: #ff007f; transform: translateY(-8px) scale(1.02);
-    box-shadow: inset 0 0 25px rgba(255, 0, 127, 0.25), 0 0 35px rgba(255, 0, 127, 0.4);
-    background: rgba(30, 8, 38, 0.95);
+.revan-card:hover {
+    border-color: #ff0055; transform: translateY(-8px) scale(1.02);
+    box-shadow: inset 0 0 30px rgba(255, 0, 85, 0.3), 0 0 40px rgba(255, 0, 85, 0.5);
+    background: rgba(28, 5, 14, 0.95);
 }
 
-.epic-card.magenta-epic .corner-bracket { border-color: #ff007f; }
-.epic-card.magenta-epic .card-scan-line { background: linear-gradient(90deg, transparent, #ff007f, transparent); }
-.epic-card.magenta-epic .card-icon,
-.epic-card.magenta-epic h3,
-.epic-card.magenta-epic .card-footer-action,
-.epic-card.magenta-epic .card-metrics { color: #ff007f; }
+.corner-bracket { position: absolute; width: 10px; height: 10px; border-color: #ff0055; border-style: solid; }
+.top-left { top: 0; left: 0; border-width: 3px 0 0 3px; }
+.top-right { top: 0; right: 0; border-width: 3px 3px 0 0; }
+.bottom-left { bottom: 0; left: 0; border-width: 0 0 3px 3px; }
+.bottom-right { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
 
-.magenta-badge { border-color: #ff007f !important; color: #ff007f !important; }
-.glass-panel-magenta { background: rgba(18, 5, 24, 0.9); border: 1px solid #ff007f; padding: 25px; box-shadow: 0 0 20px rgba(255,0,127,0.2); height: 100%; box-sizing: border-box; }
+.card-scan-line {
+    position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+    background: linear-gradient(90deg, transparent, #ff0055, transparent); opacity: 0;
+}
+.revan-card:hover .card-scan-line { opacity: 1; animation: cardScan 1.8s infinite; }
+@keyframes cardScan { 0% { top: 0; } 100% { top: 100%; } }
 
-/* FOOTER MAGENTA */
-.creative-footer { height: 60px; background: rgba(15, 4, 20, 0.95); border-top: 2px solid #ff007f; padding: 0 20px; display: flex; align-items: center; }
+.card-head { display: flex; justify-content: space-between; align-items: center; }
+.card-icon { font-size: 2.5rem; color: #ff0055; filter: drop-shadow(0 0 10px rgba(255,0,85,0.8)); }
+.sith-badge { font-size: 0.7rem; padding: 4px 10px; border: 1px solid #ff0055; background: rgba(0,0,0,0.8); color: #ff0055; }
+
+.card-body h3 { font-family: 'Orbitron'; font-size: 1.2rem; color: #ff0055; margin: 15px 0 8px 0; text-shadow: 0 0 8px rgba(255, 0, 85, 0.5); }
+.card-body p { font-family: 'Rajdhani'; color: #cca3b0; font-size: 1rem; line-height: 1.35; }
+.card-metrics { margin-top: 15px; font-size: 0.8rem; color: #ff0055; opacity: 0.85; }
+
+.card-footer-action {
+    font-size: 0.85rem; color: #ff0055; display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid rgba(255, 0, 85, 0.25); padding-top: 12px; font-family: 'Orbitron';
+}
+
+.revan-panel {
+    background: rgba(12, 2, 6, 0.95); border: 1px solid #ff0055; padding: 25px;
+    box-shadow: 0 0 25px rgba(255, 0, 85, 0.25); height: 100%; box-sizing: border-box; display: flex; flex-direction: column;
+}
+.revan-panel h2 { font-family: 'Orbitron'; color: #ff0055; margin: 0; font-size: 1.3rem; }
+
+.canvas-workspace { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed rgba(255, 0, 85, 0.3); margin-top: 15px; }
+.canvas-workspace .big-icon { font-size: 3.5rem; color: #ff0055; margin-bottom: 15px; filter: drop-shadow(0 0 15px #ff0055); }
+
+.revan-footer {
+    height: 60px; background: rgba(10, 1, 5, 0.98); border-top: 2px solid #ff0055;
+    padding: 0 25px; display: flex; align-items: center;
+}
 .input-container { display: flex; width: 100%; gap: 12px; align-items: center; }
 .input-container input {
-    flex: 1; background: rgba(0, 0, 0, 0.6); border: 1px solid #ff007f; color: #ff007f;
-    padding: 10px 15px; font-family: 'Share Tech Mono'; outline: none; box-shadow: inset 0 0 8px rgba(255,0,127,0.2);
+    flex: 1; background: rgba(0, 0, 0, 0.7); border: 1px solid #ff0055; color: #ff0055;
+    padding: 10px 15px; font-family: 'Share Tech Mono'; outline: none; box-shadow: inset 0 0 10px rgba(255, 0, 85, 0.2);
 }
-.btn-creative {
-    background: #ff007f; color: #000; font-family: 'Orbitron'; font-weight: bold;
-    border: none; padding: 10px 20px; cursor: pointer; transition: all 0.2s;
+.btn-sith {
+    background: #ff0055; color: #000; font-family: 'Orbitron'; font-weight: bold;
+    border: none; padding: 10px 22px; cursor: pointer; transition: all 0.25s;
 }
-.btn-creative:hover { background: #ff3399; box-shadow: 0 0 15px #ff007f; }
+.btn-sith:hover { background: #ff3377; box-shadow: 0 0 20px #ff0055; }
