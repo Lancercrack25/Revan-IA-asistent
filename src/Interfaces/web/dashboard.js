@@ -71,8 +71,8 @@ function playClickAndNavigate(callbackUrl = null) {
     }
 }
 
-function playHoverSFX() { playDirectSound('hover', 0.25); }
-function playSectionSFX() { playDirectSound('section', 0.5); }
+function playHoverSFX() { playDirectSound('hover', 0.5); }
+function playSectionSFX() { playDirectSound('section', 0.4); }
 
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();

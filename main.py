@@ -159,6 +159,32 @@ def apagar_sistema():
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
+def procesar_comando_agentes(prompt: str):
+    """
+    Función orquestadora: Recibe las órdenes del Dashboard y las delega 
+    al agente especialista correspondiente.
+    """
+    prompt_lower = prompt.lower()
+    # 1. AGENTE CODER (Programación / Desarrollo)
+    if any(kw in prompt_lower for kw in ["codigo", "código", "script", "python", "bug", "html", "css", "js"]):
+        transmitir_desde_hilo_externo("PROCESANDO", "#00f0ff") # Esfera en azul cyan
+        # Simulamos o llamamos a tu cliente de IA (Coder Agent)
+        respuesta = f"Analizando requerimiento de desarrollo. Generando script optimizado para: '{prompt}'."
+        # Retornamos la respuesta a la UI con la etiqueta del agente CODER
+        transmitir_chat_desde_hilo_externo("CODER", respuesta)
+    # 2. AGENTE CREATIVO (Generación de contenido, imágenes, multimedia)
+    elif any(kw in prompt_lower for kw in ["imagen", "diseño", "crear", "audio", "video", "logo"]):
+        transmitir_desde_hilo_externo("PROCESANDO", "#ff00ff") # Esfera en magenta/púrpura
+        # Simulamos o llamamos a tu cliente de IA (Creative Agent)
+        respuesta = f"Procesando activos creativos y generación multimedia para: '{prompt}'." 
+        transmitir_chat_desde_hilo_externo("CREATIVE", respuesta)
+    # 3. NÚCLEO PRINCIPAL / ORQUESTADOR REVAN (Comandos de Sistema / Consultas Generales)
+    else:
+        transmitir_desde_hilo_externo("HABLANDO", "#00ff66") # Esfera en verde
+        # Aquí puedes llamar a tu cliente de Gemini o NVIDIA NIM
+        respuesta = f"Orden '{prompt}' procesada correctamente por el núcleo principal REVAN."
+        transmitir_chat_desde_hilo_externo("REVAN", respuesta)
+
 def encender_sistemas():
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, titulo, sistema_activo, esta_hablando
     sistema_activo = True
@@ -180,7 +206,7 @@ def encender_sistemas():
         sincronizar_chat_dashboard("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
         try:
             subprocess.Popen(
-                ["cmd", "/c", "start", "brave", "--app=http://127.0.0.1:8000", "--window-size=670,670"],
+                ["cmd", "/c", "start", "brave", "http://127.0.0.1:8000"],
                 shell=False
             )
             print("[2/2] Núcleo Web Desplegado (Esfera 3D + Dashboard).")
