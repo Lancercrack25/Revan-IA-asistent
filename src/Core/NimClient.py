@@ -36,6 +36,7 @@ from src.Automation.work_apps_actions import (
     abrir_google_drive,
 )
 from src.Coder_agent.coder_agent import ejecutar_tarea_codigo, procesar_confirmacion_codigo
+from src.Creative_agent.creative_agent import generar_imagen
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
 from src.Security.rate_limiter import permitir_accion
@@ -351,6 +352,31 @@ HERRAMIENTAS = [
                 "required": ["descripcion_tarea"],
             },
         },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generar_imagen_ia",
+            "description": (
+                "Genera una imagen a partir de una descripción en texto usando IA generativa. "
+                "Úsala cuando te pidan crear, dibujar, generar o hacer una imagen/ilustración."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": (
+                            "Descripción detallada de la imagen a generar, en inglés si es "
+                            "posible (los modelos de imagen suelen dar mejores resultados con "
+                            "prompts en inglés), traducida y enriquecida a partir de lo que "
+                            "pidió el usuario."
+                        ),
+                    }
+                },
+                "required": ["prompt"],
+            },
+        },
     }
 ]
 
@@ -391,6 +417,9 @@ class NimClient:
         self.historial = [{"role": "system", "content": self.system_prompt}]
 
     def _limpiar_para_voz(self, texto: str) -> str:
+        # Delegado al limpiador centralizado (src/Core/text_utils.py), que ahora
+        # también se aplica al resto de módulos (Network, etc.) desde main.py.
+        # Se mantiene este método por compatibilidad con el resto de la clase.
         return limpiar_texto_para_voz(texto)
 
     def _guardar_nota(self, clave: str, contenido: str) -> str:
@@ -420,6 +449,8 @@ class NimClient:
         finally:
             liberar_conexion(conn)
 
+    # Mapa de tool -> categoría de rate limiting. Las tools no listadas
+    # aquí caen en "default" (10 acciones / 60s, ver rate_limiter.py).
     _CATEGORIA_RATE_LIMIT = {
         "enviar_whatsapp": "whatsapp",
         "analizar_camara": "camara",
@@ -431,6 +462,7 @@ class NimClient:
         "abrir_office": "comando_sistema",
         "abrir_aplicacion_trabajo": "comando_sistema",
         "generar_y_ejecutar_codigo": "coder_agent",
+        "generar_imagen_ia": "creative_agent",
         "crear_documento_word": "documentos",
         "crear_hoja_excel": "documentos",
         "contar_correos_no_leidos": "correo",
@@ -438,6 +470,10 @@ class NimClient:
     }
 
     def _ejecutar_herramienta(self, nombre: str, argumentos: dict) -> str:
+        # Un solo punto de control para TODAS las tools: si el LLM entra en
+        # un loop (o algo externo lo empuja a repetir la misma acción una y
+        # otra vez), esto pone un techo duro antes de que llegue a
+        # ejecutarse nada.
         categoria = self._CATEGORIA_RATE_LIMIT.get(nombre, "default")
         if not permitir_accion(categoria):
             return (
@@ -491,6 +527,11 @@ class NimClient:
             elif nombre == "crear_carpeta":
                 nombre_c = (argumentos.get("nombre") or "Nueva_Carpeta").strip()
                 ruta_c = argumentos.get("ruta", "escritorio")
+                # Sin confirmación a propósito: es una acción local y
+                # reversible (se borra si no era lo que querías), ya
+                # protegida por saneo de nombre + restricción de ruta al
+                # home del usuario + rate limiting + auditoría. Pedir
+                # "¿confirmo?" para esto sería fricción sin beneficio real.
                 resultado = crear_carpeta_sistema(nombre_c, ruta_c)
                 registrar_accion_sistema(f"crear_carpeta({nombre_c})", resultado, "CREAR_CARPETA")
                 return resultado
@@ -519,9 +560,6 @@ class NimClient:
                 return resultado
 
             elif nombre == "limpiar_sistema":
-                # Igual que crear_carpeta: sin confirmación. Son archivos
-                # temporales -de por sí diseñados para borrarse-, acción
-                # local y de bajo riesgo real.
                 resultado = ejecutar_limpieza_sistema()
                 registrar_accion_sistema("limpiar_sistema", resultado, "LIMPIEZA")
                 return resultado
@@ -584,6 +622,14 @@ class NimClient:
                 registrar_accion_sistema(f"coder_agent({descripcion_tarea[:60]})", resultado, "CODER_AGENT")
                 return resultado
 
+            elif nombre == "generar_imagen_ia":
+                prompt = argumentos.get("prompt", "")
+                if not prompt.strip():
+                    return "Señor, necesito una descripción de qué imagen generar."
+                resultado = generar_imagen(prompt)
+                registrar_accion_sistema(f"generar_imagen({prompt[:60]})", resultado, "CREATIVE_AGENT")
+                return resultado
+
             else:
                 return f"La herramienta '{nombre}' no está configurada."
 
@@ -591,12 +637,13 @@ class NimClient:
             return f"Error ejecutando '{nombre}': {e}"
 
     def generar_respuesta(self, orden_usuario: str, max_iteraciones: int = 4) -> str:
+        # 1. INTERCEPTACIÓN PRIORITARIA DE CONFIRMACIONES (Evita llamadas innecesarias a la API)
         respuesta_confirmacion = procesar_confirmacion(orden_usuario)
         if respuesta_confirmacion:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion})
             return respuesta_confirmacion
-
+        # 1b. Igual, pero para código pendiente de confirmar (Coder_agent)
         respuesta_confirmacion_codigo = procesar_confirmacion_codigo(orden_usuario)
         if respuesta_confirmacion_codigo:
             self.historial.append({"role": "user", "content": orden_usuario})
