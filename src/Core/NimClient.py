@@ -444,9 +444,6 @@ class NimClient:
             return f"Error guardando nota: {e}"
         finally:
             liberar_conexion(conn)
-
-    # Mapa de tool -> categoría de rate limiting. Las tools no listadas
-    # aquí caen en "default" (10 acciones / 60s, ver rate_limiter.py).
     _CATEGORIA_RATE_LIMIT = {
         "enviar_whatsapp": "whatsapp",
         "analizar_camara": "camara",
@@ -640,7 +637,6 @@ class NimClient:
 
         if len(self.historial) > 16:
             self.historial = [self.historial[0]] + self.historial[-15:]
-
         try:
             t0 = time.time()
             respuesta = self.client.chat.completions.create(
@@ -674,12 +670,10 @@ class NimClient:
                 res = self._ejecutar_herramienta(nombre_herramienta, argumentos)
                 resultados.append(res)
                 nombres_ejecutados.append(nombre_herramienta)
-            
             respuesta_directa = self._limpiar_para_voz(resultados[0])
             texto_para_historial = respuesta_directa
             if nombres_ejecutados and nombres_ejecutados[0] == "leer_correos_recientes":
                 texto_para_historial = envolver_contenido_externo(resultados[0], fuente="correo electrónico")
-
             self.historial.append({"role": "assistant", "content": texto_para_historial})
             return respuesta_directa
 

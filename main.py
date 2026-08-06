@@ -137,7 +137,6 @@ def activar_kill_switch() -> str:
         return "Alto total, Señor. " + "; ".join(acciones_detenidas) + "."
     return "Alto total, Señor. No había ninguna acción pendiente ni módulo activo que detener."
 
-
 def apagar_sistema():
     global sistema_activo, esta_hablando
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
@@ -220,10 +219,8 @@ def procesar_ciclo_voz():
         if esta_hablando:
             time.sleep(0.2)
             return
-
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
         print("\n[REVAN]: Escuchando...")
-
         orden_sucia = oidos_ia.escuchar()
 
         if esta_hablando:
@@ -232,11 +229,9 @@ def procesar_ciclo_voz():
         if not orden_sucia or not orden_sucia.strip():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
-
         orden_minusculas = orden_sucia.lower().strip()
         orden_busqueda = quitar_acentos(orden_minusculas)
         print(f"[Captura]: '{orden_minusculas}'")
-
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
@@ -263,13 +258,10 @@ def procesar_ciclo_voz():
                 time.sleep(0.3)
                 esta_hablando = False
                 sincronizar_estado_esfera("ESPERA", "#0077ff")
-
             threading.Thread(target=responder_listo, daemon=True).start()
             ultima_interaccion = time.time()
             return
-
         ejecutar_orden(orden_limpia, orden_mostrar=orden_sucia)
-
     except Exception as e:
         print(f"Error en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
@@ -462,7 +454,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "Agenda")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
             fecha_iso, fecha_reconocida = parsear_fecha_natural(orden_limpia_sin_acentos, devolver_estado=True)
-            
             titulo_evento = "Compromiso Agendado"
             for disparador in ["agendar", "agenda", "recuerdame", "crea un evento"]:
                 if disparador in orden_limpia_sin_acentos:
@@ -672,7 +663,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if not respuesta_final or not respuesta_final.strip():
             respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
-
         _hablar_y_mostrar(respuesta_final)
 
     except Exception as e:
