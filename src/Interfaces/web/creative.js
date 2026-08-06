@@ -1,12 +1,13 @@
-function switchCreativeTab(tabName) {
-    document.querySelectorAll('.creative-tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.hud-switcher .nav-btn:not(.back-btn)').forEach(b => b.classList.remove('active'));
+function openCreativeSubView(viewName) {
+    document.querySelectorAll('.creative-view').forEach(v => v.classList.remove('active'));
+    
+    const target = document.getElementById(`view-${viewName}`);
+    if (target) target.classList.add('active');
+}
 
-    const targetPanel = document.getElementById(`view-${tabName}`);
-    const targetBtn = document.getElementById(`tab-${tabName}`);
-
-    if (targetPanel) targetPanel.classList.add('active');
-    if (targetBtn) targetBtn.classList.add('active');
+function showCreativeMenu() {
+    document.querySelectorAll('.creative-view').forEach(v => v.classList.remove('active'));
+    document.getElementById('creative-cards-view').classList.add('active');
 }
 
 function runCreativeCommand() {
@@ -16,7 +17,11 @@ function runCreativeCommand() {
     const cmdText = input.value.trim();
     if (!cmdText) return;
 
-    alert(`Instrucción enviada a Creative Agent: "${cmdText}"`);
+    if (document.getElementById('creative-cards-view').classList.contains('active')) {
+        openCreativeSubView('canvas');
+    }
+
+    alert(`Procesando prompt en Creative Agent: "${cmdText}"`);
     input.value = '';
 }
 

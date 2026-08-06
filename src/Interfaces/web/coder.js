@@ -1,12 +1,15 @@
-function switchCoderTab(tabName) {
-    document.querySelectorAll('.coder-tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.hud-switcher .nav-btn:not(.back-btn)').forEach(b => b.classList.remove('active'));
+// Abrir vista desde las tarjetas
+function openCoderSubView(viewName) {
+    document.querySelectorAll('.coder-view').forEach(v => v.classList.remove('active'));
+    
+    const target = document.getElementById(`view-${viewName}`);
+    if (target) target.classList.add('active');
+}
 
-    const targetPanel = document.getElementById(`view-${tabName}`);
-    const targetBtn = document.getElementById(`tab-${tabName}`);
-
-    if (targetPanel) targetPanel.classList.add('active');
-    if (targetBtn) targetBtn.classList.add('active');
+// Volver a la pantalla de las 3 tarjetas
+function showSubMenu() {
+    document.querySelectorAll('.coder-view').forEach(v => v.classList.remove('active'));
+    document.getElementById('coder-cards-view').classList.add('active');
 }
 
 function clearTerminal() {
@@ -22,6 +25,11 @@ function runCoderCommand() {
     const cmdText = input.value.trim();
     if (!cmdText) return;
 
+    // Si está en la grilla de tarjetas y escribe un comando, abrir el IDE
+    if (document.getElementById('coder-cards-view').classList.contains('active')) {
+        openCoderSubView('ide');
+    }
+
     const cmdLine = document.createElement('div');
     cmdLine.style.color = '#00ffcc';
     cmdLine.innerHTML = `> [EXEC_CMD]: ${cmdText}`;
@@ -30,10 +38,10 @@ function runCoderCommand() {
     setTimeout(() => {
         const respLine = document.createElement('div');
         respLine.style.color = '#00ff88';
-        respLine.innerHTML = `> [CODER_RESP]: Script procesado correctamente sin errores sintácticos.`;
+        respLine.innerHTML = `> [CODER_RESP]: Procesando petición... OK.`;
         terminal.appendChild(respLine);
         terminal.scrollTop = terminal.scrollHeight;
-    }, 500);
+    }, 400);
 
     input.value = '';
 }

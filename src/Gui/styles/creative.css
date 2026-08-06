@@ -4,16 +4,8 @@ html, body {
     overflow: hidden; background-color: #050811;
 }
 
-.hud-frame {
-    display: flex !important; flex-direction: column !important;
-    width: 100vw !important; height: 100vh !important;
-}
-
-.hud-main {
-    display: flex !important; flex-direction: column !important;
-    flex: 1 !important; height: calc(100vh - 140px) !important;
-    padding: 15px; box-sizing: border-box;
-}
+.hud-frame { display: flex !important; flex-direction: column !important; width: 100vw !important; height: 100vh !important; }
+.hud-main { display: flex !important; flex-direction: column !important; flex: 1 !important; height: calc(100vh - 140px) !important; padding: 20px; box-sizing: border-box; }
 
 .creative-header { border-bottom-color: #ff007f !important; }
 .magenta-icon { border-color: #ff007f !important; }
@@ -22,42 +14,39 @@ html, body {
 .magenta-sub { color: #ff77be !important; }
 .magenta-hr { border-color: #ff007f !important; }
 
-.creative-tab-panel {
-    display: none !important; width: 100% !important; height: 100% !important;
+/* Vistas ocultas */
+.creative-view { display: none !important; width: 100% !important; height: 100% !important; }
+.creative-view.active { display: flex !important; flex-direction: column !important; flex: 1 !important; }
+
+/* Grilla de Tarjetas Magenta */
+.agent-cards-grid {
+    display: grid !important; grid-template-columns: repeat(3, 1fr) !important;
+    gap: 20px !important; width: 100% !important; height: 100% !important; align-items: center;
 }
 
-.creative-tab-panel.active {
-    display: flex !important; flex-direction: row !important; gap: 15px !important;
+.sub-module-card.magenta-card {
+    background: rgba(18, 8, 22, 0.85); border: 1px solid #ff007f;
+    border-radius: 6px; padding: 25px; display: flex; flex-direction: column;
+    justify-content: space-between; height: 250px; cursor: pointer; transition: all 0.3s ease;
+    box-shadow: 0 0 10px rgba(255, 0, 127, 0.1);
 }
+
+.sub-module-card.magenta-card:hover {
+    transform: translateY(-5px); box-shadow: 0 0 25px rgba(255, 0, 127, 0.4);
+    background: rgba(28, 10, 30, 0.95);
+}
+
+.sub-module-card.magenta-card .card-head i,
+.sub-module-card.magenta-card h3,
+.sub-module-card.magenta-card .card-action { color: #ff007f; }
+.sub-module-card.magenta-card .badge { border-color: #ff007f; color: #ff007f; }
 
 .creative-card {
-    flex: 1; background: rgba(18, 8, 22, 0.85);
-    border: 1px solid #ff007f; box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
-    border-radius: 4px; padding: 20px; color: #ff007f;
-    font-family: 'Share Tech Mono', monospace; overflow-y: auto;
+    flex: 1; background: rgba(18, 8, 22, 0.85); border: 1px solid #ff007f;
+    box-shadow: 0 0 15px rgba(255, 0, 127, 0.2); border-radius: 4px; padding: 20px; color: #ff007f; font-family: 'Share Tech Mono';
 }
 
-.creative-footer {
-    height: 60px; padding: 10px 20px; display: flex; align-items: center;
-    background: rgba(10, 5, 15, 0.9); border-top: 1px solid #ff007f;
-}
-
-.input-container {
-    display: flex; width: 100%; gap: 10px; align-items: center;
-}
-
-.input-container input {
-    flex: 1; background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #ff007f; color: #ff007f;
-    padding: 10px 15px; font-family: 'Share Tech Mono'; outline: none;
-}
-
-.btn-creative {
-    background: #ff007f; color: #000; font-weight: bold;
-    border: none; padding: 10px 20px; cursor: pointer;
-    font-family: 'Orbitron'; transition: background 0.2s ease;
-}
-
-.btn-creative:hover {
-    background: #ff3399;
-}
+.creative-footer { height: 60px; padding: 10px 20px; display: flex; align-items: center; background: rgba(10, 5, 15, 0.9); border-top: 1px solid #ff007f; }
+.input-container { display: flex; width: 100%; gap: 10px; align-items: center; }
+.input-container input { flex: 1; background: rgba(0, 0, 0, 0.5); border: 1px solid #ff007f; color: #ff007f; padding: 10px 15px; font-family: 'Share Tech Mono'; outline: none; }
+.btn-creative { background: #ff007f; color: #000; font-weight: bold; border: none; padding: 10px 20px; cursor: pointer; font-family: 'Orbitron'; }

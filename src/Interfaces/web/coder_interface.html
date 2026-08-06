@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REVAN // CODER AGENT</title>
 
-    <!-- Fuentes Sci-Fi -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CSS Separado -->
     <link rel="stylesheet" href="/styles/dashboard.css">
     <link rel="stylesheet" href="/styles/coder.css">
 </head>
@@ -18,7 +16,7 @@
     <div class="cyber-overlay"></div>
 
     <div class="hud-frame">
-        <!-- Header -->
+        <!-- HEADER PREDETERMINADO -->
         <header class="hud-header">
             <div class="brand-core">
                 <div class="reactor-icon cyan-pulse"><div class="core-pulse"></div></div>
@@ -32,77 +30,108 @@
                 <button class="nav-btn back-btn" onclick="window.location.href='/'">
                     <i class="fa-solid fa-arrow-left"></i> DASHBOARD
                 </button>
-                <button class="nav-btn active" id="tab-ide" onclick="switchCoderTab('ide')">
-                    <i class="fa-solid fa-code"></i> 1. CONSOLA IDE
-                </button>
-                <button class="nav-btn" id="tab-manual" onclick="switchCoderTab('manual')">
-                    <i class="fa-solid fa-book-bookmark"></i> 2. MANUAL OPERATIVO
-                </button>
-                <button class="nav-btn" id="tab-ultron" onclick="switchCoderTab('ultron')">
-                    <i class="fa-solid fa-atom"></i> 3. NÚCLEO ULTRON 3D
+                <button class="nav-btn active" id="btn-sub-menu" onclick="showSubMenu()">
+                    <i class="fa-solid fa-border-all"></i> SECCIONES
                 </button>
             </nav>
         </header>
 
-        <!-- Main Body -->
+        <!-- MAIN BODY -->
         <main class="hud-main">
-            <!-- Pestaña 1: IDE -->
-            <div id="view-ide" class="coder-tab-panel active">
+            
+            <!-- VISTA 1: LAS 3 TARJETAS TÁCTICAS (PANEL PRINCIPAL DEL AGENTE) -->
+            <div id="coder-cards-view" class="coder-view active">
+                <div class="agent-cards-grid">
+                    
+                    <!-- Tarjeta 1 -->
+                    <div class="sub-module-card" onclick="openCoderSubView('ide')">
+                        <div class="card-head">
+                            <i class="fa-solid fa-code"></i>
+                            <span class="badge">SYSTEM READY</span>
+                        </div>
+                        <h3>1. CONSOLA IDE</h3>
+                        <p>Entorno de ejecución de scripts, compilador sintáctico y telemetría en tiempo real.</p>
+                        <div class="card-action">INICIALIZAR IDE <i class="fa-solid fa-arrow-right"></i></div>
+                    </div>
+
+                    <!-- Tarjeta 2 -->
+                    <div class="sub-module-card" onclick="openCoderSubView('manual')">
+                        <div class="card-head">
+                            <i class="fa-solid fa-book-bookmark"></i>
+                            <span class="badge">DOCS_V1</span>
+                        </div>
+                        <h3>2. MANUAL OPERATIVO</h3>
+                        <p>Protocolos de depuración, sintaxis permitida y reglas de autoreparación (Self-Healing).</p>
+                        <div class="card-action">VER PROTOCOLOS <i class="fa-solid fa-arrow-right"></i></div>
+                    </div>
+
+                    <!-- Tarjeta 3 -->
+                    <div class="sub-module-card" onclick="openCoderSubView('ultron')">
+                        <div class="card-head">
+                            <i class="fa-solid fa-atom"></i>
+                            <span class="badge">3D CORE</span>
+                        </div>
+                        <h3>3. NÚCLEO ULTRON 3D</h3>
+                        <p>Monitoreo tridimensional y visualización de la red neuronal del agente Coder.</p>
+                        <div class="card-action">DESPLEGAR NÚCLEO <i class="fa-solid fa-arrow-right"></i></div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- VISTA 2: INTERFAZ CONSOLA IDE -->
+            <div id="view-ide" class="coder-view">
                 <div class="ide-container">
                     <div class="ide-editor-window">
                         <div class="window-bar">
-                            <span class="dot red"></span>
-                            <span class="dot yellow"></span>
-                            <span class="dot green"></span>
+                            <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
                             <span class="window-title"><i class="fa-solid fa-file-code"></i> script_execution_core.py</span>
                         </div>
-                        <textarea id="code-editor" class="code-area" spellcheck="false" placeholder="# Escribe tu código aquí..."></textarea>
+                        <textarea id="code-editor" class="code-area" spellcheck="false" placeholder="# Escribe o ejecuta scripts tácticos aquí..."></textarea>
                     </div>
-
                     <div class="ide-terminal-window">
                         <div class="window-bar">
-                            <span class="window-title"><i class="fa-solid fa-terminal"></i> CONSOLA SALIDA / TELEMETRÍA</span>
+                            <span class="window-title"><i class="fa-solid fa-terminal"></i> TELEMETRÍA / SALIDA</span>
                             <button class="clear-btn" onclick="clearTerminal()"><i class="fa-solid fa-trash-can"></i> LIMPIAR</button>
                         </div>
                         <div id="terminal-output" class="terminal-box">
-                            <div class="term-line success">> [SYS_INIT]: Coder Agent listo.</div>
+                            <div class="term-line success">> [SYS_INIT]: Consola Coder vinculada.</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Pestaña 2: Manual -->
-            <div id="view-manual" class="coder-tab-panel">
-                <div class="manual-container">
-                    <div class="manual-card">
-                        <h2><i class="fa-solid fa-book-open-reader"></i> PROTOCOLOS DE COMPILACIÓN</h2>
-                        <hr class="cyber-hr">
-                        <p>El Agente Coder analiza peticiones en lenguaje natural para estructurar scripts Python y Bash.</p>
-                    </div>
+            <!-- VISTA 3: INTERFAZ MANUAL -->
+            <div id="view-manual" class="coder-view">
+                <div class="manual-card">
+                    <h2><i class="fa-solid fa-book-open-reader"></i> PROTOCOLOS DE COMPILACIÓN</h2>
+                    <hr class="cyber-hr">
+                    <h3>1. Sintaxis e Instrucciones Directas</h3>
+                    <p>El Agente Coder analiza peticiones en lenguaje natural para estructurar scripts Python, Node.js y Bash.</p>
                 </div>
             </div>
 
-            <!-- Pestaña 3: Ultron 3D -->
-            <div id="view-ultron" class="coder-tab-panel">
+            <!-- VISTA 4: INTERFAZ ULTRON 3D -->
+            <div id="view-ultron" class="coder-view">
                 <div class="ultron-wrapper">
                     <iframe id="iframe-ultron" src="/esfera" frameborder="0"></iframe>
                 </div>
             </div>
+
         </main>
 
-        <!-- Footer -->
+        <!-- FOOTER -->
         <footer class="hud-footer">
             <div class="input-container">
                 <i class="fa-solid fa-terminal prompt-icon"></i>
-                <input type="text" id="coder-cmd" placeholder="Escribe instrucciones de código para el Coder Agent..." autocomplete="off">
+                <input type="text" id="coder-cmd" placeholder="Escribe instrucciones tácticas..." autocomplete="off">
                 <button id="btn-compile" onclick="runCoderCommand()">
-                    <i class="fa-solid fa-play"></i> EJECUTAR SCRIPT
+                    <i class="fa-solid fa-play"></i> EJECUTAR
                 </button>
             </div>
         </footer>
     </div>
 
-    <!-- JS Separado -->
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="/static/coder.js"></script>
 </body>
