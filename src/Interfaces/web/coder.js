@@ -3,19 +3,46 @@ const BASE_URL = window.location.origin;
 const SOUND_PATHS = {
     hover: `${BASE_URL}/src/Sounds/welcome/hovers.mp3`,
     click: `${BASE_URL}/src/Sounds/welcome/clicks.mp3`,
-    section: `${BASE_URL}/src/Sounds/welcome/sections.mp3`,
-    close: `${BASE_URL}/src/Sounds/welcome/close.mp3`
+    section: `${BASE_URL}/src/Sounds/welcome/sections.mp3`
 };
 
 let userInteracted = false;
+let audioCtx = null;
+
+// Cache precargado
+const clickAudioCache = new Audio(SOUND_PATHS.click);
+clickAudioCache.preload = 'auto';
+
+const hoverAudioCache = new Audio(SOUND_PATHS.hover);
+hoverAudioCache.preload = 'auto';
+
+const sectionAudioCache = new Audio(SOUND_PATHS.section);
+sectionAudioCache.preload = 'auto';
+
+function getAudioContext() {
+    if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+        }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
 
 function unlockAudioEngine() {
     if (userInteracted) return;
     userInteracted = true;
     
-    const dummy = new Audio(SOUND_PATHS.click);
-    dummy.volume = 0.01;
-    dummy.play().then(() => dummy.pause()).catch(() => {});
+    getAudioContext();
+
+    clickAudioCache.volume = 0.01;
+    clickAudioCache.play().then(() => {
+        clickAudioCache.pause();
+        clickAudioCache.currentTime = 0;
+    }).catch(() => {});
     
     window.removeEventListener('pointerdown', unlockAudioEngine);
     window.removeEventListener('keydown', unlockAudioEngine);
@@ -24,53 +51,67 @@ function unlockAudioEngine() {
 window.addEventListener('pointerdown', unlockAudioEngine);
 window.addEventListener('keydown', unlockAudioEngine);
 
-function playDirectSound(type, volume = 0.5) {
+function playDirectSound(type, volume = 0.8) {
     if (!SOUND_PATHS[type]) return;
     try {
-        const snd = new Audio(SOUND_PATHS[type]);
+        let snd;
+        if (type === 'click') snd = clickAudioCache.cloneNode();
+        else if (type === 'hover') snd = hoverAudioCache.cloneNode();
+        else if (type === 'section') snd = sectionAudioCache.cloneNode();
+        else snd = new Audio(SOUND_PATHS[type]);
+
         snd.volume = volume;
+        snd.currentTime = 0;
+
+        const ctx = getAudioContext();
+        if (ctx) {
+            const source = ctx.createMediaElementSource(snd);
+            const filter = ctx.createBiquadFilter();
+            
+            filter.type = "peaking";
+            filter.frequency.value = 2800;
+            filter.gain.value = 4;
+            
+            source.connect(filter);
+            filter.connect(ctx.destination);
+        }
+
         snd.play().catch(() => {});
-    } catch (e) {}
+    } catch (e) {
+        try {
+            let snd = new Audio(SOUND_PATHS[type]);
+            snd.volume = volume;
+            snd.play().catch(() => {});
+        } catch(err) {}
+    }
 }
 
 function playClickAndNavigate(callbackUrl = null) {
     unlockAudioEngine();
     
-    try {
-        const clickAudio = new Audio(SOUND_PATHS.click);
-        clickAudio.volume = 0.8;
+    // Fuerza la reproducción explícita del sonido 'click'
+    playDirectSound('click', 1.0);
 
-        if (callbackUrl) {
-            let navigated = false;
+    if (!callbackUrl) return;
 
-            const goToPage = () => {
-                if (!navigated) {
-                    navigated = true;
-                    window.location.href = callbackUrl;
-                }
-            };
-
-            clickAudio.play().then(() => {
-                setTimeout(goToPage, 180);
-            }).catch(() => {
-                goToPage();
-            });
-
-            setTimeout(goToPage, 250);
-        } else {
-            clickAudio.play().catch(() => {});
+    let navigated = false;
+    const goToPage = () => {
+        if (!navigated) {
+            navigated = true;
+            window.location.href = callbackUrl;
         }
-    } catch (e) {
-        if (callbackUrl) window.location.href = callbackUrl;
-    }
+    };
+
+    setTimeout(goToPage, 260);
+    setTimeout(goToPage, 450);
 }
 
-function playHoverSFX() { playDirectSound('hover', 0.25); }
-function playSectionSFX() { playDirectSound('section', 0.5); }
+function playHoverSFX() { playDirectSound('hover', 0.4); }
+function playSectionSFX() { playDirectSound('section', 0.7); }
 
-// CONTROL DE INTERFAZ CODER
 function openCoderSubView(viewName) {
-    playSectionSFX();
+    // Al hacer clic en un módulo o tarjeta se escucha un 'click' seco y limpio
+    playDirectSound('click', 1.0);
     document.querySelectorAll('.coder-view').forEach(v => v.classList.remove('active'));
     
     const target = document.getElementById(`view-${viewName}`);
@@ -80,7 +121,7 @@ function openCoderSubView(viewName) {
 }
 
 function toggleCoderView() {
-    playDirectSound('click', 0.5);
+    playDirectSound('click', 1.0);
     const cardsView = document.getElementById('coder-cards-view');
     if (cardsView && cardsView.classList.contains('active')) {
         openCoderSubView('ide');
@@ -91,7 +132,7 @@ function toggleCoderView() {
 }
 
 function clearTerminal() {
-    playDirectSound('click', 0.5);
+    playDirectSound('click', 1.0);
     const terminal = document.getElementById('terminal-output');
     if (terminal) terminal.innerHTML = '';
 }
@@ -104,7 +145,7 @@ function runCoderCommand() {
     const cmdText = input.value.trim();
     if (!cmdText) return;
 
-    playDirectSound('click', 0.5);
+    playDirectSound('click', 1.0);
 
     if (document.getElementById('coder-cards-view').classList.contains('active')) {
         openCoderSubView('ide');
@@ -128,12 +169,11 @@ function runCoderCommand() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Repro en carga
+    // Unico momento donde se usa section.mp3: al cargar la interfaz
     setTimeout(() => {
         playSectionSFX();
     }, 150);
 
-    // Hover genérico
     let currentHoveredElement = null;
     document.addEventListener('mouseover', (e) => {
         const target = e.target.closest('button, a, .epic-card, input, [onclick]');
@@ -152,7 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Telemetría
     setInterval(() => {
         const cpu = Math.floor(Math.random() * 25) + 20;
         const ram = Math.floor(Math.random() * 15) + 55;
@@ -167,9 +206,19 @@ document.addEventListener('DOMContentLoaded', () => {
             "particles": {
                 "number": { "value": 35 },
                 "color": { "value": "#00ffcc" },
-                "line_linked": { "enable": true, "distance": 140, "color": "#00ffcc", "opacity": 0.2, "width": 1 },
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.5 },
+                "size": { "value": 3, "random": true },
+                "line_linked": { 
+                    "enable": true, 
+                    "distance": 140, 
+                    "color": "#00ffcc", 
+                    "opacity": 0.2, 
+                    "width": 1 
+                },
                 "move": { "enable": true, "speed": 1 }
-            }
+            },
+            "retina_detect": true
         });
     }
 });

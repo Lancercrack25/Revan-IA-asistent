@@ -15,3 +15,5 @@
 {"timestamp": "2026-08-06 13:17:04", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
 {"timestamp": "2026-08-06 15:56:20", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
 {"timestamp": "2026-08-06 16:04:34", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
+{"timestamp": "2026-08-06 16:17:25", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
+{"timestamp": "2026-08-06 16:29:22", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}

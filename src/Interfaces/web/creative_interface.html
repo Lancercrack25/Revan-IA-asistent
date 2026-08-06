@@ -8,10 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <link rel="stylesheet" href="/styles/dashboard.css">
-    <link rel="stylesheet" href="/styles/creative.css">
+    <link rel="stylesheet" href="styles/dashboard.css">
+    <link rel="stylesheet" href="styles/creative.css">
 </head>
 <body>
+    <!-- CONTENEDOR DE PARTÍCULAS -->
     <div id="particles-js"></div>
     <div class="scanline-revan"></div>
 
@@ -34,7 +35,7 @@
             </div>
 
             <nav class="hud-switcher">
-                <button class="nav-btn back-btn sith-btn-back" onclick="playCreativeAudio('close'); window.location.href='/'">
+                <button class="nav-btn back-btn sith-btn-back" onclick="playClickAndNavigate('/')">
                     <i class="fa-solid fa-arrow-left"></i> DASHBOARD
                 </button>
                 <button class="nav-btn active sith-btn" id="btn-toggle-creative" onclick="toggleCreativeView()">
@@ -66,7 +67,7 @@
                         </div>
                         <div class="card-body">
                             <h3>1. FORJA VISUAL NEURAL</h3>
-                            <p>Generación de arte conceptual, renderizado gráfico y síntesis de imágenes por difusa.</p>
+                            <p>Generación de arte conceptual, renderizado gráfico y síntesis de imágenes por difusión.</p>
                             <div class="card-metrics">
                                 <span><i class="fa-solid fa-microchip"></i> REVAN ENGINE V4</span>
                             </div>

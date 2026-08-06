@@ -19,37 +19,32 @@
     <div class="scanline"></div>
 
     <div class="hud-frame">
-        <!-- HEADER HUD MILITAR -->
-        <header class="hud-header">
-            <div class="brand-core">
-                <div class="reactor-icon cyan-pulse"><div class="core-pulse"></div></div>
-                <div class="title-group">
-                    <h1 class="glitch-text" data-text="CODER AGENT">CODER AGENT</h1>
-                    <span class="sub-text"><i class="fa-solid fa-microchip"></i> OVERWATCH PROTOCOL // AUTOMATED IDE & COMPILER</span>
-                </div>
-            </div>
+        <header class="hud-header coder-header">
+    <div class="brand-core">
+        <div class="reactor-icon cyan-icon">
+            <div class="core-pulse cyan-pulse"></div>
+        </div>
+        <div class="title-group">
+            <h1 class="glitch-text cyan-text" data-text="CODER AGENT">CODER AGENT</h1>
+            <span class="sub-text cyan-sub"><i class="fa-solid fa-code"></i> MATRIX CORE // ARQUITECTURA & COMPILACIÓN</span>
+        </div>
+    </div>
 
-            <div class="hud-status-widget">
-                <div class="widget-item">
-                    <span class="label">CPU CORE</span>
-                    <div class="meter-bar"><div class="meter-fill" id="cpu-fill" style="width: 32%;"></div></div>
-                </div>
-                <div class="widget-item">
-                    <span class="label">RAM STACK</span>
-                    <div class="meter-bar"><div class="meter-fill" id="ram-fill" style="width: 58%;"></div></div>
-                </div>
-            </div>
+    <div class="hud-waveform cyan-waveform">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+    </div>
 
-            <nav class="hud-switcher">
-                <button class="nav-btn back-btn" onclick="playAudio('back'); window.location.href='/'">
-                    <i class="fa-solid fa-arrow-left"></i> DASHBOARD
-                </button>
-                <button class="nav-btn active" id="btn-toggle-view" onclick="toggleCoderView()">
-                    <i class="fa-solid fa-border-all"></i> SECCIONES
-                </button>
-            </nav>
-        </header>
-
+    <nav class="hud-switcher">
+        <!-- BOTÓN CORREGIDO PARA EL CODER -->
+        <button class="nav-btn back-btn cyan-btn-back" onclick="playClickAndNavigate('/')">
+            <i class="fa-solid fa-arrow-left"></i> DASHBOARD
+        </button>
+        <button class="nav-btn active cyan-btn" id="btn-toggle-coder" onclick="toggleCoderView()">
+            <i class="fa-solid fa-terminal"></i> MÓDULOS
+        </button>
+    </nav>
+</header>
         <!-- MAIN BODY -->
         <main class="hud-main">
             
