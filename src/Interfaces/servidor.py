@@ -55,6 +55,15 @@ async def obtener_dashboard():
 async def obtener_index():
     """Ruta secundaria: Carga la esfera 3D dentro del iframe del Dashboard"""
     return servir_html_modulo("index.html")
+
+@app.get("/coder")
+async def obtener_coder():
+    return servir_html_modulo("coder_interface.html")
+
+@app.get("/creative")
+async def obtener_creative():
+    return servir_html_modulo("creative_interface.html")
+
 # --- RUTAS DE INFORMACIÓN DE MÓDULOS ---
 @app.get("/modulos/camera")
 async def info_camera():

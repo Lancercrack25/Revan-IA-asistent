@@ -73,6 +73,7 @@ function playClickAndNavigate(callbackUrl = null) {
 
 function playHoverSFX() { playDirectSound('hover', 0.25); }
 function playSectionSFX() { playDirectSound('section', 0.5); }
+
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
     initTilt();
@@ -187,24 +188,27 @@ function initTilt() {
     }
 }
 
+// CAMBIO DE VISTAS EN SPA (Vista Táctica, Coder, Creative, Esfera 3D)
 function switchView(vista) {
     playSectionSFX();
-    const vTactico = document.getElementById("view-tactico");
-    const vEsfera = document.getElementById("view-esfera");
-    const bTactico = document.getElementById("btn-tactico");
-    const bEsfera = document.getElementById("btn-esfera");
 
-    if (vista === "tactico") {
-        if (vTactico) vTactico.classList.add("active");
-        if (vEsfera) vEsfera.classList.remove("active");
-        if (bTactico) bTactico.classList.add("active");
-        if (bEsfera) bEsfera.classList.remove("active");
-    } else if (vista === "esfera") {
-        if (vTactico) vTactico.classList.remove("active");
-        if (vEsfera) vEsfera.classList.add("active");
-        if (bTactico) bTactico.classList.remove("active");
-        if (bEsfera) bEsfera.classList.add("active");
+    // 1. Ocultar todos los paneles de vista SPA
+    const panels = document.querySelectorAll('.view-panel');
+    panels.forEach(p => p.classList.remove('active'));
 
+    // 2. Desactivar todos los botones de la barra de navegación HUD
+    const buttons = document.querySelectorAll('.hud-switcher .nav-btn');
+    buttons.forEach(b => b.classList.remove('active'));
+
+    // 3. Activar el panel seleccionado y su respectivo botón
+    const targetPanel = document.getElementById(`view-${vista}`);
+    const targetBtn = document.getElementById(`btn-${vista}`);
+
+    if (targetPanel) targetPanel.classList.add('active');
+    if (targetBtn) targetBtn.classList.add('active');
+
+    // 4. Lógica de carga bajo demanda para el núcleo 3D (Iframe)
+    if (vista === "esfera") {
         const iframe = document.getElementById("iframe-esfera");
         if (iframe && !iframe.getAttribute("src")) {
             iframe.src = "/esfera";
@@ -213,6 +217,7 @@ function switchView(vista) {
 }
 
 function setupModuleNavigation() {
+    // Módulos tácticos principales
     const rutasModulos = {
         'btn-camera': '/modulos/camera',
         'btn-phone': '/modulos/phone',
@@ -239,6 +244,25 @@ function setupModuleNavigation() {
             });
         }
     });
+
+    // Enlaces para los Agentes en el Roster Lateral
+    const agentCoder = document.getElementById('agent-coder');
+    if (agentCoder) {
+        agentCoder.addEventListener("click", (e) => {
+            e.preventDefault();
+            addLog("Estableciendo interfaz con CODER AGENT...", "system");
+            playClickAndNavigate('/coder_interface.html');
+        });
+    }
+
+    const agentCreative = document.getElementById('agent-creative');
+    if (agentCreative) {
+        agentCreative.addEventListener("click", (e) => {
+            e.preventDefault();
+            addLog("Estableciendo interfaz con CREATIVE AGENT...", "system");
+            playClickAndNavigate('/creative_interface.html');
+        });
+    }
 }
 
 function conectarWebSocket() {
