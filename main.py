@@ -53,7 +53,7 @@ PALABRAS_CLAVE_ACCION = [
     "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
     "cancion", "musica", "adivina", "reconoce", "identifica", "sonando",
     "programa", "programar", "codigo", "script", "arduino", "esp32", "sensor",
-    "teams", "outlook", "vscode", "meet", "drive", "trabajo",
+    "teams", "outlook", "vscode", "meet", "drive", "trabajo","crea","genera"
     "imagen", "dibuja", "dibujar", "ilustracion", "ilustra"
 ]
 
@@ -211,7 +211,7 @@ def encender_sistemas():
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
         registrar_manejador_comando_texto(procesar_comando_texto)
-        reproducir_sfx("welcome", "Bienvenida")
+        reproducir_sfx("welcome", "Bienvenida",volumen=0.3)
 
         def saludo_inicial():
             global esta_hablando
