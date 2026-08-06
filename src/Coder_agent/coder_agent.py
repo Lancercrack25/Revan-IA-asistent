@@ -39,12 +39,15 @@ detección de riesgo se equivoca en algún caso límite.
 import re
 import os
 import time
-from openai import OpenAI
+from openai import OpenAI, RateLimitError, APIStatusError
+
 from src.Security.sandbox import ejecutar_codigo_python
 from src.Security.confirmation import GestorConfirmacion
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
+# Patrones que, si aparecen en código PYTHON, lo marcan como "toca
+# archivos/red/hardware" -> requiere confirmación antes de ejecutarse.
 _PATRONES_RIESGO = {
     "archivos": [r'\bopen\s*\(', r'\bos\.remove\b', r'\bos\.rmdir\b', r'\bshutil\.', r'\bos\.rename\b', r'\bos\.replace\b'],
     "red": [r'\bsocket\.', r'\brequests\.', r'\burllib\.', r'\bhttp\.client\b', r'\bftplib\b'],
@@ -52,8 +55,16 @@ _PATRONES_RIESGO = {
     "subprocesos": [r'\bsubprocess\.', r'\bos\.system\b', r'\bos\.popen\b'],
 }
 
+# Firma típica de un sketch de Arduino/ESP32: ambas funciones son
+# obligatorias en todo sketch válido, así que su presencia conjunta es
+# una señal confiable de que el código es C++ para un microcontrolador,
+# no Python.
 _PATRON_ARDUINO = (re.compile(r'\bvoid\s+setup\s*\('), re.compile(r'\bvoid\s+loop\s*\('))
+
+# Confirmación con TTL más largo que WhatsApp (90s en vez de 60s): revisar
+# código toma más tiempo que decidir si mandar un mensaje.
 _gestor_confirmacion_codigo = GestorConfirmacion(ttl_segundos=90)
+
 _SYSTEM_PROMPT_CODER = (
     "Eres el módulo de programación de REVAN, un asistente de IA. Tu trabajo es escribir "
     "código funcional y bien comentado para lo que te pida el usuario -sobre todo apoyo de "
@@ -181,6 +192,15 @@ def _ejecutar_y_formatear(codigo: str, ruta_guardado: str) -> str:
 
 
 def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
+    """
+    Punto de entrada principal: genera código para la tarea pedida,
+    SIEMPRE guarda una copia permanente, y:
+      - si es Arduino C++: no lo ejecuta (no tiene sentido en esta PC),
+        solo avisa dónde quedó guardado para subirlo con el IDE de Arduino.
+      - si es Python de bajo riesgo: se ejecuta directo en el sandbox.
+      - si es Python que toca archivos/red/hardware: pide confirmación
+        antes de ejecutar.
+    """
     if not permitir_accion("coder_agent"):
         return (
             "Señor, alcancé el límite de generación de código en el último minuto. "
@@ -189,6 +209,26 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
 
     try:
         codigo = generar_codigo(descripcion_tarea, api_key=api_key)
+    except RateLimitError:
+        registrar_evento(
+            modulo="coder_agent",
+            accion="generar_codigo",
+            resultado="Límite de solicitudes por minuto de la cuenta de NVIDIA alcanzado (429)",
+            nivel=NIVEL_ADVERTENCIA,
+        )
+        return (
+            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM "
+            "-se comparte entre el chat, la generación de código y de imágenes-. Espere un "
+            "momento e intente de nuevo."
+        )
+    except APIStatusError as e:
+        registrar_evento(
+            modulo="coder_agent",
+            accion="generar_codigo",
+            resultado=f"Error de la API de NVIDIA NIM (código {e.status_code}): {e}",
+            nivel=NIVEL_ADVERTENCIA,
+        )
+        return f"NVIDIA NIM devolvió un error, Señor (código {e.status_code}): {e}"
     except Exception as e:
         registrar_evento(
             modulo="coder_agent",
@@ -246,7 +286,13 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
             descripcion=descripcion_para_confirmar,
             callback_confirmar=lambda: _ejecutar_y_formatear(codigo, ruta_guardado),
         )
+    
     return _ejecutar_y_formatear(codigo, ruta_guardado)
 
 def procesar_confirmacion_codigo(texto_respuesta: str):
+    """
+    Debe llamarse desde NimClient.generar_respuesta ANTES de procesar
+    cualquier otra cosa, igual que ya se hace con procesar_confirmacion()
+    de WhatsApp -mismo patrón, pieza de confirmación distinta-.
+    """
     return _gestor_confirmacion_codigo.procesar_respuesta(texto_respuesta)

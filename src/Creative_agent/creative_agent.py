@@ -7,6 +7,11 @@ NimClient para el LLM -NVIDIA_NIM_API_KEY-, no hace falta una cuenta
 nueva). Si por algún motivo NVIDIA no está disponible pero sí tienes una
 key de Hugging Face configurada, cae a ese proveedor como respaldo.
 
+Sin confirmación, a propósito: es una acción local y reversible -genera
+un archivo de imagen y lo abre-, mismo criterio que ya se aplicó a
+carpetas/Word/Excel (la confirmación se reserva para lo irreversible y
+externo, como WhatsApp o correo).
+
 *** AVISO HONESTO ***
 El formato exacto del endpoint de NVIDIA NIM para imágenes se armó según
 la documentación pública (https://docs.api.nvidia.com/nim/reference/
@@ -22,17 +27,15 @@ import re
 import time
 import base64
 import requests
+
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
 NVIDIA_IMG_URL = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-medium"
 NVIDIA_MODELO_DEFAULT = "stabilityai/stable-diffusion-3-medium"
-
 HF_INFERENCE_URL = "https://api-inference.huggingface.co/models/{modelo}"
 HF_MODELO_DEFAULT = "stabilityai/stable-diffusion-xl-base-1.0"
-
 TIMEOUT_SEGUNDOS = 60
-
 
 def _slug_desde_prompt(prompt: str) -> str:
     slug = re.sub(r'[^a-zA-Z0-9]+', '_', prompt.strip().lower())
@@ -81,6 +84,11 @@ def _finalizar_imagen(contenido_bytes: bytes, prompt: str, proveedor: str) -> st
     )
     return f"Imagen generada y abierta, Señor. Guardada en:\n{ruta_guardado}"
 
+
+# ---------------------------------------------------------------------
+# Proveedor 1: NVIDIA NIM (principal, misma key que el LLM)
+# ---------------------------------------------------------------------
+
 def _generar_imagen_nvidia(prompt: str, api_key: str) -> tuple:
     """
     Devuelve (bytes_imagen, error_o_None). Si error_o_None no es None,
@@ -107,6 +115,24 @@ def _generar_imagen_nvidia(prompt: str, api_key: str) -> tuple:
     if respuesta.status_code == 401:
         return None, "Señor, la API key de NVIDIA NIM fue rechazada para el servicio de imágenes."
 
+    if respuesta.status_code == 429:
+        # NVIDIA NIM (build.nvidia.com) limita solicitudes por minuto de
+        # forma COMPARTIDA entre todos los modelos de la cuenta -si el
+        # chat estuvo activo justo antes, esto puede dispararse aunque el
+        # rate limit interno de REVAN (rate_limiter.py) no se haya
+        # alcanzado, porque ese es por categoría dentro de REVAN, no el
+        # límite real de la cuenta de NVIDIA.
+        registrar_evento(
+            modulo="creative_agent", accion="generar_imagen_nvidia",
+            resultado="Límite de solicitudes por minuto de la cuenta de NVIDIA alcanzado (429)",
+            nivel=NIVEL_ADVERTENCIA,
+        )
+        return None, (
+            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM "
+            "-se comparte entre el chat y la generación de imágenes-. Espere un momento e "
+            "intente de nuevo."
+        )
+
     if respuesta.status_code != 200:
         registrar_evento(
             modulo="creative_agent", accion="generar_imagen_nvidia",
@@ -122,6 +148,9 @@ def _generar_imagen_nvidia(prompt: str, api_key: str) -> tuple:
         datos = respuesta.json()
     except Exception:
         return None, "NVIDIA NIM no devolvió una respuesta JSON válida, Señor."
+
+    # El campo exacto puede variar entre modelos/versiones del catálogo;
+    # se prueban las dos formas documentadas más comunes.
     b64_imagen = datos.get("image") or (datos.get("artifacts") or [{}])[0].get("base64")
 
     if not b64_imagen:
@@ -168,6 +197,13 @@ def _generar_imagen_huggingface(prompt: str, api_key: str, modelo: str = HF_MODE
     return respuesta.content, None
 
 def generar_imagen(prompt: str, api_key_nvidia: str = None, api_key_hf: str = None) -> str:
+    """
+    Genera una imagen a partir de 'prompt'. Intenta primero NVIDIA NIM
+    (misma key que el LLM); si no hay key de NVIDIA configurada, o si
+    NVIDIA falla y SÍ hay una key de Hugging Face disponible, cae a ese
+    proveedor. Guarda el resultado en el Escritorio ('Imagenes_REVAN') y
+    lo abre automáticamente.
+    """
     if not permitir_accion("creative_agent"):
         return (
             "Señor, alcancé el límite de generación de imágenes en el último minuto. "

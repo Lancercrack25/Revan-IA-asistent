@@ -30,6 +30,8 @@ from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
 from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
 from src.Sounds.sounds_main import reproducir_sfx
 from src.Sounds.music_detector.detector import identificar_y_abrir_cancion
+from src.Coder_agent.coder_agent import ejecutar_tarea_codigo
+from src.Creative_agent.creative_agent import generar_imagen
 
 cerebro_ia = None
 gemini_ia = None
@@ -160,30 +162,26 @@ def apagar_sistema():
     sys.exit(0)
 
 def procesar_comando_agentes(prompt: str):
-    """
-    Función orquestadora: Recibe las órdenes del Dashboard y las delega 
-    al agente especialista correspondiente.
-    """
     prompt_lower = prompt.lower()
-    # 1. AGENTE CODER (Programación / Desarrollo)
-    if any(kw in prompt_lower for kw in ["codigo", "código", "script", "python", "bug", "html", "css", "js"]):
-        transmitir_desde_hilo_externo("PROCESANDO", "#00f0ff") # Esfera en azul cyan
-        # Simulamos o llamamos a tu cliente de IA (Coder Agent)
-        respuesta = f"Analizando requerimiento de desarrollo. Generando script optimizado para: '{prompt}'."
-        # Retornamos la respuesta a la UI con la etiqueta del agente CODER
-        transmitir_chat_desde_hilo_externo("CODER", respuesta)
-    # 2. AGENTE CREATIVO (Generación de contenido, imágenes, multimedia)
-    elif any(kw in prompt_lower for kw in ["imagen", "diseño", "crear", "audio", "video", "logo"]):
-        transmitir_desde_hilo_externo("PROCESANDO", "#ff00ff") # Esfera en magenta/púrpura
-        # Simulamos o llamamos a tu cliente de IA (Creative Agent)
-        respuesta = f"Procesando activos creativos y generación multimedia para: '{prompt}'." 
-        transmitir_chat_desde_hilo_externo("CREATIVE", respuesta)
-    # 3. NÚCLEO PRINCIPAL / ORQUESTADOR REVAN (Comandos de Sistema / Consultas Generales)
+    if any(kw in prompt_lower for kw in ["codigo", "código", "script", "python", "bug", "html", "arduino", "algoritmo"]):
+        # Cambiamos esfera a color Cyan de Coder
+        transmitir_desde_hilo_externo("PROCESANDO", "#00f0ff")
+        # Llamada REAL a tu coder_agent.py
+        respuesta_coder = ejecutar_tarea_codigo(prompt)
+        # Enviamos el resultado a la Web UI / Voz
+        transmitir_chat_desde_hilo_externo("CODER", respuesta_coder)
+        transmitir_desde_hilo_externo("HABLANDO", "#00ff66")
+
+    elif any(kw in prompt_lower for kw in ["imagen", "diseño", "crear foto", "dibuja", "logo", "concepto"]):
+        # Cambiamos esfera a color Magenta de Creative
+        transmitir_desde_hilo_externo("PROCESANDO", "#ff00ff")
+        # Llamada REAL a tu creative_agent.py
+        respuesta_creative = generar_imagen(prompt)
+        # Enviamos la ruta/confirmación a la Web UI / Voz
+        transmitir_chat_desde_hilo_externo("CREATIVE", respuesta_creative)
+        transmitir_desde_hilo_externo("HABLANDO", "#00ff66")
     else:
-        transmitir_desde_hilo_externo("HABLANDO", "#00ff66") # Esfera en verde
-        # Aquí puedes llamar a tu cliente de Gemini o NVIDIA NIM
-        respuesta = f"Orden '{prompt}' procesada correctamente por el núcleo principal REVAN."
-        transmitir_chat_desde_hilo_externo("REVAN", respuesta)
+        transmitir_desde_hilo_externo("HABLANDO", "#00ff66")
 
 def encender_sistemas():
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, titulo, sistema_activo, esta_hablando
