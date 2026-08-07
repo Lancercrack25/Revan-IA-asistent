@@ -73,14 +73,14 @@ def _limpiar_codigo_generado(texto: str) -> str:
 
 
 def generar_codigo(descripcion_tarea: str, api_key: str = None,
-                   modelo: str = "meta/llama-3.3-70b-instruct") -> str:
+                   modelo: str = "meta/llama-3.1-8b-instruct") -> str:
     """Genera código mediante llamada REST limpia usando Llama 3.3 70B Instruct."""
     api_key = api_key or _obtener_api_key()
     if not api_key:
         raise ValueError("Falta la 'CODER_API_KEY' en el archivo de configuración JSON.")
 
     # ✅ URL CORREGIDA Y LIMPIA
-    url = "[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)"
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -185,7 +185,6 @@ def _ejecutar_y_formatear(codigo: str, ruta_guardado: str) -> str:
         salida = resultado_sandbox.salida.strip() or "(sin salida impresa)"
         return f"Código ejecutado con éxito, Señor. Resultado:\n{salida}{ubicacion}"
     return f"El código se ejecutó pero terminó con error, Señor:\n{resultado_sandbox.error}{ubicacion}"
-
 
 def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
     """Punto de entrada principal para la generación y ejecución de código."""

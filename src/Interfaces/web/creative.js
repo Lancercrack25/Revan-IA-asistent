@@ -1,9 +1,10 @@
 const BASE_URL = window.location.origin;
 
+// Cambia esto al nombre EXACTO de tu archivo físico (revisa minúsculas y dobles 's'):
 const SOUND_PATHS = {
     hover: `${BASE_URL}/src/Sounds/welcome/hovers.mp3`,
     click: `${BASE_URL}/src/Sounds/welcome/clicks.mp3`,
-    section: `${BASE_URL}/src/Sounds/modules/Creative_asistent.mp3`
+    section: `${BASE_URL}/src/Sounds/modules/Creative_asisstent.mp3` // <-- Revisa si lleva 'ss' o minúsculas
 };
 
 let userInteracted = false;
@@ -90,6 +91,27 @@ function playDirectSound(type, volume = 0.8) {
     }
 }
 
+// 🔊 Función para navegar a Creative Agent reproduciendo el sonido de sección/voz antes del cambio de página
+function navegarACreative(targetUrl = '/creative') {
+    unlockAudioEngine();
+    
+    // Reproduce el clic y el sonido de voz del módulo Creative
+    playDirectSound('click', 1.0);
+    playSectionSFX();
+
+    let navigated = false;
+    const goToPage = () => {
+        if (!navigated) {
+            navigated = true;
+            window.location.href = targetUrl;
+        }
+    };
+
+    // Dar tiempo para escuchar el sonido antes de navegar
+    setTimeout(goToPage, 300);
+    setTimeout(goToPage, 500);
+}
+
 function playClickAndNavigate(callbackUrl = null) {
     unlockAudioEngine();
     
@@ -154,7 +176,7 @@ function conectarWebSocketCreative() {
 
 function _obtenerWorkspaceCanvas() {
     const workspace = document.querySelector('#view-canvas .canvas-workspace');
-    if (workspace && document.getElementById('creative-cards-view').classList.contains('active')) {
+    if (workspace && document.getElementById('creative-cards-view') && document.getElementById('creative-cards-view').classList.contains('active')) {
         openCreativeSubView('canvas');
     }
     return workspace;
@@ -167,7 +189,7 @@ function mostrarRespuestaCreative(texto) {
     const lineaEspera = document.getElementById('creative-espera-linea');
     if (lineaEspera) lineaEspera.remove();
 
-    // 🔊 Reproduce el audio de Creative Agent al recibir la respuesta
+    // Reproduce el audio del módulo al recibir la respuesta
     playSectionSFX();
 
     const p = document.createElement('p');
@@ -222,9 +244,19 @@ function runCreativeCommand() {
 document.addEventListener('DOMContentLoaded', () => {
     conectarWebSocketCreative();
 
-    setTimeout(() => {
+    // 🔊 Reproducir el sonido de entrada de Creative Agent
+    const reproducirSonidoEntrada = () => {
         playSectionSFX();
-    }, 150);
+        window.removeEventListener('pointerdown', reproducirSonidoEntrada);
+        window.removeEventListener('keydown', reproducirSonidoEntrada);
+    };
+
+    try {
+        playSectionSFX();
+    } catch(e) {}
+
+    window.addEventListener('pointerdown', reproducirSonidoEntrada, { once: true });
+    window.addEventListener('keydown', reproducirSonidoEntrada, { once: true });
 
     let currentHoveredElement = null;
     document.addEventListener('mouseover', (e) => {
