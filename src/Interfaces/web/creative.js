@@ -131,12 +131,6 @@ function toggleCreativeView() {
     }
 }
 
-// --- CONEXIÓN REAL CON EL BACKEND (REVAN) ---
-// Antes esta página no tenía NINGUNA conexión al servidor: el botón
-// "SINTETIZAR" solo vaciaba el campo de texto sin hacer nada más. Ahora
-// sí manda el prompt al Creative Agent real (src/Creative_agent/creative_agent.py)
-// vía el mismo WebSocket que usa el dashboard, y muestra la respuesta real
-// (incluye la ruta donde se guardó la imagen generada).
 let creativeSocket = null;
 
 function conectarWebSocketCreative() {

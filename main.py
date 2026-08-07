@@ -15,16 +15,8 @@ from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
 from src.Automation.work_apps_actions import abrir_teams, abrir_outlook, abrir_vscode, abrir_google_meet, abrir_google_drive
-from src.Interfaces.servidor import (
-    iniciar_servidor_ui,
-    transmitir_desde_hilo_externo,
-    transmitir_chat_desde_hilo_externo,
-    registrar_manejador_comando_texto,
-    registrar_manejador_comando_coder,
-    registrar_manejador_comando_creative,
-    transmitir_respuesta_coder_desde_hilo_externo,
-    transmitir_respuesta_creative_desde_hilo_externo,
-)
+from src.Interfaces.servidor import (iniciar_servidor_ui,transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo,registrar_manejador_comando_texto,
+    registrar_manejador_comando_coder,registrar_manejador_comando_creative,transmitir_respuesta_coder_desde_hilo_externo,transmitir_respuesta_creative_desde_hilo_externo,)
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Core.Gemini_client import GeminiClient
@@ -77,12 +69,10 @@ def quitar_acentos(texto: str) -> str:
 def es_intencion_de_comando(texto: str) -> bool:
     texto_sin_acentos = quitar_acentos(texto.lower())
     es_orden = any(palabra in texto_sin_acentos for palabra in PALABRAS_CLAVE_ACCION)
-    
     if es_orden:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
-        
     return es_orden
 
 def hilo_servidor_web():
@@ -184,11 +174,6 @@ def procesar_comando_coder(prompt: str):
 
 
 def procesar_comando_creative(prompt: str):
-    """
-    Procesa prompts escritos en la terminal de la página dedicada del
-    Creative Agent (/creative). Mismo patrón que procesar_comando_coder:
-    hilo aparte, resultado de vuelta solo a esa página.
-    """
     if not prompt or not prompt.strip():
         return
 
