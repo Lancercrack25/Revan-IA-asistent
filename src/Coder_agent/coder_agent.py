@@ -7,38 +7,21 @@ Pensado sobre todo para apoyar con programación del módulo de
 Electronics (Arduino/ESP32/sensores), pero sirve para cualquier tarea de
 scripting.
 
-DOS FORMATOS POSIBLES, detectados automáticamente sobre el código YA
-GENERADO (no se le pregunta al modelo qué generó, se verifica el
-resultado real):
-  - Python: se ejecuta en el sandbox (con confirmación condicional, ver
-    abajo) y además se guarda una copia permanente.
-  - Arduino C++ (firmware real para la placa, con setup()/loop()): NO se
-    ejecuta -eso correría en esta PC, no en el microcontrolador, no tiene
-    sentido intentarlo-. Se guarda como .ino y se le dice al usuario que
-    lo abra con el IDE de Arduino para subirlo a la placa.
+FORMATOS:
+  - Python: se ejecuta en el sandbox (con confirmación condicional si toca
+    red/archivos/hardware) y se guarda una copia en 'Escritorio/Codigos_REVAN'.
+  - Arduino C++: se guarda como .ino para compilarlo desde el IDE (no se ejecuta localmente).
 
-ALMACENAMIENTO PERMANENTE:
-  Todo código generado -se ejecute o no, sea Python o Arduino- se guarda
-  en una carpeta fija en el Escritorio: 'Codigos_REVAN'. Antes, el código
-  que corría en el sandbox vivía en una carpeta temporal que se borraba
-  automáticamente al terminar -no quedaba ningún rastro después-.
-
-REGLA DE AUTONOMÍA para código Python (decidida explícitamente):
-  - Si NO toca archivos, red, ni hardware (puertos serie/USB, GPIO) ->
-    se ejecuta DIRECTO en el sandbox, sin pedir confirmación.
-  - Si SÍ toca archivos, red, o hardware -> se pide confirmación
-    explícita, mostrando el código completo ANTES de ejecutar nada.
-
-Esto se decide con un análisis estático simple del texto del código (no
-es un sandbox perfecto contra código adversario deliberadamente
-ofuscado), pero el sandbox subyacente sigue aplicando sus propias
-protecciones (timeout, subprocess aislado, sin shell) incluso si la
-detección de riesgo se equivoca en algún caso límite.
+OPTIMIZACIÓN DE TOKENS:
+  - System prompt condensado al mínimo necesario.
+  - Temperatura baja (0.2) para precisión lógica y sintáctica.
 """
 
 import re
 import os
 import time
+import json
+from pathlib import Path
 from openai import OpenAI, RateLimitError, APIStatusError
 
 from src.Security.sandbox import ejecutar_codigo_python
@@ -46,8 +29,27 @@ from src.Security.confirmation import GestorConfirmacion
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
-# Patrones que, si aparecen en código PYTHON, lo marcan como "toca
-# archivos/red/hardware" -> requiere confirmación antes de ejecutarse.
+
+def _cargar_env_desde_config_json():
+    """Carga variables desde la carpeta 'config' asignando NVIDIA_NIM_API_KEY."""
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    carpeta_config = base_dir / "config"
+    
+    if carpeta_config.exists() and carpeta_config.is_dir():
+        for archivo in carpeta_config.glob("*.json"):
+            try:
+                with open(archivo, "r", encoding="utf-8") as f:
+                    datos = json.load(f)
+                    if isinstance(datos, dict):
+                        for clave, valor in datos.items():
+                            if valor and isinstance(valor, str):
+                                os.environ[clave] = valor.strip()
+            except Exception:
+                pass
+
+
+_cargar_env_desde_config_json()
+
 _PATRONES_RIESGO = {
     "archivos": [r'\bopen\s*\(', r'\bos\.remove\b', r'\bos\.rmdir\b', r'\bshutil\.', r'\bos\.rename\b', r'\bos\.replace\b'],
     "red": [r'\bsocket\.', r'\brequests\.', r'\burllib\.', r'\bhttp\.client\b', r'\bftplib\b'],
@@ -55,43 +57,21 @@ _PATRONES_RIESGO = {
     "subprocesos": [r'\bsubprocess\.', r'\bos\.system\b', r'\bos\.popen\b'],
 }
 
-# Firma típica de un sketch de Arduino/ESP32: ambas funciones son
-# obligatorias en todo sketch válido, así que su presencia conjunta es
-# una señal confiable de que el código es C++ para un microcontrolador,
-# no Python.
 _PATRON_ARDUINO = (re.compile(r'\bvoid\s+setup\s*\('), re.compile(r'\bvoid\s+loop\s*\('))
-
-# Confirmación con TTL más largo que WhatsApp (90s en vez de 60s): revisar
-# código toma más tiempo que decidir si mandar un mensaje.
 _gestor_confirmacion_codigo = GestorConfirmacion(ttl_segundos=90)
 
+# System prompt optimizado para consumir el mínimo de tokens posible
 _SYSTEM_PROMPT_CODER = (
-    "Eres el módulo de programación de REVAN, un asistente de IA. Tu trabajo es escribir "
-    "código funcional y bien comentado para lo que te pida el usuario -sobre todo apoyo de "
-    "programación para electrónica (Arduino, ESP32, sensores), pero también scripts y "
-    "utilidades generales en Python.\n\n"
+    "Eres el módulo Coder de REVAN. Genera código funcional y bien comentado.\n"
     "REGLAS:\n"
-    "- Responde ÚNICAMENTE con el código, sin explicación antes o después, y SIN usar bloques "
-    "de markdown (nada de ```python, ```cpp, ni ```).\n"
-    "- El código debe ser autocontenido y ejecutable/compilable tal cual (incluye los imports "
-    "o #include que necesite).\n"
-    "- MUY IMPORTANTE: si la tarea es el FIRMWARE que corre directamente en una placa "
-    "Arduino/ESP32 (el sketch en sí, lo que se sube a la placa), escribe código Arduino en "
-    "C++ con la estructura estándar setup()/loop() -NO Python, un sketch real no es Python-. "
-    "Si en cambio la tarea es un script que corre en la PC y se comunica con una placa YA "
-    "programada por puerto serial, entonces sí escribe Python usando pyserial "
-    "('import serial').\n"
-    "- Si usas pines, valores de calibración, o el puerto COM/tty, dejalos como constantes "
-    "comentadas al inicio del código, indicando claramente que son ejemplos a ajustar.\n"
-    "- Comenta el código lo suficiente para que alguien aprendiendo electrónica/programación "
-    "pueda seguirlo.\n"
-    "- Si la tarea es ambigua, haz la suposición más razonable y coméntala en el código, no "
-    "dejes de generar código por pedir aclaraciones.\n"
+    "1. Responde ÚNICAMENTE con código ejecutable. NO agregues explicaciones ni bloques markdown (sin ```).\n"
+    "2. Si es firmware para microcontroladores (Arduino/ESP32), usa C++ con setup()/loop(). Si es script para PC, usa Python.\n"
+    "3. Declara pines, puertos y constantes ajustables al inicio como comentarios."
 )
 
 
 def _limpiar_codigo_generado(texto: str) -> str:
-    """Quita los ``` de markdown si el modelo los incluyó a pesar de la instrucción."""
+    """Quita envoltorios de markdown si el modelo los incluyó."""
     texto = (texto or "").strip()
     texto = re.sub(r'^```(?:python|cpp|c\+\+|ino)?\s*\n?', '', texto)
     texto = re.sub(r'\n?```$', '', texto)
@@ -99,21 +79,14 @@ def _limpiar_codigo_generado(texto: str) -> str:
 
 
 def generar_codigo(descripcion_tarea: str, api_key: str = None,
-                    modelo: str = "meta/llama-3.1-70b-instruct") -> str:
-    """
-    Genera código a partir de una descripción en lenguaje natural (Python
-    o Arduino C++, según lo que pida la tarea -ver _SYSTEM_PROMPT_CODER-).
-    Usa el mismo endpoint de NVIDIA NIM que el resto de REVAN (NimClient),
-    pero con un modelo más grande por defecto (70b en vez del 8b
-    conversacional) porque generar código correcto exige más capacidad de
-    razonamiento que responder una pregunta casual. Si tu cuenta de NIM no
-    tiene acceso al 70b, pasa 'modelo="meta/llama-3.1-8b-instruct"'.
-    """
+                   modelo: str = "meta/llama-3.1-70b-instruct") -> str:
+    _cargar_env_desde_config_json()
+    # Este agente consulta prioritariamente 'NVIDIA_NIM_API_KEY'
     api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
     if not api_key:
-        raise ValueError("Falta la API key de NVIDIA NIM.")
+        raise ValueError("Falta la API key de NVIDIA NIM en la configuración.")
 
-    client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
+    client = OpenAI(base_url="[https://integrate.api.nvidia.com/v1](https://integrate.api.nvidia.com/v1)", api_key=api_key)
 
     respuesta = client.chat.completions.create(
         model=modelo,
@@ -130,11 +103,7 @@ def generar_codigo(descripcion_tarea: str, api_key: str = None,
 
 
 def detectar_riesgo(codigo: str):
-    """
-    Analiza el TEXTO del código Python (no lo ejecuta) buscando patrones
-    de archivos/red/hardware/subprocesos. Devuelve una tupla:
-    (necesita_confirmacion: bool, categorias_detectadas: list[str]).
-    """
+    """Analiza el código Python buscando operaciones sensibles."""
     categorias_detectadas = []
     for categoria, patrones in _PATRONES_RIESGO.items():
         if any(re.search(p, codigo) for p in patrones):
@@ -144,12 +113,7 @@ def detectar_riesgo(codigo: str):
 
 
 def detectar_formato(codigo: str):
-    """
-    Heurística sobre el código YA GENERADO (más confiable que adivinar
-    por la descripción de la tarea): si tiene la firma típica de un
-    sketch de Arduino (setup()/loop()), se trata como Arduino C++.
-    Cualquier otra cosa se asume Python. Devuelve (formato, extension).
-    """
+    """Determina si el código generado es Arduino C++ o Python."""
     patron_setup, patron_loop = _PATRON_ARDUINO
     if patron_setup.search(codigo) and patron_loop.search(codigo):
         return "arduino_cpp", ".ino"
@@ -162,6 +126,7 @@ def _slug_desde_tarea(descripcion_tarea: str) -> str:
 
 
 def guardar_codigo_generado(codigo: str, descripcion_tarea: str, extension: str) -> str:
+    """Guarda copia permanente en Escritorio/Codigos_REVAN."""
     from src.Services.os_service import obtener_ruta_escritorio
 
     carpeta_codigos = os.path.join(obtener_ruta_escritorio(), "Codigos_REVAN")
@@ -192,15 +157,7 @@ def _ejecutar_y_formatear(codigo: str, ruta_guardado: str) -> str:
 
 
 def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
-    """
-    Punto de entrada principal: genera código para la tarea pedida,
-    SIEMPRE guarda una copia permanente, y:
-      - si es Arduino C++: no lo ejecuta (no tiene sentido en esta PC),
-        solo avisa dónde quedó guardado para subirlo con el IDE de Arduino.
-      - si es Python de bajo riesgo: se ejecuta directo en el sandbox.
-      - si es Python que toca archivos/red/hardware: pide confirmación
-        antes de ejecutar.
-    """
+    """Punto de entrada principal para la generación y ejecución de código."""
     if not permitir_accion("coder_agent"):
         return (
             "Señor, alcancé el límite de generación de código en el último minuto. "
@@ -213,19 +170,18 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
         registrar_evento(
             modulo="coder_agent",
             accion="generar_codigo",
-            resultado="Límite de solicitudes por minuto de la cuenta de NVIDIA alcanzado (429)",
+            resultado="Límite de solicitudes por minuto alcanzado (429)",
             nivel=NIVEL_ADVERTENCIA,
         )
         return (
-            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM "
-            "-se comparte entre el chat, la generación de código y de imágenes-. Espere un "
-            "momento e intente de nuevo."
+            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM. "
+            "Espere un momento e intente de nuevo."
         )
     except APIStatusError as e:
         registrar_evento(
             modulo="coder_agent",
             accion="generar_codigo",
-            resultado=f"Error de la API de NVIDIA NIM (código {e.status_code}): {e}",
+            resultado=f"Error API NVIDIA NIM ({e.status_code}): {e}",
             nivel=NIVEL_ADVERTENCIA,
         )
         return f"NVIDIA NIM devolvió un error, Señor (código {e.status_code}): {e}"
@@ -261,11 +217,10 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
             resultado=f"Sketch Arduino generado para: '{descripcion_tarea[:80]}'",
             nivel=NIVEL_INFO,
         )
-        ubicacion = f"\n{ruta_guardado}" if ruta_guardado else " (no se pudo guardar en disco, revise permisos)"
+        ubicacion = f"\n{ruta_guardado}" if ruta_guardado else " (no se pudo guardar en disco)"
         return (
             f"Señor, escribí el sketch de Arduino y lo guardé en:{ubicacion}\n\n"
-            f"Ábralo con el IDE de Arduino para compilarlo y subirlo a la placa -no lo "
-            f"ejecuté aquí, eso requiere el hardware conectado y el IDE-."
+            f"Ábralo con el IDE de Arduino para compilarlo y subirlo a la placa."
         )
 
     necesita_confirmacion, categorias = detectar_riesgo(codigo)
@@ -289,10 +244,6 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
     
     return _ejecutar_y_formatear(codigo, ruta_guardado)
 
+
 def procesar_confirmacion_codigo(texto_respuesta: str):
-    """
-    Debe llamarse desde NimClient.generar_respuesta ANTES de procesar
-    cualquier otra cosa, igual que ya se hace con procesar_confirmacion()
-    de WhatsApp -mismo patrón, pieza de confirmación distinta-.
-    """
     return _gestor_confirmacion_codigo.procesar_respuesta(texto_respuesta)

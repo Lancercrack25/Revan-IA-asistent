@@ -1,248 +1,161 @@
 """
-Creative_agent: generación de imágenes de REVAN.
+Creative_agent: el módulo creativo y conceptual de REVAN.
 
-Genera imágenes a partir de una descripción en texto. Proveedor
-principal: NVIDIA NIM (mismo catálogo y MISMA API key que ya usa
-NimClient para el LLM -NVIDIA_NIM_API_KEY-, no hace falta una cuenta
-nueva). Si por algún motivo NVIDIA no está disponible pero sí tienes una
-key de Hugging Face configurada, cae a ese proveedor como respaldo.
+Diseñado para lluvia de ideas, redacción, generación de historias, diseño
+de conceptos o respuestas narrativas/artísticas donde se busca variabilidad
+y exploración temática.
 
-Sin confirmación, a propósito: es una acción local y reversible -genera
-un archivo de imagen y lo abre-, mismo criterio que ya se aplicó a
-carpetas/Word/Excel (la confirmación se reserva para lo irreversible y
-externo, como WhatsApp o correo).
-
-*** AVISO HONESTO ***
-El formato exacto del endpoint de NVIDIA NIM para imágenes se armó según
-la documentación pública (https://docs.api.nvidia.com/nim/reference/
-stabilityai-stable-diffusion-3-medium-infer), pero no se pudo probar
-contra la API real con una key válida. Si al usarlo el error menciona un
-campo del JSON que no reconoce, es cuestión de ajustar
-_construir_payload_nvidia()/_extraer_imagen_nvidia() a como responda tu
-cuenta real -la lógica general (guardar, abrir, auditar, rate limit) no
-cambia.
+OPTIMIZACIÓN DE TOKENS:
+  - System prompt condensado al mínimo sin perder directivas clave.
+  - Temperatura más alta (0.7) para fomentar variabilidad y creatividad.
+  - Guarda automáticamente el contenido generado en 'Escritorio/Creatividad_REVAN'.
 """
-import os
+
 import re
+import os
 import time
-import base64
-import requests
+import json
+from pathlib import Path
+from openai import OpenAI, RateLimitError, APIStatusError
 
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
-NVIDIA_IMG_URL = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-medium"
-NVIDIA_MODELO_DEFAULT = "stabilityai/stable-diffusion-3-medium"
-HF_INFERENCE_URL = "https://api-inference.huggingface.co/models/{modelo}"
-HF_MODELO_DEFAULT = "stabilityai/stable-diffusion-xl-base-1.0"
-TIMEOUT_SEGUNDOS = 60
 
-def _slug_desde_prompt(prompt: str) -> str:
-    slug = re.sub(r'[^a-zA-Z0-9]+', '_', prompt.strip().lower())
-    return slug.strip('_')[:40] or "imagen"
+def _cargar_env_desde_config_json():
+    """Carga variables desde archivos JSON en 'config' a os.environ."""
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    carpeta_config = base_dir / "config"
+    
+    if carpeta_config.exists() and carpeta_config.is_dir():
+        for archivo in carpeta_config.glob("*.json"):
+            try:
+                with open(archivo, "r", encoding="utf-8") as f:
+                    datos = json.load(f)
+                    if isinstance(datos, dict):
+                        for clave, valor in datos.items():
+                            if valor and isinstance(valor, str):
+                                os.environ[clave] = valor
+            except Exception:
+                pass
 
 
-def _guardar_imagen(contenido_bytes: bytes, prompt: str) -> str:
-    """
-    Guarda la imagen generada en una carpeta fija 'Imagenes_REVAN' dentro
-    del Escritorio real del usuario (mismo patrón que Codigos_REVAN de
-    Coder_agent: obtener_ruta_escritorio() detecta si el Escritorio está
-    redirigido por OneDrive).
-    """
+_cargar_env_desde_config_json()
+
+# System prompt optimizado al máximo para reducir uso de tokens de entrada
+_SYSTEM_PROMPT_CREATIVE = (
+    "Eres el módulo creativo de REVAN. Genera ideas, historias, conceptos,imagenes "
+    "o textos creativos según la solicitud del usuario. Sé original, conciso y "
+    "ve directo al grano sin introducciones innecesarias ni rellenos."
+)
+
+
+def generar_contenido_creativo(descripcion_tarea: str, api_key: str = None,
+                               modelo: str = "meta/llama-3.1-70b-instruct") -> str:
+    """Invoca la API con una temperatura mayor (0.7) para favorecer la creatividad."""
+    _cargar_env_desde_config_json()
+    api_key = api_key or os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        raise ValueError("Falta la API key de NVIDIA NIM en la configuración.")
+
+    client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
+
+    respuesta = client.chat.completions.create(
+        model=modelo,
+        messages=[
+            {"role": "system", "content": _SYSTEM_PROMPT_CREATIVE},
+            {"role": "user", "content": descripcion_tarea},
+        ],
+        temperature=0.7,
+        max_tokens=1500,
+    )
+
+    return (respuesta.choices[0].message.content or "").strip()
+
+
+def _slug_desde_tarea(descripcion_tarea: str) -> str:
+    slug = re.sub(r'[^a-zA-Z0-9]+', '_', descripcion_tarea.strip().lower())
+    return slug.strip('_')[:40] or "creacion"
+
+
+def guardar_texto_generado(contenido: str, descripcion_tarea: str) -> str:
+    """Guarda el texto generado en la carpeta 'Creatividad_REVAN' del Escritorio."""
     from src.Services.os_service import obtener_ruta_escritorio
 
-    carpeta_imagenes = os.path.join(obtener_ruta_escritorio(), "Imagenes_REVAN")
-    os.makedirs(carpeta_imagenes, exist_ok=True)
+    carpeta_destino = os.path.join(obtener_ruta_escritorio(), "Creatividad_REVAN")
+    os.makedirs(carpeta_destino, exist_ok=True)
 
-    nombre_archivo = f"{_slug_desde_prompt(prompt)}_{time.strftime('%Y%m%d_%H%M%S')}.png"
-    ruta_completa = os.path.join(carpeta_imagenes, nombre_archivo)
+    nombre_archivo = f"{_slug_desde_tarea(descripcion_tarea)}_{time.strftime('%Y%m%d_%H%M%S')}.txt"
+    ruta_completa = os.path.join(carpeta_destino, nombre_archivo)
 
-    with open(ruta_completa, "wb") as f:
-        f.write(contenido_bytes)
+    with open(ruta_completa, "w", encoding="utf-8") as f:
+        f.write(contenido)
 
     return ruta_completa
 
 
-def _finalizar_imagen(contenido_bytes: bytes, prompt: str, proveedor: str) -> str:
-    try:
-        ruta_guardado = _guardar_imagen(contenido_bytes, prompt)
-    except Exception as e:
-        registrar_evento(
-            modulo="creative_agent", accion="guardar_imagen",
-            resultado=f"Error guardando: {e}", nivel=NIVEL_ADVERTENCIA,
-        )
-        return f"Generé la imagen ({proveedor}) pero no pude guardarla en disco, Señor: {e}"
-
-    try:
-        os.startfile(ruta_guardado)
-    except Exception:
-        pass  # No crítico si falla abrir la imagen; ya quedó guardada.
-
-    registrar_evento(
-        modulo="creative_agent", accion="generar_imagen",
-        resultado=f"Imagen generada ({proveedor}) y guardada en {ruta_guardado}", nivel=NIVEL_INFO,
-    )
-    return f"Imagen generada y abierta, Señor. Guardada en:\n{ruta_guardado}"
-
-
-# ---------------------------------------------------------------------
-# Proveedor 1: NVIDIA NIM (principal, misma key que el LLM)
-# ---------------------------------------------------------------------
-
-def _generar_imagen_nvidia(prompt: str, api_key: str) -> tuple:
+def ejecutar_tarea_creativa(descripcion_tarea: str, api_key: str = None) -> str:
     """
-    Devuelve (bytes_imagen, error_o_None). Si error_o_None no es None,
-    bytes_imagen es None y el string trae el mensaje para el usuario.
-    """
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "prompt": prompt,
-        "cfg_scale": 5,
-        "aspect_ratio": "1:1",
-        "seed": 0,
-        "steps": 30,
-    }
-
-    try:
-        respuesta = requests.post(NVIDIA_IMG_URL, headers=headers, json=payload, timeout=TIMEOUT_SEGUNDOS)
-    except requests.RequestException as e:
-        return None, f"No pude contactar a NVIDIA NIM, Señor: {e}"
-
-    if respuesta.status_code == 401:
-        return None, "Señor, la API key de NVIDIA NIM fue rechazada para el servicio de imágenes."
-
-    if respuesta.status_code == 429:
-        # NVIDIA NIM (build.nvidia.com) limita solicitudes por minuto de
-        # forma COMPARTIDA entre todos los modelos de la cuenta -si el
-        # chat estuvo activo justo antes, esto puede dispararse aunque el
-        # rate limit interno de REVAN (rate_limiter.py) no se haya
-        # alcanzado, porque ese es por categoría dentro de REVAN, no el
-        # límite real de la cuenta de NVIDIA.
-        registrar_evento(
-            modulo="creative_agent", accion="generar_imagen_nvidia",
-            resultado="Límite de solicitudes por minuto de la cuenta de NVIDIA alcanzado (429)",
-            nivel=NIVEL_ADVERTENCIA,
-        )
-        return None, (
-            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM "
-            "-se comparte entre el chat y la generación de imágenes-. Espere un momento e "
-            "intente de nuevo."
-        )
-
-    if respuesta.status_code != 200:
-        registrar_evento(
-            modulo="creative_agent", accion="generar_imagen_nvidia",
-            resultado=f"HTTP {respuesta.status_code}: {respuesta.text[:300]}",
-            nivel=NIVEL_ADVERTENCIA,
-        )
-        return None, (
-            f"NVIDIA NIM devolvió un error (código {respuesta.status_code}), Señor: "
-            f"{respuesta.text[:200]}"
-        )
-
-    try:
-        datos = respuesta.json()
-    except Exception:
-        return None, "NVIDIA NIM no devolvió una respuesta JSON válida, Señor."
-
-    # El campo exacto puede variar entre modelos/versiones del catálogo;
-    # se prueban las dos formas documentadas más comunes.
-    b64_imagen = datos.get("image") or (datos.get("artifacts") or [{}])[0].get("base64")
-
-    if not b64_imagen:
-        registrar_evento(
-            modulo="creative_agent", accion="generar_imagen_nvidia",
-            resultado=f"Respuesta sin imagen reconocible: {str(datos)[:300]}",
-            nivel=NIVEL_ADVERTENCIA,
-        )
-        return None, "NVIDIA NIM respondió pero no encontré la imagen en el formato esperado, Señor."
-
-    try:
-        return base64.b64decode(b64_imagen), None
-    except Exception as e:
-        return None, f"No pude decodificar la imagen recibida de NVIDIA NIM, Señor: {e}"
-
-def _generar_imagen_huggingface(prompt: str, api_key: str, modelo: str = HF_MODELO_DEFAULT) -> tuple:
-    url = HF_INFERENCE_URL.format(modelo=modelo)
-    headers = {"Authorization": f"Bearer {api_key}"}
-
-    try:
-        respuesta = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=TIMEOUT_SEGUNDOS)
-    except requests.RequestException as e:
-        return None, f"No pude contactar a Hugging Face, Señor: {e}"
-
-    if respuesta.status_code == 503:
-        try:
-            tiempo_estimado = int(respuesta.json().get("estimated_time", 20))
-        except Exception:
-            tiempo_estimado = 20
-        return None, (
-            f"El modelo de imágenes se está inicializando en Hugging Face, Señor "
-            f"(~{tiempo_estimado}s). Intente de nuevo en un momento."
-        )
-
-    if respuesta.status_code == 401:
-        return None, "Señor, la API key de Hugging Face fue rechazada."
-
-    if respuesta.status_code != 200:
-        return None, f"Error generando la imagen en Hugging Face, Señor (código {respuesta.status_code})."
-
-    if "image" not in respuesta.headers.get("content-type", ""):
-        return None, "Señor, Hugging Face no devolvió una imagen válida."
-
-    return respuesta.content, None
-
-def generar_imagen(prompt: str, api_key_nvidia: str = None, api_key_hf: str = None) -> str:
-    """
-    Genera una imagen a partir de 'prompt'. Intenta primero NVIDIA NIM
-    (misma key que el LLM); si no hay key de NVIDIA configurada, o si
-    NVIDIA falla y SÍ hay una key de Hugging Face disponible, cae a ese
-    proveedor. Guarda el resultado en el Escritorio ('Imagenes_REVAN') y
-    lo abre automáticamente.
+    Punto de entrada principal para tareas creativas.
+    Verifica rate limit, genera contenido, guarda copia local y retorna respuesta.
     """
     if not permitir_accion("creative_agent"):
         return (
-            "Señor, alcancé el límite de generación de imágenes en el último minuto. "
+            "Señor, alcancé el límite de generación creativa en el último minuto. "
             "Espere un momento antes de intentarlo de nuevo."
         )
 
-    if not prompt or not prompt.strip():
-        return "Señor, necesito una descripción de qué imagen generar."
-
-    api_key_nvidia = api_key_nvidia or os.getenv("NVIDIA_NIM_API_KEY", "")
-    api_key_hf = api_key_hf or os.getenv("HUGGINGFACE_API_KEY", "")
-
-    if not api_key_nvidia and not api_key_hf:
+    try:
+        contenido = generar_contenido_creativo(descripcion_tarea, api_key=api_key)
+    except RateLimitError:
+        registrar_evento(
+            modulo="creative_agent",
+            accion="generar_contenido",
+            resultado="Límite de solicitudes por minuto alcanzado (429)",
+            nivel=NIVEL_ADVERTENCIA,
+        )
         return (
-            "Señor, no tengo ninguna API key configurada para generar imágenes. Con "
-            "NVIDIA_NIM_API_KEY (la misma que ya usa el resto de REVAN) basta, no hace "
-            "falta una cuenta nueva."
+            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM. "
+            "Espere un momento e intente de nuevo."
+        )
+    except APIStatusError as e:
+        registrar_evento(
+            modulo="creative_agent",
+            accion="generar_contenido",
+            resultado=f"Error API NVIDIA NIM ({e.status_code}): {e}",
+            nivel=NIVEL_ADVERTENCIA,
+        )
+        return f"NVIDIA NIM devolvió un error, Señor (código {e.status_code}): {e}"
+    except Exception as e:
+        registrar_evento(
+            modulo="creative_agent",
+            accion="generar_contenido",
+            resultado=f"Error generando contenido: {e}",
+            nivel=NIVEL_ADVERTENCIA,
+        )
+        return f"No pude procesar la tarea creativa, Señor: {e}"
+
+    if not contenido:
+        return "El modelo no devolvió ningún contenido, Señor. Intente reformular la tarea."
+
+    # Guardar copia en disco
+    try:
+        ruta_guardado = guardar_texto_generado(contenido, descripcion_tarea)
+    except Exception as e:
+        ruta_guardado = None
+        registrar_evento(
+            modulo="creative_agent",
+            accion="guardar_texto",
+            resultado=f"Error al guardar copia permanente: {e}",
+            nivel=NIVEL_ADVERTENCIA,
         )
 
-    if api_key_nvidia:
-        contenido, error = _generar_imagen_nvidia(prompt, api_key_nvidia)
-        if contenido:
-            return _finalizar_imagen(contenido, prompt, proveedor="NVIDIA NIM")
-
-        if not api_key_hf:
-            registrar_evento(
-                modulo="creative_agent", accion="generar_imagen",
-                resultado=f"Falló NVIDIA y no hay respaldo de Hugging Face: {error}",
-                nivel=NIVEL_ADVERTENCIA,
-            )
-            return error
-
-    contenido, error = _generar_imagen_huggingface(prompt, api_key_hf)
-    if contenido:
-        return _finalizar_imagen(contenido, prompt, proveedor="Hugging Face")
-
     registrar_evento(
-        modulo="creative_agent", accion="generar_imagen",
-        resultado=f"Fallaron ambos proveedores. Último error: {error}",
-        nivel=NIVEL_ADVERTENCIA,
+        modulo="creative_agent",
+        accion="contenido_generado",
+        resultado=f"Tarea creativa completada para: '{descripcion_tarea[:80]}'",
+        nivel=NIVEL_INFO,
     )
-    return error
+
+    ubicacion = f"\n\n(Guardado en: {ruta_guardado})" if ruta_guardado else ""
+    return f"{contenido}{ubicacion}"
