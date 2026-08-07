@@ -3,7 +3,7 @@ const BASE_URL = window.location.origin;
 const SOUND_PATHS = {
     hover: `${BASE_URL}/src/Sounds/welcome/hovers.mp3`,
     click: `${BASE_URL}/src/Sounds/welcome/clicks.mp3`,
-    section: `${BASE_URL}/src/Sounds/welcome/sections.mp3`
+    section: `${BASE_URL}/src/Sounds/modules/Agente programador.mp3`
 };
 
 let userInteracted = false;
@@ -58,28 +58,32 @@ function playDirectSound(type, volume = 0.8) {
         if (type === 'click') snd = clickAudioCache.cloneNode();
         else if (type === 'hover') snd = hoverAudioCache.cloneNode();
         else if (type === 'section') snd = sectionAudioCache.cloneNode();
-        else snd = new Audio(SOUND_PATHS[type]);
+        else snd = new Audio(encodeURI(SOUND_PATHS[type]));
 
         snd.volume = volume;
         snd.currentTime = 0;
 
         const ctx = getAudioContext();
         if (ctx) {
-            const source = ctx.createMediaElementSource(snd);
-            const filter = ctx.createBiquadFilter();
-            
-            filter.type = "peaking";
-            filter.frequency.value = 2800;
-            filter.gain.value = 4;
-            
-            source.connect(filter);
-            filter.connect(ctx.destination);
+            try {
+                const source = ctx.createMediaElementSource(snd);
+                const filter = ctx.createBiquadFilter();
+                
+                filter.type = "peaking";
+                filter.frequency.value = 2800;
+                filter.gain.value = 4;
+                
+                source.connect(filter);
+                filter.connect(ctx.destination);
+            } catch (errNode) {
+                // Si el nodo WebAudio ya fue conectado, reproduce por HTML5 directo
+            }
         }
 
         snd.play().catch(() => {});
     } catch (e) {
         try {
-            let snd = new Audio(SOUND_PATHS[type]);
+            let snd = new Audio(encodeURI(SOUND_PATHS[type]));
             snd.volume = volume;
             snd.play().catch(() => {});
         } catch(err) {}
@@ -89,7 +93,6 @@ function playDirectSound(type, volume = 0.8) {
 function playClickAndNavigate(callbackUrl = null) {
     unlockAudioEngine();
     
-    // Fuerza la reproducción explícita del sonido 'click'
     playDirectSound('click', 1.0);
 
     if (!callbackUrl) return;
@@ -107,10 +110,9 @@ function playClickAndNavigate(callbackUrl = null) {
 }
 
 function playHoverSFX() { playDirectSound('hover', 0.4); }
-function playSectionSFX() { playDirectSound('section', 0.7); }
+function playSectionSFX() { playDirectSound('section', 0.8); }
 
 function openCoderSubView(viewName) {
-    // Al hacer clic en un módulo o tarjeta se escucha un 'click' seco y limpio
     playDirectSound('click', 1.0);
     document.querySelectorAll('.coder-view').forEach(v => v.classList.remove('active'));
     
@@ -152,7 +154,6 @@ function conectarWebSocketCoder() {
     };
 
     coderSocket.onclose = () => {
-        // Reintenta la conexión sola si se cae (ej. REVAN se reinició)
         setTimeout(conectarWebSocketCoder, 2000);
     };
 }
@@ -164,7 +165,9 @@ function mostrarRespuestaCoder(texto) {
     const lineaEspera = document.getElementById('coder-espera-linea');
     if (lineaEspera) lineaEspera.remove();
 
-    playHoverSFX();
+    // 🔊 Reproduce el audio de Agente Programador al recibir la respuesta
+    playSectionSFX();
+
     const respLine = document.createElement('div');
     respLine.style.color = '#00ff88';
     respLine.style.whiteSpace = 'pre-wrap';
@@ -181,7 +184,12 @@ function runCoderCommand() {
     const cmdText = input.value.trim();
     if (!cmdText) return;
 
-    playDirectSound('click', 1.0);
+    // 🔊 Sonido directo e instantáneo al presionar Ejecutar o Enter
+    try {
+        const sndClick = new Audio(SOUND_PATHS.click);
+        sndClick.volume = 1.0;
+        sndClick.play().catch(() => {});
+    } catch(e) {}
 
     if (document.getElementById('coder-cards-view').classList.contains('active')) {
         openCoderSubView('ide');
@@ -216,7 +224,6 @@ function runCoderCommand() {
 document.addEventListener('DOMContentLoaded', () => {
     conectarWebSocketCoder();
 
-    // Unico momento donde se usa section.mp3: al cargar la interfaz
     setTimeout(() => {
         playSectionSFX();
     }, 150);

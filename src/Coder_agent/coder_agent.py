@@ -1,20 +1,10 @@
 """
-Coder_agent: el módulo de programación de REVAN.
+Coder_agent: El módulo de programación de REVAN (Soporte Multilenguaje).
 
-Genera código a partir de una descripción en lenguaje natural y lo
-ejecuta en el sandbox de src/Security/sandbox.py (solo si es Python).
-Pensado sobre todo para apoyar con programación del módulo de
-Electronics (Arduino/ESP32/sensores), pero sirve para cualquier tarea de
-scripting.
-
-FORMATOS:
-  - Python: se ejecuta en el sandbox (con confirmación condicional si toca
-    red/archivos/hardware) y se guarda una copia en 'Escritorio/Codigos_REVAN'.
-  - Arduino C++: se guarda como .ino para compilarlo desde el IDE (no se ejecuta localmente).
-
-OPTIMIZACIÓN DE TOKENS:
-  - System prompt condensado al mínimo necesario.
-  - Temperatura baja (0.2) para precisión lógica y sintáctica.
+Genera código en Python, C++, C#, Java, Rust, Go, JS, etc.
+  - Python: Se ejecuta en sandbox y se guarda como .py.
+  - Lenguajes compilados/web (C++, C#, Rust, JS, etc.): Se guardan con su extensión
+    correspondiente en 'Escritorio/Codigos_REVAN/'.
 """
 
 import re
@@ -22,7 +12,7 @@ import os
 import time
 import json
 from pathlib import Path
-from openai import OpenAI, RateLimitError, APIStatusError
+import requests
 
 from src.Security.sandbox import ejecutar_codigo_python
 from src.Security.confirmation import GestorConfirmacion
@@ -31,7 +21,7 @@ from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENC
 
 
 def _cargar_env_desde_config_json():
-    """Carga variables desde la carpeta 'config' asignando NVIDIA_NIM_API_KEY."""
+    """Carga variables desde la carpeta 'config' asignando las API Keys."""
     base_dir = Path(__file__).resolve().parent.parent.parent
     carpeta_config = base_dir / "config"
     
@@ -57,49 +47,98 @@ _PATRONES_RIESGO = {
     "subprocesos": [r'\bsubprocess\.', r'\bos\.system\b', r'\bos\.popen\b'],
 }
 
-_PATRON_ARDUINO = (re.compile(r'\bvoid\s+setup\s*\('), re.compile(r'\bvoid\s+loop\s*\('))
 _gestor_confirmacion_codigo = GestorConfirmacion(ttl_segundos=90)
 
-# System prompt optimizado para consumir el mínimo de tokens posible
 _SYSTEM_PROMPT_CODER = (
-    "Eres el módulo Coder de REVAN. Genera código funcional y bien comentado.\n"
-    "REGLAS:\n"
-    "1. Responde ÚNICAMENTE con código ejecutable. NO agregues explicaciones ni bloques markdown (sin ```).\n"
-    "2. Si es firmware para microcontroladores (Arduino/ESP32), usa C++ con setup()/loop(). Si es script para PC, usa Python.\n"
-    "3. Declara pines, puertos y constantes ajustables al inicio como comentarios."
+    "Eres el módulo Coder de REVAN, un programador experto políglota.\n"
+    "REGLAS ESTRICTAS:\n"
+    "1. Responde ÚNICAMENTE con el código ejecutable solicitado (Python, C++, C#, Java, Rust, Go, JS, etc.).\n"
+    "2. NO agregues explicaciones, ni textos introductorios, ni bloques markdown (sin ```).\n"
+    "3. Incluye comentarios claros dentro del código explicando la lógica básica."
 )
 
 
+def _obtener_api_key() -> str:
+    """Obtiene únicamente la API Key configurada para el Coder Agent."""
+    _cargar_env_desde_config_json()
+    return os.getenv("CODER_API_KEY", "").strip()
+
+
 def _limpiar_codigo_generado(texto: str) -> str:
-    """Quita envoltorios de markdown si el modelo los incluyó."""
+    """Quita envoltorios de markdown si el modelo los incluyó por error."""
     texto = (texto or "").strip()
-    texto = re.sub(r'^```(?:python|cpp|c\+\+|ino)?\s*\n?', '', texto)
+    texto = re.sub(r'^```(?:python|cpp|c\+\+|cs|csharp|java|rust|go|javascript|js|html|php|ino)?\s*\n?', '', texto)
     texto = re.sub(r'\n?```$', '', texto)
     return texto.strip()
 
 
 def generar_codigo(descripcion_tarea: str, api_key: str = None,
-                   modelo: str = "meta/llama-3.1-70b-instruct") -> str:
-    _cargar_env_desde_config_json()
-    # Este agente consulta prioritariamente 'CREATIVE_API_KEY'
-    api_key = api_key or os.getenv("CODER_API_KEY", "")
+                   modelo: str = "meta/llama-3.3-70b-instruct") -> str:
+    """Genera código mediante llamada REST limpia usando Llama 3.3 70B Instruct."""
+    api_key = api_key or _obtener_api_key()
     if not api_key:
-        raise ValueError("Falta la API key de NVIDIA NIM en la configuración.")
+        raise ValueError("Falta la 'CODER_API_KEY' en el archivo de configuración JSON.")
 
-    client = OpenAI(base_url="[https://integrate.api.nvidia.com/v1](https://integrate.api.nvidia.com/v1)", api_key=api_key)
+    # ✅ URL CORREGIDA Y LIMPIA
+    url = "[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
 
-    respuesta = client.chat.completions.create(
-        model=modelo,
-        messages=[
+    payload = {
+        "model": modelo,
+        "messages": [
             {"role": "system", "content": _SYSTEM_PROMPT_CODER},
-            {"role": "user", "content": descripcion_tarea},
+            {"role": "user", "content": descripcion_tarea}
         ],
-        temperature=0.2,
-        max_tokens=1500,
-    )
+        "temperature": 0.2,
+        "max_tokens": 2000
+    }
 
-    codigo = respuesta.choices[0].message.content or ""
-    return _limpiar_codigo_generado(codigo)
+    response = requests.post(url, headers=headers, json=payload, timeout=40)
+
+    if response.status_code == 200:
+        datos = response.json()
+        codigo = datos["choices"][0]["message"]["content"]
+        return _limpiar_codigo_generado(codigo)
+    else:
+        raise Exception(f"Error HTTP {response.status_code}: {response.text}")
+
+
+def detectar_formato(codigo: str):
+    """Determina la sintaxis y extensión adecuada para el lenguaje generado."""
+    c_str = codigo.lower()
+    
+    # Arduino / ESP32
+    if "void setup()" in c_str and "void loop()" in c_str:
+        return "Arduino C++", ".ino"
+    # C# (.NET)
+    elif "using system;" in c_str or "namespace " in c_str or "console.writeline" in c_str:
+        return "C#", ".cs"
+    # C++ Estándar
+    elif "#include <iostream>" in c_str or "std::cout" in c_str or "int main(" in c_str:
+        return "C++", ".cpp"
+    # Java
+    elif "public class " in c_str or "system.out.println" in c_str:
+        return "Java", ".java"
+    # Rust
+    elif "fn main()" in c_str or "println!" in c_str:
+        return "Rust", ".rs"
+    # Go
+    elif "package main" in c_str or "fmt.println" in c_str:
+        return "Go", ".go"
+    # JavaScript / Node.js
+    elif "console.log(" in c_str or "const " in c_str or "function " in c_str:
+        return "JavaScript", ".js"
+    # HTML / Web
+    elif "<!doctype html>" in c_str or "<html" in c_str:
+        return "HTML", ".html"
+    
+    # Por defecto, se asume Python
+    return "Python", ".py"
 
 
 def detectar_riesgo(codigo: str):
@@ -110,14 +149,6 @@ def detectar_riesgo(codigo: str):
             categorias_detectadas.append(categoria)
 
     return (len(categorias_detectadas) > 0), categorias_detectadas
-
-
-def detectar_formato(codigo: str):
-    """Determina si el código generado es Arduino C++ o Python."""
-    patron_setup, patron_loop = _PATRON_ARDUINO
-    if patron_setup.search(codigo) and patron_loop.search(codigo):
-        return "arduino_cpp", ".ino"
-    return "python", ".py"
 
 
 def _slug_desde_tarea(descripcion_tarea: str) -> str:
@@ -166,25 +197,6 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
 
     try:
         codigo = generar_codigo(descripcion_tarea, api_key=api_key)
-    except RateLimitError:
-        registrar_evento(
-            modulo="coder_agent",
-            accion="generar_codigo",
-            resultado="Límite de solicitudes por minuto alcanzado (429)",
-            nivel=NIVEL_ADVERTENCIA,
-        )
-        return (
-            "Señor, alcancé el límite de solicitudes por minuto de la cuenta de NVIDIA NIM. "
-            "Espere un momento e intente de nuevo."
-        )
-    except APIStatusError as e:
-        registrar_evento(
-            modulo="coder_agent",
-            accion="generar_codigo",
-            resultado=f"Error API NVIDIA NIM ({e.status_code}): {e}",
-            nivel=NIVEL_ADVERTENCIA,
-        )
-        return f"NVIDIA NIM devolvió un error, Señor (código {e.status_code}): {e}"
     except Exception as e:
         registrar_evento(
             modulo="coder_agent",
@@ -197,7 +209,7 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
     if not codigo.strip():
         return "El modelo no devolvió código utilizable, Señor. Intente reformular la tarea."
 
-    formato, extension = detectar_formato(codigo)
+    lenguaje, extension = detectar_formato(codigo)
 
     try:
         ruta_guardado = guardar_codigo_generado(codigo, descripcion_tarea, extension)
@@ -210,17 +222,18 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
             nivel=NIVEL_ADVERTENCIA,
         )
 
-    if formato == "arduino_cpp":
+    # Si es cualquier lenguaje distinto a Python, se guarda y se le notifica al usuario
+    if lenguaje != "Python":
         registrar_evento(
             modulo="coder_agent",
             accion="codigo_generado",
-            resultado=f"Sketch Arduino generado para: '{descripcion_tarea[:80]}'",
+            resultado=f"Código {lenguaje} generado para: '{descripcion_tarea[:80]}'",
             nivel=NIVEL_INFO,
         )
-        ubicacion = f"\n{ruta_guardado}" if ruta_guardado else " (no se pudo guardar en disco)"
+        ubicacion = f"\n{ruta_guardado}" if ruta_guardado else ""
         return (
-            f"Señor, escribí el sketch de Arduino y lo guardé en:{ubicacion}\n\n"
-            f"Ábralo con el IDE de Arduino para compilarlo y subirlo a la placa."
+            f"Señor, generé el programa en **{lenguaje}** y lo guardé en:{ubicacion}\n\n"
+            f"Puede compilarlo o ejecutarlo con su entorno habitual de {lenguaje}."
         )
 
     necesita_confirmacion, categorias = detectar_riesgo(codigo)
@@ -243,6 +256,7 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
         )
     
     return _ejecutar_y_formatear(codigo, ruta_guardado)
+
 
 def procesar_confirmacion_codigo(texto_respuesta: str):
     return _gestor_confirmacion_codigo.procesar_respuesta(texto_respuesta)
