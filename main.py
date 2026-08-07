@@ -145,7 +145,6 @@ def apagar_sistema():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
-
     esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     reproducir_sfx("welcome", "close")
@@ -154,14 +153,12 @@ def apagar_sistema():
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
-
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
 def procesar_comando_coder(prompt: str):
     if not prompt or not prompt.strip():
         return
-
     print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
 
     def _tarea():
@@ -169,22 +166,17 @@ def procesar_comando_coder(prompt: str):
         resultado = ejecutar_tarea_codigo(prompt.strip())
         transmitir_respuesta_coder_desde_hilo_externo(resultado)
         sincronizar_estado_esfera("ESPERA", "#0077ff")
-
     threading.Thread(target=_tarea, daemon=True).start()
-
 
 def procesar_comando_creative(prompt: str):
     if not prompt or not prompt.strip():
         return
-
     print(f"[Creative Agent - UI dedicada]: '{prompt.strip()}'")
-
     def _tarea():
         sincronizar_estado_esfera("PROCESANDO", "#ff00ff")
         resultado = generar_imagen(prompt.strip())
         transmitir_respuesta_creative_desde_hilo_externo(resultado)
         sincronizar_estado_esfera("ESPERA", "#0077ff")
-
     threading.Thread(target=_tarea, daemon=True).start()
 
 def encender_sistemas():
