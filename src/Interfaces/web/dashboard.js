@@ -26,7 +26,7 @@ window.addEventListener('pointerdown', unlockAudioEngine);
 window.addEventListener('keydown', unlockAudioEngine);
 
 // Reproduce audio normal (Hover/Section)
-function playDirectSound(type, volume = 0.5) {
+function playDirectSound(type, volume = 0.8) {
     if (!SOUND_PATHS[type]) return;
     try {
         const snd = new Audio(SOUND_PATHS[type]);
@@ -41,7 +41,7 @@ function playClickAndNavigate(callbackUrl = null) {
     
     try {
         const clickAudio = new Audio(SOUND_PATHS.click);
-        clickAudio.volume = 0.8;
+        clickAudio.volume = 1.1;
 
         // Si hay una redirección, esperamos a que el audio inicie/avance
         if (callbackUrl) {
@@ -71,8 +71,8 @@ function playClickAndNavigate(callbackUrl = null) {
     }
 }
 
-function playHoverSFX() { playDirectSound('hover', 0.5); }
-function playSectionSFX() { playDirectSound('section', 0.4); }
+function playHoverSFX() { playDirectSound('hover', 0.6); }
+function playSectionSFX() { playDirectSound('section', 0.8); }
 
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();

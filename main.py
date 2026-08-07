@@ -15,7 +15,16 @@ from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
 from src.Automation.work_apps_actions import abrir_teams, abrir_outlook, abrir_vscode, abrir_google_meet, abrir_google_drive
-from src.Interfaces.servidor import (iniciar_servidor_ui, transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo, registrar_manejador_comando_texto,)
+from src.Interfaces.servidor import (
+    iniciar_servidor_ui,
+    transmitir_desde_hilo_externo,
+    transmitir_chat_desde_hilo_externo,
+    registrar_manejador_comando_texto,
+    registrar_manejador_comando_coder,
+    registrar_manejador_comando_creative,
+    transmitir_respuesta_coder_desde_hilo_externo,
+    transmitir_respuesta_creative_desde_hilo_externo,
+)
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Core.Gemini_client import GeminiClient
@@ -53,7 +62,7 @@ PALABRAS_CLAVE_ACCION = [
     "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
     "cancion", "musica", "adivina", "reconoce", "identifica", "sonando",
     "programa", "programar", "codigo", "script", "arduino", "esp32", "sensor",
-    "teams", "outlook", "vscode", "meet", "drive", "trabajo","crea","genera"
+    "teams", "outlook", "vscode", "meet", "drive", "trabajo",
     "imagen", "dibuja", "dibujar", "ilustracion", "ilustra"
 ]
 
@@ -97,9 +106,7 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
 
 def activar_kill_switch() -> str:
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
-
     acciones_detenidas = []
-
     try:
         resultado_wa = cancelar_envio_pendiente()
         if "no hay ninguna" not in resultado_wa.lower():
@@ -161,27 +168,39 @@ def apagar_sistema():
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
-def procesar_comando_agentes(prompt: str):
-    prompt_lower = prompt.lower()
-    if any(kw in prompt_lower for kw in ["codigo", "código", "script", "python", "bug", "html", "arduino", "algoritmo"]):
-        # Cambiamos esfera a color Cyan de Coder
-        transmitir_desde_hilo_externo("PROCESANDO", "#00f0ff")
-        # Llamada REAL a tu coder_agent.py
-        respuesta_coder = ejecutar_tarea_codigo(prompt)
-        # Enviamos el resultado a la Web UI / Voz
-        transmitir_chat_desde_hilo_externo("CODER", respuesta_coder)
-        transmitir_desde_hilo_externo("HABLANDO", "#00ff66")
+def procesar_comando_coder(prompt: str):
+    if not prompt or not prompt.strip():
+        return
 
-    elif any(kw in prompt_lower for kw in ["imagen", "diseño", "crear foto", "dibuja", "logo", "concepto"]):
-        # Cambiamos esfera a color Magenta de Creative
-        transmitir_desde_hilo_externo("PROCESANDO", "#ff00ff")
-        # Llamada REAL a tu creative_agent.py
-        respuesta_creative = generar_imagen(prompt)
-        # Enviamos la ruta/confirmación a la Web UI / Voz
-        transmitir_chat_desde_hilo_externo("CREATIVE", respuesta_creative)
-        transmitir_desde_hilo_externo("HABLANDO", "#00ff66")
-    else:
-        transmitir_desde_hilo_externo("HABLANDO", "#00ff66")
+    print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
+
+    def _tarea():
+        sincronizar_estado_esfera("PROCESANDO", "#00f0ff")
+        resultado = ejecutar_tarea_codigo(prompt.strip())
+        transmitir_respuesta_coder_desde_hilo_externo(resultado)
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+
+    threading.Thread(target=_tarea, daemon=True).start()
+
+
+def procesar_comando_creative(prompt: str):
+    """
+    Procesa prompts escritos en la terminal de la página dedicada del
+    Creative Agent (/creative). Mismo patrón que procesar_comando_coder:
+    hilo aparte, resultado de vuelta solo a esa página.
+    """
+    if not prompt or not prompt.strip():
+        return
+
+    print(f"[Creative Agent - UI dedicada]: '{prompt.strip()}'")
+
+    def _tarea():
+        sincronizar_estado_esfera("PROCESANDO", "#ff00ff")
+        resultado = generar_imagen(prompt.strip())
+        transmitir_respuesta_creative_desde_hilo_externo(resultado)
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+
+    threading.Thread(target=_tarea, daemon=True).start()
 
 def encender_sistemas():
     global cerebro_ia, gemini_ia, voz_ia, oidos_ia, titulo, sistema_activo, esta_hablando
@@ -211,7 +230,9 @@ def encender_sistemas():
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
         registrar_manejador_comando_texto(procesar_comando_texto)
-        reproducir_sfx("welcome", "Bienvenida",volumen=0.3)
+        registrar_manejador_comando_coder(procesar_comando_coder)
+        registrar_manejador_comando_creative(procesar_comando_creative)
+        reproducir_sfx("welcome", "Bienvenida",volumen = 1.1)
 
         def saludo_inicial():
             global esta_hablando

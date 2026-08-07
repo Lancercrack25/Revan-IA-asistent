@@ -38,7 +38,7 @@ function unlockAudioEngine() {
     
     getAudioContext();
 
-    clickAudioCache.volume = 0.01;
+    clickAudioCache.volume = 0.9;
     clickAudioCache.play().then(() => {
         clickAudioCache.pause();
         clickAudioCache.currentTime = 0;
@@ -131,6 +131,54 @@ function toggleCreativeView() {
     }
 }
 
+// --- CONEXIÓN REAL CON EL BACKEND (REVAN) ---
+// Antes esta página no tenía NINGUNA conexión al servidor: el botón
+// "SINTETIZAR" solo vaciaba el campo de texto sin hacer nada más. Ahora
+// sí manda el prompt al Creative Agent real (src/Creative_agent/creative_agent.py)
+// vía el mismo WebSocket que usa el dashboard, y muestra la respuesta real
+// (incluye la ruta donde se guardó la imagen generada).
+let creativeSocket = null;
+
+function conectarWebSocketCreative() {
+    creativeSocket = new WebSocket(`ws://${window.location.host}/ws`);
+
+    creativeSocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.tipo === 'creative_response') {
+                mostrarRespuestaCreative(data.texto);
+            }
+        } catch (e) { /* mensaje no relacionado con este canal, se ignora */ }
+    };
+
+    creativeSocket.onclose = () => {
+        setTimeout(conectarWebSocketCreative, 2000);
+    };
+}
+
+function _obtenerWorkspaceCanvas() {
+    const workspace = document.querySelector('#view-canvas .canvas-workspace');
+    if (workspace && document.getElementById('creative-cards-view').classList.contains('active')) {
+        openCreativeSubView('canvas');
+    }
+    return workspace;
+}
+
+function mostrarRespuestaCreative(texto) {
+    const workspace = document.querySelector('#view-canvas .canvas-workspace');
+    if (!workspace) return;
+
+    const lineaEspera = document.getElementById('creative-espera-linea');
+    if (lineaEspera) lineaEspera.remove();
+
+    playHoverSFX();
+    const p = document.createElement('p');
+    p.style.color = '#ff66aa';
+    p.style.whiteSpace = 'pre-wrap';
+    p.textContent = `> ${texto}`;
+    workspace.appendChild(p);
+}
+
 function runCreativeCommand() {
     const input = document.getElementById('creative-cmd');
     if (!input) return;
@@ -140,14 +188,37 @@ function runCreativeCommand() {
 
     playDirectSound('click', 1.0);
 
-    if (document.getElementById('creative-cards-view').classList.contains('active')) {
-        openCreativeSubView('canvas');
+    const workspace = _obtenerWorkspaceCanvas();
+
+    if (workspace) {
+        const p = document.createElement('p');
+        p.style.color = '#ffffff';
+        p.textContent = `> Prompt: "${cmdText}"`;
+        workspace.appendChild(p);
+    }
+
+    if (creativeSocket && creativeSocket.readyState === WebSocket.OPEN) {
+        if (workspace) {
+            const espera = document.createElement('p');
+            espera.id = 'creative-espera-linea';
+            espera.style.color = '#888';
+            espera.textContent = '> Generando imagen, esto puede tardar unos segundos...';
+            workspace.appendChild(espera);
+        }
+        creativeSocket.send(JSON.stringify({ type: 'creative_command', content: cmdText }));
+    } else if (workspace) {
+        const err = document.createElement('p');
+        err.style.color = '#ff4444';
+        err.textContent = '> [ERROR]: Sin conexión con REVAN. Verifique que main.py esté corriendo.';
+        workspace.appendChild(err);
     }
 
     input.value = '';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    conectarWebSocketCreative();
+
     // Unico momento donde se usa section.mp3: al cargar la interfaz
     setTimeout(() => {
         playSectionSFX();

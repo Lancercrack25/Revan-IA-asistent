@@ -10,6 +10,8 @@ from fastapi.responses import HTMLResponse
 conexiones_activas: set[WebSocket] = set()
 loop_real_servidor = None
 manejador_comando_texto_callback = None
+manejador_comando_coder_callback = None
+manejador_comando_creative_callback = None
 
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
@@ -112,9 +114,19 @@ async def info_electronics(): return servir_html_modulo("info_electronics.html")
 
 # --- REGISTRO DE MANEJADORES ---
 def registrar_manejador_comando_texto(callback):
-    """Permite a main.py registrar la función que procesará los textos enviados desde la web UI."""
+    """Permite a main.py registrar la función que procesará los textos enviados desde el chat del Dashboard."""
     global manejador_comando_texto_callback
     manejador_comando_texto_callback = callback
+
+def registrar_manejador_comando_coder(callback):
+    """Registra la función que procesa comandos escritos en la terminal de la página dedicada del Coder Agent (/coder)."""
+    global manejador_comando_coder_callback
+    manejador_comando_coder_callback = callback
+
+def registrar_manejador_comando_creative(callback):
+    """Registra la función que procesa prompts escritos en la página dedicada del Creative Agent (/creative)."""
+    global manejador_comando_creative_callback
+    manejador_comando_creative_callback = callback
 
 # --- WEBSOCKET UNIFICADO ---
 @app.websocket("/ws")
@@ -129,25 +141,47 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     conexiones_activas.add(websocket)
-    print("[WebSocket]: Cliente (Dashboard/Esfera) conectado al canal de control.")
+    print("[WebSocket]: Cliente (Dashboard/Esfera/Coder/Creative) conectado al canal de control.")
 
     try:
         while True:
             data_raw = await websocket.receive_text()
             try:
                 data = json.loads(data_raw)
-                
-                # Procesa comando de texto enviado desde el input del Dashboard
-                if data.get("type") in ["text_command", "comando_texto"]:
+                tipo_mensaje = data.get("type")
+
+                # Comando de texto enviado desde el chat general del Dashboard
+                if tipo_mensaje in ["text_command", "comando_texto"]:
                     prompt = data.get("content") or data.get("texto")
                     print(f"[WebSocket Text]: Orden recibida desde UI -> '{prompt}'")
-                    
+
                     if manejador_comando_texto_callback and prompt:
-                        # Si el callback es asíncrono lo ejecutamos con create_task, si es síncrono directamente
                         if asyncio.iscoroutinefunction(manejador_comando_texto_callback):
                             asyncio.create_task(manejador_comando_texto_callback(prompt))
                         else:
                             manejador_comando_texto_callback(prompt)
+
+                # Comando escrito en la terminal dedicada del Coder Agent (/coder)
+                elif tipo_mensaje == "coder_command":
+                    prompt = data.get("content")
+                    print(f"[WebSocket Coder]: Orden recibida desde UI dedicada -> '{prompt}'")
+
+                    if manejador_comando_coder_callback and prompt:
+                        if asyncio.iscoroutinefunction(manejador_comando_coder_callback):
+                            asyncio.create_task(manejador_comando_coder_callback(prompt))
+                        else:
+                            manejador_comando_coder_callback(prompt)
+
+                # Prompt escrito en la terminal dedicada del Creative Agent (/creative)
+                elif tipo_mensaje == "creative_command":
+                    prompt = data.get("content")
+                    print(f"[WebSocket Creative]: Orden recibida desde UI dedicada -> '{prompt}'")
+
+                    if manejador_comando_creative_callback and prompt:
+                        if asyncio.iscoroutinefunction(manejador_comando_creative_callback):
+                            asyncio.create_task(manejador_comando_creative_callback(prompt))
+                        else:
+                            manejador_comando_creative_callback(prompt)
 
             except json.JSONDecodeError:
                 pass
@@ -181,6 +215,22 @@ async def actualizar_chat_dashboard(rol: str, texto: str):
         try: await ws.send_text(paquete)
         except Exception: conexiones_activas.discard(ws)
 
+async def enviar_respuesta_coder(texto: str):
+    """Envía el resultado del Coder Agent de vuelta a la terminal de /coder."""
+    if not conexiones_activas: return
+    paquete = json.dumps({"tipo": "coder_response", "texto": texto})
+    for ws in list(conexiones_activas):
+        try: await ws.send_text(paquete)
+        except Exception: conexiones_activas.discard(ws)
+
+async def enviar_respuesta_creative(texto: str):
+    """Envía el resultado del Creative Agent de vuelta al canvas de /creative."""
+    if not conexiones_activas: return
+    paquete = json.dumps({"tipo": "creative_response", "texto": texto})
+    for ws in list(conexiones_activas):
+        try: await ws.send_text(paquete)
+        except Exception: conexiones_activas.discard(ws)
+
 # --- PUENTES MULTIHILO EXTERNOS ---
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     global loop_real_servidor
@@ -197,6 +247,16 @@ def transmitir_chat_desde_hilo_externo(rol: str, texto: str):
     global loop_real_servidor
     if loop_real_servidor and loop_real_servidor.is_running():
         asyncio.run_coroutine_threadsafe(actualizar_chat_dashboard(rol, texto), loop_real_servidor)
+
+def transmitir_respuesta_coder_desde_hilo_externo(texto: str):
+    global loop_real_servidor
+    if loop_real_servidor and loop_real_servidor.is_running():
+        asyncio.run_coroutine_threadsafe(enviar_respuesta_coder(texto), loop_real_servidor)
+
+def transmitir_respuesta_creative_desde_hilo_externo(texto: str):
+    global loop_real_servidor
+    if loop_real_servidor and loop_real_servidor.is_running():
+        asyncio.run_coroutine_threadsafe(enviar_respuesta_creative(texto), loop_real_servidor)
 
 def iniciar_servidor_ui():
     config = uvicorn.Config(app=app, host="127.0.0.1", port=8000, log_level="warning")

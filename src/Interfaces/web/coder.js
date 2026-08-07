@@ -38,7 +38,7 @@ function unlockAudioEngine() {
     
     getAudioContext();
 
-    clickAudioCache.volume = 0.01;
+    clickAudioCache.volume = 0.9;
     clickAudioCache.play().then(() => {
         clickAudioCache.pause();
         clickAudioCache.currentTime = 0;
@@ -137,6 +137,42 @@ function clearTerminal() {
     if (terminal) terminal.innerHTML = '';
 }
 
+let coderSocket = null;
+
+function conectarWebSocketCoder() {
+    coderSocket = new WebSocket(`ws://${window.location.host}/ws`);
+
+    coderSocket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.tipo === 'coder_response') {
+                mostrarRespuestaCoder(data.texto);
+            }
+        } catch (e) { /* mensaje no relacionado con este canal, se ignora */ }
+    };
+
+    coderSocket.onclose = () => {
+        // Reintenta la conexión sola si se cae (ej. REVAN se reinició)
+        setTimeout(conectarWebSocketCoder, 2000);
+    };
+}
+
+function mostrarRespuestaCoder(texto) {
+    const terminal = document.getElementById('terminal-output');
+    if (!terminal) return;
+
+    const lineaEspera = document.getElementById('coder-espera-linea');
+    if (lineaEspera) lineaEspera.remove();
+
+    playHoverSFX();
+    const respLine = document.createElement('div');
+    respLine.style.color = '#00ff88';
+    respLine.style.whiteSpace = 'pre-wrap';
+    respLine.textContent = `> [CODER_RESP]: ${texto}`;
+    terminal.appendChild(respLine);
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
 function runCoderCommand() {
     const input = document.getElementById('coder-cmd');
     const terminal = document.getElementById('terminal-output');
@@ -153,22 +189,33 @@ function runCoderCommand() {
 
     const cmdLine = document.createElement('div');
     cmdLine.style.color = '#00ffcc';
-    cmdLine.innerHTML = `> [EXEC_CMD]: ${cmdText}`;
+    cmdLine.textContent = `> [EXEC_CMD]: ${cmdText}`;
     terminal.appendChild(cmdLine);
+    terminal.scrollTop = terminal.scrollHeight;
 
-    setTimeout(() => {
-        playHoverSFX();
-        const respLine = document.createElement('div');
-        respLine.style.color = '#00ff88';
-        respLine.innerHTML = `> [CODER_RESP]: Comando compilado y procesado exitosamente.`;
-        terminal.appendChild(respLine);
+    if (coderSocket && coderSocket.readyState === WebSocket.OPEN) {
+        const lineaEspera = document.createElement('div');
+        lineaEspera.id = 'coder-espera-linea';
+        lineaEspera.style.color = '#888';
+        lineaEspera.textContent = '> [SYS]: Procesando en el Coder Agent, esto puede tardar unos segundos...';
+        terminal.appendChild(lineaEspera);
         terminal.scrollTop = terminal.scrollHeight;
-    }, 350);
+
+        coderSocket.send(JSON.stringify({ type: 'coder_command', content: cmdText }));
+    } else {
+        const errLine = document.createElement('div');
+        errLine.style.color = '#ff4444';
+        errLine.textContent = '> [ERROR]: Sin conexión con REVAN. Verifique que main.py esté corriendo.';
+        terminal.appendChild(errLine);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
 
     input.value = '';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    conectarWebSocketCoder();
+
     // Unico momento donde se usa section.mp3: al cargar la interfaz
     setTimeout(() => {
         playSectionSFX();
