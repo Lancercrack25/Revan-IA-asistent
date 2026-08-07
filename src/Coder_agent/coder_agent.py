@@ -81,8 +81,8 @@ def _limpiar_codigo_generado(texto: str) -> str:
 def generar_codigo(descripcion_tarea: str, api_key: str = None,
                    modelo: str = "meta/llama-3.1-70b-instruct") -> str:
     _cargar_env_desde_config_json()
-    # Este agente consulta prioritariamente 'NVIDIA_NIM_API_KEY'
-    api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
+    # Este agente consulta prioritariamente 'CREATIVE_API_KEY'
+    api_key = api_key or os.getenv("CODER_API_KEY", "")
     if not api_key:
         raise ValueError("Falta la API key de NVIDIA NIM en la configuración.")
 
@@ -243,7 +243,6 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
         )
     
     return _ejecutar_y_formatear(codigo, ruta_guardado)
-
 
 def procesar_confirmacion_codigo(texto_respuesta: str):
     return _gestor_confirmacion_codigo.procesar_respuesta(texto_respuesta)

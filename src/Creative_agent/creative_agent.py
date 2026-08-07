@@ -130,7 +130,7 @@ def generar_imagen(prompt_imagen: str, api_key: str = None) -> str:
         return "Señor, alcancé el límite de generación creativa en el último minuto."
 
     _cargar_env_desde_config_json()
-    api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
+    api_key = api_key or os.getenv("CREATIVE_API_KEY", "")
     
     # Limpiar el prompt de comandos comunes como "revan crea una imagen de..."
     prompt_limpio = re.sub(r'^(revan\s+)?(crea|genera|dibuja)\s+(una\s+imagen\s+de|un\s+dibujo\s+de|imagen\s+de)\s*', '', prompt_imagen, flags=re.IGNORECASE).strip()
