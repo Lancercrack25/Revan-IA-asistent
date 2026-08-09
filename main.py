@@ -220,11 +220,9 @@ def encender_sistemas():
             time.sleep(0.3)
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
-
         threading.Thread(target=saludo_inicial, daemon=True).start()
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
-
     except Exception as e:
         sincronizar_estado_esfera("ERROR", "#f85149")
         print(f" Error crítico al inicializar las APIs locales: {e}")
