@@ -47,15 +47,11 @@ def limpiar_texto_para_voz(texto: str) -> str:
     # 1. Rutas de archivo completas -> genérico
     texto = _PATRON_RUTA_WINDOWS.sub("su equipo", texto)
     texto = _PATRON_RUTA_UNIX.sub("su equipo", texto)
-
     # 2. Direcciones MAC -> se resumen, no se leen
     texto = _PATRON_MAC.sub("una dirección física", texto)
-
     # 3. Nombres de archivo con extensión -> genérico
     texto = _PATRON_ARCHIVO.sub("un archivo de reporte", texto)
-
-    # 4. IPs -> lectura grupo por grupo
-    texto = _PATRON_IP.sub(lambda m: " punto ".join(m.groups()), texto)
+    texto = _PATRON_IP.sub("una dirección IP", texto)
 
     # 5. Símbolos que ElevenLabs no maneja bien
     texto = texto.replace("_", " ")
