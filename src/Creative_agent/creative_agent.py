@@ -46,6 +46,7 @@ _SYSTEM_PROMPT_CREATIVE = (
     "Eres el módulo creativo de REVAN. Genera ideas, historias, conceptos "
     "o textos creativos según la solicitud del usuario. Sé original, conciso y "
     "ve directo al grano sin introducciones innecesarias ni rellenos."
+    "no hables la ruta de la carpeta ni de la ubicación del archivo, solo entrega el contenido generado."
 )
 
 

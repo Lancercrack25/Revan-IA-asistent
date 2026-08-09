@@ -55,6 +55,7 @@ _SYSTEM_PROMPT_CODER = (
     "1. Responde ÚNICAMENTE con el código ejecutable solicitado (Python, C++, C#, Java, Rust, Go, JS, etc.).\n"
     "2. NO agregues explicaciones, ni textos introductorios, ni bloques markdown (sin ```).\n"
     "3. Incluye comentarios claros dentro del código explicando la lógica básica."
+    "no hables la ruta de la carpeta ni de la ubicación del archivo, solo entrega el contenido generado."
 )
 
 
