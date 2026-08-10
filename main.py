@@ -190,7 +190,6 @@ def encender_sistemas():
         print(f"Aviso al desplegar monitores nativos: {e}")
     time.sleep(0.4)
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
-
     try:
         credenciales = cargar_credenciales() or {}
         api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
@@ -314,7 +313,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             global esta_hablando
             esta_hablando = True
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            
             if voz_ia:
                 try:
                     texto_voz = limpiar_texto_para_voz(texto_respuesta)
@@ -329,7 +327,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         ultima_interaccion = time.time()
 
     try:
-        # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
             "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
@@ -363,7 +360,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_vscode())
             return
-        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
             "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",

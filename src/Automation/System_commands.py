@@ -297,22 +297,31 @@ def lanzar_aplicacion_usuario(nombre_app: str) -> str:
         return f"Error al lanzar la aplicación {nombre}: {e}"
 
 def lanzar_videojuego(nombre_juego: str) -> str:
+    """
+    Lanza un videojuego específico (ej: Minecraft, GTA, Valorant). 
+    Si la entrada resulta ser una aplicación, launcher o comando del sistema (ej: Steam, Discord, Chrome),
+    se redirige automáticamente sin fallar.
+    """
     try:
         nombre_juego = sanitizar_o_rechazar(nombre_juego, contexto="nombre de videojuego")
     except EntradaNoSeguraError as err_sanit:
         return f"Señor, no puedo procesar ese nombre de juego: {err_sanit}"
 
     nombre = nombre_juego.lower().strip()
-    try:
-        if "minecraft" in nombre:
+
+    # 1. Atajos directos para ejecutables con protocolo URI
+    if "minecraft" in nombre:
+        try:
             os.startfile("minecraft:")
-            return "Iniciando Minecraft."
-        else:
-            try:
-                os.startfile(nombre_juego)
-                return f"Iniciando {nombre_juego}."
-            except OSError:
-                return f"No se encontró el juego {nombre_juego}, Señor."
+            return "Iniciando Minecraft, Señor."
+        except Exception:
+            pass
+    try:
+        os.startfile(nombre_juego)
+        return f"Iniciando {nombre_juego}."
+    except OSError:
+        print(f"[REVAN Redirección]: '{nombre_juego}' no se encontró como ejecutable directo. Intentando como aplicación de usuario...")
+        return lanzar_aplicacion_usuario(nombre_juego)
     except Exception as e:
         return f"Error al intentar abrir el juego: {e}"
 
@@ -351,4 +360,5 @@ __all__ = [
     "desplegar_monitores_windows",
     "ejecutar_aplicacion_office",
     "crear_y_abrir_documento_word",
+    "crear_y_abrir_hoja_excel",
 ]
