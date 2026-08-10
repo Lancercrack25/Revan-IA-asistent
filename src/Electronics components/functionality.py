@@ -8,9 +8,7 @@ hubiera nada conectado-. Ahora usa pyserial para enumerar los puertos
 serie REALES del sistema e identificar, por VID/PID y descripción,
 cuáles corresponden a chips típicos de Arduino/ESP32.
 """
-
-import serial.tools.list_ports
-
+import serial
 # VID:PID y nombres típicos de chips USB-serial usados por Arduino/ESP32
 # y clones. No es una lista exhaustiva -el universo de clones chinos con
 # VID/PID genéricos es enorme-, pero cubre los casos más comunes.
@@ -79,4 +77,3 @@ def obtener_puerto_mas_probable():
         if p["identificado_como"]:
             return p["puerto"]
     return None
-
