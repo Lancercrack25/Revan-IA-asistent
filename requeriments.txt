@@ -2,6 +2,7 @@
 # Generado escaneando los imports reales de todo el proyecto (no es una
 # lista genérica). Instalar con:
 #   pip install -r requirements.txt
+#
 # Nota: varias librerías (opencv, mediapipe, pygame, sounddevice) requieren
 # que el sistema tenga las dependencias nativas correspondientes (drivers de
 # audio/video). Si algo falla al instalar, primero revisa el mensaje de error
@@ -13,6 +14,9 @@ google-genai==0.3.0             # opcional: solo si activas el bloque de respald
 
 # --- Coder_agent / Electrónica ---
 pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
+bleak==0.22.3                  # deteccion de dispositivos Bluetooth (BLE)
+# wmi==1.5.1 y pywin32==308     # descomenta estas 2 EN WINDOWS si quieres detección de
+                                # cualquier dispositivo USB genérico (no solo los de puerto serie)
 
 # --- Servidor web / dashboard ---
 fastapi==0.115.0
@@ -52,6 +56,13 @@ psutil==6.0.0
 # --- Ciencia / gráficos (Inspector_asistent) ---
 scipy==1.14.1
 matplotlib==3.9.2
+
+# --- GUI legada (Gui/Dashboard.py) ---
+# Descomenta esta línea SOLO si sigues usando la GUI de escritorio antigua
+# (Gui/Dashboard.py). Ya no está conectada a main.py -ver el hallazgo de
+# código muerto de la revisión anterior-, así que si la vas a borrar, no
+# hace falta instalar esto.
+# customtkinter==5.2.2
 
 # --- Librerías de la librería estándar de Python que NO van aquí ---
 # (no requieren instalación, ya vienen con Python): os, sys, time, json,

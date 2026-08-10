@@ -8,7 +8,6 @@ try:
 except ImportError:
     print("Falta la librería 'openai'. Instálala con: pip install openai")
     raise
-
 from src.Services.os_service import (
     analizar_entorno_vision,
     abrir_carpeta_sistema,
@@ -404,11 +403,20 @@ HERRAMIENTAS = [
         "function": {
             "name": "detectar_hardware_conectado",
             "description": (
-                "Detecta de verdad qué dispositivos electrónicos (Arduino, ESP32, etc.) están "
-                "conectados por USB ahora mismo. Úsala cuando pregunten qué hay conectado, si "
-                "detecta el Arduino/ESP32, o antes de programar hardware para saber el puerto real."
+                "Detecta de verdad qué dispositivos electrónicos (Arduino, ESP32, sensores, "
+                "periféricos USB, etc.) están conectados ahora mismo. Úsala cuando pregunten "
+                "qué hay conectado, si detecta el Arduino/ESP32, o antes de programar hardware "
+                "para saber el puerto real."
             ),
-            "parameters": {"type": "object", "properties": {}},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "incluir_bluetooth": {
+                        "type": "boolean",
+                        "description": "True solo si el usuario pidió explícitamente buscar también dispositivos Bluetooth (tarda varios segundos más).",
+                    }
+                },
+            },
         },
     },
     {
@@ -516,8 +524,6 @@ class NimClient:
         finally:
             liberar_conexion(conn)
 
-    # Mapa de tool -> categoría de rate limiting. Las tools no listadas
-    # aquí caen en "default" (10 acciones / 60s, ver rate_limiter.py).
     _CATEGORIA_RATE_LIMIT = {
         "enviar_whatsapp": "whatsapp",
         "analizar_camara": "camara",
@@ -547,7 +553,6 @@ class NimClient:
                 f"minuto. Espere un momento antes de volver a intentarlo -esto es para "
                 f"evitar que un error se convierta en un bucle descontrolado-."
             )
-
         try:
             if nombre == "buscar_en_navegador":
                 consulta = argumentos.get("consulta", "")
@@ -621,9 +626,6 @@ class NimClient:
                 return resultado
 
             elif nombre == "limpiar_sistema":
-                # Igual que crear_carpeta: sin confirmación. Son archivos
-                # temporales -de por sí diseñados para borrarse-, acción
-                # local y de bajo riesgo real.
                 resultado = ejecutar_limpieza_sistema()
                 registrar_accion_sistema("limpiar_sistema", resultado, "LIMPIEZA")
                 return resultado
@@ -695,7 +697,8 @@ class NimClient:
                 return resultado
 
             elif nombre == "detectar_hardware_conectado":
-                resultado = detectar_componentes_electronicos()
+                incluir_bt = bool(argumentos.get("incluir_bluetooth", False))
+                resultado = detectar_componentes_electronicos(incluir_bluetooth=incluir_bt)
                 registrar_accion_sistema("detectar_hardware_conectado", resultado, "ELECTRONICS")
                 return resultado
 
@@ -732,21 +735,18 @@ class NimClient:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion})
             return respuesta_confirmacion
-
         # 1b. Igual, pero para código pendiente de confirmar (Coder_agent)
         respuesta_confirmacion_codigo = procesar_confirmacion_codigo(orden_usuario)
         if respuesta_confirmacion_codigo:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion_codigo})
             return respuesta_confirmacion_codigo
-
         # 1c. Igual, pero para comandos seriales pendientes (Electronics)
         respuesta_confirmacion_serial = procesar_confirmacion_serial(orden_usuario)
         if respuesta_confirmacion_serial:
             self.historial.append({"role": "user", "content": orden_usuario})
             self.historial.append({"role": "assistant", "content": respuesta_confirmacion_serial})
             return respuesta_confirmacion_serial
-
         # 2. Si no hay confirmación pendiente, se procesa la solicitud mediante LLM
         self.historial.append({"role": "user", "content": orden_usuario})
 
