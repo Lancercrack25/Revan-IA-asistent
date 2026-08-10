@@ -14,9 +14,7 @@ google-genai==0.3.0             # opcional: solo si activas el bloque de respald
 
 # --- Coder_agent / Electrónica ---
 pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
-bleak==0.22.3                  # deteccion de dispositivos Bluetooth (BLE)
-# wmi==1.5.1 y pywin32==308     # descomenta estas 2 EN WINDOWS si quieres detección de
-                                # cualquier dispositivo USB genérico (no solo los de puerto serie)
+bleak==0.22.3                  # detección opcional de dispositivos Bluetooth (BLE)
 
 # --- Servidor web / dashboard ---
 fastapi==0.115.0
