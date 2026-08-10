@@ -1,0 +1,1 @@
+#este archivo se encargara de mostrar el rendimiento del hardware
