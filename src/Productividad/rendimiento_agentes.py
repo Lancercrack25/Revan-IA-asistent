@@ -13,9 +13,6 @@ logs/security_audit.log, y aquí solo se lee y resume ese log.
 from collections import defaultdict
 
 from src.Security.auditoria import leer_eventos_recientes
-
-# Los nombres de módulo tal como los usan registrar_evento(modulo=...)
-# en cada agente.
 _AGENTES_MONITOREADOS = ["coder_agent", "creative_agent", "electronics", "social_discord"]
 
 _ETIQUETAS_LEGIBLES = {
@@ -24,7 +21,6 @@ _ETIQUETAS_LEGIBLES = {
     "electronics": "Electronics",
     "social_discord": "Social (Discord)",
 }
-
 
 def obtener_rendimiento_agentes(ventana_eventos: int = 300) -> dict:
     """

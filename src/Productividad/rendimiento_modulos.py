@@ -10,9 +10,7 @@ nueva, solo se consulta lo que ya se está guardando.
 """
 
 from collections import Counter
-
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
-
 
 def obtener_rendimiento_modulos(limite_filas: int = 500) -> dict:
     """
@@ -48,7 +46,6 @@ def obtener_rendimiento_modulos(limite_filas: int = 500) -> dict:
         clave = accion or "DESCONOCIDO"
         if clave not in ultima_fecha_por_modulo:
             ultima_fecha_por_modulo[clave] = fecha.isoformat() if fecha else None
-
     return {
         modulo: {"usos": cantidad, "ultimo_uso": ultima_fecha_por_modulo.get(modulo)}
         for modulo, cantidad in conteo.most_common()

@@ -9,12 +9,6 @@ from src.Productividad.rendimiento_agentes import obtener_rendimiento_agentes
 from src.Productividad.rendimiento_modulos import obtener_rendimiento_modulos
 
 def obtener_snapshot_completo() -> dict:
-    """
-    Une las 3 fuentes en un solo dict. Cada sub-función ya maneja sus
-    propios errores (devuelve dict vacío o valores en 0 en vez de
-    lanzar excepción), así que esta función no necesita try/except
-    adicional.
-    """
     return {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "hardware": obtener_rendimiento_hardware(),

@@ -5,10 +5,7 @@ rendimiento_hardware.py — snapshot de recursos del sistema (CPU/RAM/disco).
 Usa psutil, que ya es dependencia del proyecto (Network/analize_network.py
 y otros ya lo usan).
 """
-
 import psutil
-
-
 def obtener_rendimiento_hardware() -> dict:
     """
     Snapshot instantáneo de CPU, RAM y disco. cpu_percent con interval
