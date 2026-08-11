@@ -15,8 +15,11 @@ from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
 from src.Automation.work_apps_actions import abrir_teams, abrir_outlook, abrir_vscode, abrir_google_meet, abrir_google_drive
-from src.Interfaces.servidor import (iniciar_servidor_ui,transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo,registrar_manejador_comando_texto,
-    registrar_manejador_comando_coder,registrar_manejador_comando_creative,transmitir_respuesta_coder_desde_hilo_externo,transmitir_respuesta_creative_desde_hilo_externo,)
+from src.Interfaces.servidor import (iniciar_servidor_ui,transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo,
+    registrar_manejador_comando_texto,registrar_manejador_comando_coder,registrar_manejador_comando_creative,transmitir_respuesta_coder_desde_hilo_externo,
+    transmitir_respuesta_creative_desde_hilo_externo,transmitir_rendimiento_desde_hilo_externo,
+)
+from src.Productividad.rendimiento_general import obtener_snapshot_completo
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
 from src.Core.Gemini_client import GeminiClient
@@ -53,9 +56,10 @@ PALABRAS_CLAVE_ACCION = [
     "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar",
     "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
     "cancion", "musica", "adivina", "reconoce", "identifica", "sonando",
-    "programa", "programar", "codigo", "script", "arduino", "esp32", "sensor",
+    "programa", "programar", "codigo", "script","sensor",
+    "electronica", "hardware", "placa", "microcontrolador",
     "teams", "outlook", "vscode", "meet", "drive", "trabajo",
-    "imagen", "dibuja", "dibujar", "ilustracion", "ilustra"
+    "imagen", "crea", "dibujar"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -69,10 +73,12 @@ def quitar_acentos(texto: str) -> str:
 def es_intencion_de_comando(texto: str) -> bool:
     texto_sin_acentos = quitar_acentos(texto.lower())
     es_orden = any(palabra in texto_sin_acentos for palabra in PALABRAS_CLAVE_ACCION)
+    
     if es_orden:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
+        
     return es_orden
 
 def hilo_servidor_web():
@@ -96,7 +102,9 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
 
 def activar_kill_switch() -> str:
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
     acciones_detenidas = []
+
     try:
         resultado_wa = cancelar_envio_pendiente()
         if "no hay ninguna" not in resultado_wa.lower():
@@ -145,6 +153,7 @@ def apagar_sistema():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
+
     esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
     reproducir_sfx("welcome", "close")
@@ -153,12 +162,14 @@ def apagar_sistema():
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
+
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
 def procesar_comando_coder(prompt: str):
     if not prompt or not prompt.strip():
         return
+
     print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
 
     def _tarea():
@@ -166,17 +177,22 @@ def procesar_comando_coder(prompt: str):
         resultado = ejecutar_tarea_codigo(prompt.strip())
         transmitir_respuesta_coder_desde_hilo_externo(resultado)
         sincronizar_estado_esfera("ESPERA", "#0077ff")
+
     threading.Thread(target=_tarea, daemon=True).start()
+
 
 def procesar_comando_creative(prompt: str):
     if not prompt or not prompt.strip():
         return
+
     print(f"[Creative Agent - UI dedicada]: '{prompt.strip()}'")
+
     def _tarea():
         sincronizar_estado_esfera("PROCESANDO", "#ff00ff")
         resultado = generar_imagen(prompt.strip())
         transmitir_respuesta_creative_desde_hilo_externo(resultado)
         sincronizar_estado_esfera("ESPERA", "#0077ff")
+
     threading.Thread(target=_tarea, daemon=True).start()
 
 def encender_sistemas():
@@ -190,6 +206,7 @@ def encender_sistemas():
         print(f"Aviso al desplegar monitores nativos: {e}")
     time.sleep(0.4)
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
+
     try:
         credenciales = cargar_credenciales() or {}
         api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
@@ -208,7 +225,7 @@ def encender_sistemas():
         registrar_manejador_comando_texto(procesar_comando_texto)
         registrar_manejador_comando_coder(procesar_comando_coder)
         registrar_manejador_comando_creative(procesar_comando_creative)
-        reproducir_sfx("welcome", "Bienvenida",volumen = 1.1)
+        reproducir_sfx("welcome", "Bienvenida",volumen=1.2)
 
         def saludo_inicial():
             global esta_hablando
@@ -219,9 +236,14 @@ def encender_sistemas():
             time.sleep(0.3)
             esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+
         threading.Thread(target=saludo_inicial, daemon=True).start()
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
+
+        hilo_rendimiento = threading.Thread(target=bucle_rendimiento_hilo, daemon=True)
+        hilo_rendimiento.start()
+
     except Exception as e:
         sincronizar_estado_esfera("ERROR", "#f85149")
         print(f" Error crítico al inicializar las APIs locales: {e}")
@@ -231,6 +253,23 @@ def bucle_escucha_hilo():
     while sistema_activo:
         procesar_ciclo_voz()
         time.sleep(0.05)
+
+def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
+    """
+    Cada 'intervalo_segundos' toma un snapshot de hardware/agentes/módulos
+    y lo transmite por WebSocket -alimenta las gráficas en tiempo real de
+    la página de Rendimiento en el dashboard-. Corre mientras el sistema
+    esté activo; si algo falla en una vuelta, no tumba el hilo, solo lo
+    reporta y sigue en la siguiente.
+    """
+    global sistema_activo
+    while sistema_activo:
+        try:
+            snapshot = obtener_snapshot_completo()
+            transmitir_rendimiento_desde_hilo_externo(snapshot)
+        except Exception as e:
+            print(f"[Rendimiento] Error tomando snapshot: {e}")
+        time.sleep(intervalo_segundos)
 
 def procesar_ciclo_voz():
     global oidos_ia, ultima_interaccion, esta_hablando
@@ -313,6 +352,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             global esta_hablando
             esta_hablando = True
             sincronizar_estado_esfera("HABLANDO", "#ff0055")
+            
             if voz_ia:
                 try:
                     texto_voz = limpiar_texto_para_voz(texto_respuesta)
@@ -327,6 +367,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         ultima_interaccion = time.time()
 
     try:
+        # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
             "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
@@ -360,6 +401,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_vscode())
             return
+        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
             "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
@@ -640,6 +682,12 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         palabras_creative_agent = ["imagen", "dibuja", "dibujar", "ilustracion", "ilustra"]
         if any(p in orden_limpia_sin_acentos.split() for p in palabras_creative_agent):
             reproducir_sfx("modules", "Creative_asisstent")
+
+        palabras_electronics = ["sensor", "electronica", "hardware", "placa", "microcontrolador"]
+        frases_electronics = ["puerto serial", "puerto usb"]
+        if (any(p in orden_limpia_sin_acentos.split() for p in palabras_electronics)
+                or any(f in orden_limpia_sin_acentos for f in frases_electronics)):
+            reproducir_sfx("modules", "Electro")
 
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             reproducir_sfx("modules", "Cam")
