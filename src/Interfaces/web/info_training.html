@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REVAN - Módulo de Telemetría & Productividad</title>
+    <title>REVAN - Módulo de Telemetría Avanzada</title>
     <link rel="shortcut icon" href="#">
     <link rel="stylesheet" href="/styles/dashboard.css">
     <!-- Chart.js CDN -->
@@ -12,40 +12,39 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
-            background-color: #0d0312;
+            background-color: #030712;
             color: #00f0ff;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
-            padding: 2rem;
+            padding: 1.5rem;
             display: flex;
             justify-content: center;
             align-items: flex-start;
         }
 
-        /* Contenedor Principal idéntico a tus otros módulos REVAN */
         .module-container {
-            max-width: 950px;
+            max-width: 1100px;
             width: 100%;
             background: rgba(10, 15, 30, 0.85);
             border: 1px solid rgba(0, 240, 255, 0.3);
             border-radius: 16px;
-            padding: 2.5rem;
+            padding: 2rem;
             box-shadow: 0 0 35px rgba(0, 240, 255, 0.15);
             backdrop-filter: blur(12px);
         }
 
-        /* Encabezado */
+        /* Header HUD */
         .header-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid rgba(0, 240, 255, 0.2);
-            padding-bottom: 1.2rem;
-            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            margin-bottom: 1.2rem;
         }
 
         .header-title h1 {
-            font-size: 1.8rem;
+            font-size: 1.7rem;
             font-weight: 700;
             letter-spacing: 1px;
             color: #00f0ff;
@@ -53,24 +52,23 @@
         }
 
         .header-title span {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 2px;
             display: block;
-            margin-bottom: 0.2rem;
         }
 
         .btn-back {
             background: rgba(0, 240, 255, 0.05);
             border: 1px solid #00f0ff;
             color: #00f0ff;
-            padding: 0.6rem 1.2rem;
+            padding: 0.5rem 1.1rem;
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             transition: all 0.3s ease;
         }
 
@@ -81,23 +79,16 @@
         }
 
         .section-title {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             color: #ffffff;
             margin-bottom: 0.8rem;
-            margin-top: 1.5rem;
+            margin-top: 1.2rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .description {
-            color: #94a3b8;
-            line-height: 1.7;
-            font-size: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        /* Panel de Métricas Rápidas HUD */
+        /* Tarjetas de Resumen KPI */
         .telemetry-summary {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -122,67 +113,66 @@
         }
 
         .summary-card .value {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             font-weight: bold;
             color: #ffffff;
             margin-top: 0.2rem;
         }
 
-        /* Gráficas Contenedor */
-        .charts-grid {
+        /* Layout Grid 2x2 para 4 Gráficas */
+        .charts-grid-4 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+            gap: 1.2rem;
+            margin-bottom: 1.8rem;
         }
 
         .chart-card {
             background: rgba(0, 240, 255, 0.02);
             border: 1px solid rgba(0, 240, 255, 0.2);
             border-radius: 12px;
-            padding: 1.2rem;
+            padding: 1rem;
             box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.03);
-            position: relative;
         }
 
         .chart-card h3 {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             color: #ffffff;
-            margin-bottom: 1rem;
+            margin-bottom: 0.8rem;
             letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
 
         .canvas-container {
             position: relative;
-            height: 220px;
+            height: 200px;
             width: 100%;
         }
 
-        /* Comandos Activos */
+        /* Comandos Tácticos */
         .keywords-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.8rem;
         }
 
         .keyword-card {
             background: rgba(0, 240, 255, 0.03);
-            border-left: 4px solid #00f0ff;
+            border-left: 3px solid #00f0ff;
             border-top: 1px solid rgba(0, 240, 255, 0.1);
             border-right: 1px solid rgba(0, 240, 255, 0.1);
             border-bottom: 1px solid rgba(0, 240, 255, 0.1);
-            padding: 1rem 1.2rem;
+            padding: 0.8rem 1rem;
             border-radius: 6px;
         }
 
         .keyword-card strong {
             color: #ffffff;
             display: block;
-            font-size: 0.95rem;
-            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            margin-bottom: 0.3rem;
         }
 
         .keyword-card code {
@@ -190,13 +180,17 @@
             background: rgba(0, 240, 255, 0.1);
             padding: 0.2rem 0.5rem;
             border-radius: 4px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 900px) {
+            .charts-grid-4 { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="module-container">
-        <!-- Encabezado Estándar REVAN -->
+        <!-- Encabezado HUD REVAN -->
         <div class="header-bar">
             <div class="header-title">
                 <span>Módulo de Control</span>
@@ -205,45 +199,62 @@
             <a href="/" class="btn-back">← Volver al Dashboard</a>
         </div>
 
-        <h2 class="section-title">📊 Telemetría en Tiempo Real</h2>
-        <p class="description">
-            Monitor táctico de consumo de hardware local y registro de peticiones procesadas por los módulos y agentes subordinados de REVAN.
-        </p>
-
-        <!-- Indicadores Rápidos -->
+        <!-- KPI Resumen -->
         <div class="telemetry-summary">
             <div class="summary-card">
-                <label>CPU Uso</label>
+                <label>CPU USO</label>
                 <div class="value" id="valCpu">0%</div>
             </div>
             <div class="summary-card">
-                <label>RAM Uso</label>
+                <label>RAM USO</label>
                 <div class="value" id="valRam">0%</div>
             </div>
             <div class="summary-card">
-                <label>Canal WS</label>
-                <div class="value" id="valWs" style="color: #00ff66;">CONECTADO</div>
+                <label>LATENCIA WS</label>
+                <div class="value" id="valPing" style="color: #00f0ff;">-- ms</div>
             </div>
             <div class="summary-card">
-                <label>Total Agentes Tareas</label>
+                <label>TOTAL TAREAS</label>
                 <div class="value" id="valTotalAgentes">0</div>
             </div>
         </div>
 
-        <!-- Gráficas Estables -->
-        <div class="charts-grid">
+        <!-- GRID 2X2 DE 4 GRÁFICAS -->
+        <h2 class="section-title">📊 Centro de Mando de Telemetría</h2>
+        <div class="charts-grid-4">
+            
+            <!-- Gráfica 1: Hardware -->
             <div class="chart-card">
                 <h3>🖥️ Consumo de Hardware (CPU & RAM)</h3>
                 <div class="canvas-container">
                     <canvas id="hardwareChart"></canvas>
                 </div>
             </div>
+
+            <!-- Gráfica 2: Proporción de Agentes (Doughnut) -->
             <div class="chart-card">
-                <h3>🤖 Actividad y Tareas por Agente</h3>
+                <h3>🤖 Distribución de Carga por Agente</h3>
                 <div class="canvas-container">
-                    <canvas id="agentsChart"></canvas>
+                    <canvas id="agentsDoughnutChart"></canvas>
                 </div>
             </div>
+
+            <!-- Gráfica 3: Latencia en Tiempo Real -->
+            <div class="chart-card">
+                <h3>⚡ Latencia WebSocket (Respuesta en ms)</h3>
+                <div class="canvas-container">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfica 4: Histórico por Agente (Barras) -->
+            <div class="chart-card">
+                <h3>📈 Métricas de Rendimiento por Agente</h3>
+                <div class="canvas-container">
+                    <canvas id="agentsBarChart"></canvas>
+                </div>
+            </div>
+
         </div>
 
         <!-- Lista de Comandos -->

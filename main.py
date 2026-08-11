@@ -47,6 +47,7 @@ ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
+    # --- Módulo de Aplicaciones & Archivos ---
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
@@ -55,10 +56,11 @@ PALABRAS_CLAVE_ACCION = [
     "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar",
     "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
     "cancion", "musica", "adivina", "reconoce", "identifica", "sonando",
-    "programa", "programar", "codigo", "script","sensor",
-    "electronica", "hardware", "placa", "microcontrolador",
+    "programa", "programar", "codigo", "script",
     "teams", "outlook", "vscode", "meet", "drive", "trabajo",
-    "imagen", "crea", "dibujar"
+    "imagen", "dibujar", "sensor", "electronica", "hardware", "placa", "microcontrolador",
+    "componente", "pin", "voltaje", "circuito", "gpio","rendimiento", "productividad", "cpu", "ram", "memoria",
+    "reporte", "metricas", "optimiza", "recursos", "sistema", "agentes"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -604,7 +606,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             else:
                 _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
             return
-
         palabras_lista = orden_limpia_sin_acentos.split()
         es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
         es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
