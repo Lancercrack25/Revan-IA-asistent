@@ -16,8 +16,7 @@ from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
 from src.Automation.work_apps_actions import abrir_teams, abrir_outlook, abrir_vscode, abrir_google_meet, abrir_google_drive
 from src.Interfaces.servidor import (iniciar_servidor_ui,transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo,
-    registrar_manejador_comando_texto,registrar_manejador_comando_coder,registrar_manejador_comando_creative,transmitir_respuesta_coder_desde_hilo_externo,
-    transmitir_respuesta_creative_desde_hilo_externo,transmitir_rendimiento_desde_hilo_externo,
+    registrar_manejador_comando_texto,registrar_manejador_comando_coder,registrar_manejador_comando_creative,transmitir_respuesta_coder_desde_hilo_externo,transmitir_respuesta_creative_desde_hilo_externo,transmitir_rendimiento_desde_hilo_externo,
 )
 from src.Productividad.rendimiento_general import obtener_snapshot_completo
 from src.Database.init import inicializar_base_datos
@@ -422,8 +421,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                 "buzon", "ultimos correos", "cuales son los correos", "cuales son los ultimos correos",
                 "que correos tengo", "mis ultimos correos"
             ]
-        )
-        
+        )       
         es_redaccion_asistida = any(p in orden_limpia_sin_acentos for p in ["ayudame a redactar", "redacta un correo", "escribe un correo", "haz un correo"])
         es_envio_directo = not es_redaccion_asistida and any(p in orden_limpia_sin_acentos for p in ["enviar correo", "manda un correo", "mandar correo", "envia un correo", "manda correo", "envia correo"])
         es_confirmar_mail = any(p in orden_limpia_sin_acentos for p in ["confirma el correo", "envia el correo", "confirmo correo"])
@@ -567,7 +565,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     return
             except Exception as err_wa:
                 print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
-        # --- 6. MÓDULO CÁMARA Y CONTROL DE ESFERA ---
         palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
         palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
 

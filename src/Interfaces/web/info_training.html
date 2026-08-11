@@ -12,7 +12,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
-            background-color: #030712;
+            background-color: #0d0312;
             color: #00f0ff;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
@@ -272,7 +272,6 @@
         // Configurar fuentes globales de Chart.js
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
-
         // 1. Inicialización Gráfica Hardware (Line Chart)
         const ctxHardware = document.getElementById('hardwareChart').getContext('2d');
         const hardwareChart = new Chart(ctxHardware, {
@@ -295,7 +294,7 @@
                         data: [],
                         borderColor: '#ff0055',
                         backgroundColor: 'rgba(255, 0, 85, 0.1)',
-                        borderWidth: 2,
+                        borderWidth: 6,
                         pointRadius: 2,
                         fill: true,
                         tension: 0.2
@@ -356,7 +355,6 @@
                 plugins: { legend: { display: false } }
             }
         });
-
         // Conexión WebSocket
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
