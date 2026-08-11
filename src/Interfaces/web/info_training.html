@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REVAN - Módulo Entrenamiento IA</title>
+    <title>REVAN - Módulo de Productividad & Telemetría</title>
     <link rel="shortcut icon" href="#">
     <link rel="stylesheet" href="/styles/dashboard.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -19,7 +21,7 @@
             align-items: flex-start;
         }
         .module-container {
-            max-width: 950px;
+            max-width: 1000px;
             width: 100%;
             background: rgba(10, 15, 30, 0.85);
             border: 1px solid rgba(0, 240, 255, 0.3);
@@ -65,21 +67,6 @@
             color: #030712;
             box-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
         }
-        .banner-wrapper {
-            position: relative;
-            width: 100%;
-            height: 260px;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(0, 240, 255, 0.3);
-        }
-        .banner-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: brightness(0.8) contrast(1.1);
-        }
         .section-title {
             font-size: 1.2rem;
             color: #ffffff;
@@ -94,9 +81,28 @@
             font-size: 1rem;
             margin-bottom: 2rem;
         }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .chart-card {
+            background: rgba(0, 240, 255, 0.02);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 12px;
+            padding: 1.2rem;
+            box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.05);
+        }
+        .chart-card h3 {
+            font-size: 1rem;
+            color: #ffffff;
+            margin-bottom: 1rem;
+            letter-spacing: 0.5px;
+        }
         .keywords-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 1rem;
         }
         .keyword-card {
@@ -127,42 +133,149 @@
     <div class="module-container">
         <div class="header-bar">
             <div class="header-title">
-                <span>Módulo de Control</span>
-                <h1>ENTRENAMIENTO & REFINAMIENTO IA</h1>
+                <span>Módulo de Telemetría</span>
+                <h1>PRODUCTIVIDAD & RENDIMIENTO</h1>
             </div>
             <a href="/" class="btn-back">← Volver al Dashboard</a>
         </div>
 
-        <div class="banner-wrapper">
-            <img src="https://images.unsplash.com/photo-1677442136019-21780efad99a?q=80&w=1000&auto=format&fit=crop" alt="Redes Neuronales IA" class="banner-img" loading="lazy" 
-         decoding="async">
-        </div>
-
-        <h2 class="section-title">🧠 Capacidades del Módulo</h2>
+        <h2 class="section-title">📊 Telemetría en Tiempo Real</h2>
         <p class="description">
-            Gestiona el ajuste fino (fine-tuning) de las respuestas de REVAN, el reentrenamiento con datasets locales y la retroalimentación directa del usuario para mejorar la precisión y adaptación del comportamiento táctico.
+            Monitor de estado para medir la carga de hardware local y el volumen de peticiones procesadas por los agentes subordinados de REVAN.
         </p>
 
-        <h2 class="section-title">💬 Palabras Clave y Comandos Activos</h2>
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>🖥️ Consumo de Hardware (CPU & RAM)</h3>
+                <canvas id="hardwareChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>🤖 Actividad y Tareas por Agente</h3>
+                <canvas id="agentsChart"></canvas>
+            </div>
+        </div>
+
+        <h2 class="section-title">💬 Comandos de Diagnóstico Activos</h2>
         <div class="keywords-grid">
             <div class="keyword-card">
-                <strong>Feedback de Respuesta</strong>
-                <code>"eso es incorrecto"</code> | <code>"aprende esto: [Dato]"</code>
+                <strong>Estado de Rendimiento</strong>
+                <code>"reporte de productividad"</code>
             </div>
             <div class="keyword-card">
-                <strong>Ejecución Fine-Tuning</strong>
-                <code>"inicia entrenamiento"</code> | <code>"reentrena modelo"</code>
+                <strong>Uso de Hardware</strong>
+                <code>"estado del sistema"</code>
             </div>
             <div class="keyword-card">
-                <strong>Métricas de Aprendizaje</strong>
-                <code>"estado del modelo"</code> | <code>"nivel de precisión"</code>
+                <strong>Métricas de Agentes</strong>
+                <code>"rendimiento de agentes"</code>
             </div>
             <div class="keyword-card">
-                <strong>Carga de Datasets</strong>
-                <code>"importa datos de entrenamiento"</code>
+                <strong>Limpieza de Recursos</strong>
+                <code>"optimiza memoria"</code>
             </div>
         </div>
     </div>
-    <script src="/static/dashboard.js"></script>
+
+    <script>
+        // Configuración Inicial Gráfica 1: Hardware
+        const ctxHardware = document.getElementById('hardwareChart').getContext('2d');
+        const hardwareChart = new Chart(ctxHardware, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'CPU (%)',
+                        data: [],
+                        borderColor: '#00f0ff',
+                        backgroundColor: 'rgba(0, 240, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'RAM (%)',
+                        data: [],
+                        borderColor: '#ff0055',
+                        backgroundColor: 'rgba(255, 0, 85, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' } }
+                },
+                plugins: { legend: { labels: { color: '#ffffff' } } }
+            }
+        });
+
+        // Configuración Inicial Gráfica 2: Agentes
+        const ctxAgents = document.getElementById('agentsChart').getContext('2d');
+        const agentsChart = new Chart(ctxAgents, {
+            type: 'bar',
+            data: {
+                labels: ['Coder', 'Creative', 'System', 'Orchestrator'],
+                datasets: [{
+                    label: 'Tareas Procesadas',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#00f0ff', '#7000ff', '#ff0055', '#00ff66'],
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // Conexión en vivo por WebSocket
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+
+                if (data.tipo === 'rendimiento_update') {
+                    const metrics = data.datos;
+
+                    // Mantener un máximo de 10 muestras en pantalla
+                    if (hardwareChart.data.labels.length >= 10) {
+                        hardwareChart.data.labels.shift();
+                        hardwareChart.data.datasets[0].data.shift();
+                        hardwareChart.data.datasets[1].data.shift();
+                    }
+
+                    // Actualizar Líneas de Hardware
+                    hardwareChart.data.labels.push(metrics.timestamp);
+                    hardwareChart.data.datasets[0].data.push(metrics.cpu);
+                    hardwareChart.data.datasets[1].data.push(metrics.ram);
+                    hardwareChart.update();
+
+                    // Actualizar Barras de Agentes
+                    if (metrics.agentes) {
+                        agentsChart.data.datasets[0].data = [
+                            metrics.agentes.coder || 0,
+                            metrics.agentes.creative || 0,
+                            metrics.agentes.system || 0,
+                            metrics.agentes.orchestrator || 0
+                        ];
+                        agentsChart.update();
+                    }
+                }
+            } catch (err) {
+                console.error("Error al procesar paquete WebSocket:", err);
+            }
+        };
+    </script>
 </body>
 </html>
