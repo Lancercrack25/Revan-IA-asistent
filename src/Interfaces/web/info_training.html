@@ -3,450 +3,420 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REVAN - Módulo de Telemetría Avanzada</title>
-    <link rel="shortcut icon" href="#">
-    <link rel="stylesheet" href="/styles/dashboard.css">
-    <!-- Chart.js CDN -->
+    <title>REVAN - Telemetría & Rendimiento</title>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@500;600;700&display=swap');
+
+        :root {
+            --bg-dark: #050811;
+            --panel-bg: rgba(10, 16, 30, 0.85);
+            --cyan-glow: #00f0ff;
+            --pink-glow: #ff0055;
+            --green-glow: #00ffaa;
+            --yellow-glow: #ffaa00;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --border-neon: rgba(0, 240, 255, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
         body {
-            background-color: #090312;
-            color: #00f0ff;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 70%),
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            color: var(--text-main);
             min-height: 100vh;
-            padding: 1.5rem;
+            padding: 25px;
             display: flex;
             justify-content: center;
-            align-items: flex-start;
+            align-items: center;
         }
 
-        .module-container {
-            max-width: 1100px;
+        .telemetry-container {
             width: 100%;
-            background: rgba(10, 15, 30, 0.85);
-            border: 1px solid rgba(0, 238, 255, 0.384);
+            max-width: 1300px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-neon);
             border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 0 35px rgba(0, 240, 255, 0.15);
             backdrop-filter: blur(12px);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
         }
 
-        /* Header HUD */
-        .header-bar {
+        /* HEADER */
+        .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(0, 240, 255, 0.2);
-            padding-bottom: 1rem;
-            margin-bottom: 1.2rem;
+            border-bottom: 1px solid var(--border-neon);
+            padding-bottom: 15px;
         }
 
-        .header-title h1 {
-            font-size: 1.7rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-            color: #00f0ff;
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
-        }
-
-        .header-title span {
-            font-size: 0.8rem;
-            color: #64748b;
-            text-transform: uppercase;
+        .title-area h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
             letter-spacing: 2px;
-            display: block;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .title-area h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            color: var(--cyan-glow);
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
         }
 
         .btn-back {
-            background: rgba(0, 240, 255, 0.05);
-            border: 1px solid #00f0ff;
-            color: #00f0ff;
-            padding: 0.5rem 1.1rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            padding: 10px 20px;
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 0.85rem;
             transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
         }
 
         .btn-back:hover {
-            background: #00f0ff;
-            color: #030712;
-            box-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+            background: var(--cyan-glow);
+            color: #000;
+            box-shadow: 0 0 20px var(--cyan-glow);
         }
 
-        .section-title {
-            font-size: 1.1rem;
-            color: #ffffff;
-            margin-bottom: 0.8rem;
-            margin-top: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Tarjetas de Resumen KPI */
-        .telemetry-summary {
+        /* METRICS CARDS */
+        .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
         }
 
-        .summary-card {
-            background: rgba(0, 240, 255, 0.03);
-            border: 1px solid rgba(0, 240, 255, 0.15);
-            border-left: 4px solid #00f0ff;
-            padding: 0.8rem 1rem;
-            border-radius: 6px;
+        .kpi-card {
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 15px 20px;
+            position: relative;
+            overflow: hidden;
         }
 
-        .summary-card label {
-            font-size: 0.75rem;
-            color: #64748b;
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: var(--cyan-glow);
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .kpi-card.ram::before { background: var(--pink-glow); box-shadow: 0 0 10px var(--pink-glow); }
+        .kpi-card.ws::before { background: var(--green-glow); box-shadow: 0 0 10px var(--green-glow); }
+        .kpi-card.agent::before { background: var(--yellow-glow); box-shadow: 0 0 10px var(--yellow-glow); }
+
+        .kpi-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
-            display: block;
+            font-weight: 600;
         }
 
-        .summary-card .value {
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: #ffffff;
-            margin-top: 0.2rem;
+        .kpi-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 5px;
         }
 
-        /* Layout Grid 2x2 para 4 Gráficas */
-        .charts-grid-4 {
+        /* CHARTS SECTION */
+        .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
-            gap: 1.2rem;
-            margin-bottom: 1.8rem;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
         }
 
-        .chart-card {
-            background: rgba(0, 240, 255, 0.02);
-            border: 1px solid rgba(0, 240, 255, 0.2);
+        .chart-box {
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid var(--border-neon);
             border-radius: 12px;
-            padding: 1rem;
-            box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.03);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
-        .chart-card h3 {
-            font-size: 0.9rem;
-            color: #ffffff;
-            margin-bottom: 0.8rem;
-            letter-spacing: 0.5px;
+        .chart-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-main);
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 8px;
         }
 
-        .canvas-container {
+        .chart-wrapper {
             position: relative;
-            height: 200px;
             width: 100%;
+            height: 260px;
+            display: block;
         }
 
-        /* Comandos Tácticos */
+        /* KEYWORDS SECTION */
+        .keywords-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
         .keywords-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 0.8rem;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
         }
 
-        .keyword-card {
-            background: rgba(0, 240, 255, 0.03);
-            border-left: 3px solid #00f0ff;
-            border-top: 1px solid rgba(0, 240, 255, 0.1);
-            border-right: 1px solid rgba(0, 240, 255, 0.1);
-            border-bottom: 1px solid rgba(0, 240, 255, 0.1);
-            padding: 0.8rem 1rem;
-            border-radius: 6px;
+        .kw-card {
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
         }
 
-        .keyword-card strong {
-            color: #ffffff;
-            display: block;
-            font-size: 0.85rem;
-            margin-bottom: 0.3rem;
+        .kw-title {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            margin-bottom: 10px;
+            font-weight: 700;
         }
 
-        .keyword-card code {
-            color: #00f0ff;
+        .tag {
+            display: inline-block;
             background: rgba(0, 240, 255, 0.1);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            padding: 4px 10px;
+            border-radius: 5px;
             font-size: 0.8rem;
-        }
-
-        @media (max-width: 900px) {
-            .charts-grid-4 { grid-template-columns: 1fr; }
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <div class="module-container">
-        <!-- Encabezado HUD REVAN -->
-        <div class="header-bar">
-            <div class="header-title">
-                <span>Módulo de Control</span>
-                <h1>PRODUCTIVIDAD & TELEMETRÍA</h1>
+
+    <div class="telemetry-container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="title-area">
+                <h2>Módulo de Control</h2>
+                <h1>Productividad & Telemetría</h1>
             </div>
             <a href="/" class="btn-back">← Volver al Dashboard</a>
         </div>
 
-        <!-- KPI Resumen -->
-        <div class="telemetry-summary">
-            <div class="summary-card">
-                <label>CPU USO</label>
-                <div class="value" id="valCpu">0%</div>
+        <!-- TARJETAS DE MÉTRICAS -->
+        <div class="kpi-grid">
+            <div class="kpi-card cpu">
+                <div class="kpi-label">CPU Uso</div>
+                <div class="kpi-value" id="kpi-cpu">0%</div>
             </div>
-            <div class="summary-card">
-                <label>RAM USO</label>
-                <div class="value" id="valRam">0%</div>
+            <div class="kpi-card ram">
+                <div class="kpi-label">RAM Uso</div>
+                <div class="kpi-value" id="kpi-ram">0%</div>
             </div>
-            <div class="summary-card">
-                <label>LATENCIA WS</label>
-                <div class="value" id="valPing" style="color: #00f0ff;">-- ms</div>
+            <div class="kpi-card ws">
+                <div class="kpi-label">Canal WS</div>
+                <div class="kpi-value" id="kpi-ws" style="color: var(--yellow-glow);">CONECTANDO...</div>
             </div>
-            <div class="summary-card">
-                <label>TOTAL TAREAS</label>
-                <div class="value" id="valTotalAgentes">0</div>
+            <div class="kpi-card agent">
+                <div class="kpi-label">Tareas de Agentes</div>
+                <div class="kpi-value" id="kpi-agentes">0</div>
             </div>
         </div>
 
-        <!-- GRID 2X2 DE 4 GRÁFICAS -->
-        <h2 class="section-title">📊 Centro de Mando de Telemetría</h2>
-        <div class="charts-grid-4">
-            
-            <!-- Gráfica 1: Hardware -->
-            <div class="chart-card">
-                <h3>🖥️ Consumo de Hardware (CPU & RAM)</h3>
-                <div class="canvas-container">
-                    <canvas id="hardwareChart"></canvas>
+        <!-- GRÁFICAS PRINCIPALES -->
+        <div class="charts-grid">
+            <div class="chart-box">
+                <div class="chart-title">💻 Consumo de Hardware (CPU & RAM)</div>
+                <div class="chart-wrapper">
+                    <canvas id="hardwareChart" height="260"></canvas>
                 </div>
             </div>
 
-            <!-- Gráfica 2: Proporción de Agentes (Doughnut) -->
-            <div class="chart-card">
-                <h3>🤖 Distribución de Carga por Agente</h3>
-                <div class="canvas-container">
-                    <canvas id="agentsDoughnutChart"></canvas>
+            <div class="chart-box">
+                <div class="chart-title">🤖 Actividad y Tareas por Agente</div>
+                <div class="chart-wrapper">
+                    <canvas id="agentsChart" height="260"></canvas>
                 </div>
             </div>
-
-            <!-- Gráfica 3: Latencia en Tiempo Real -->
-            <div class="chart-card">
-                <h3>⚡ Latencia WebSocket (Respuesta en ms)</h3>
-                <div class="canvas-container">
-                    <canvas id="latencyChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Gráfica 4: Histórico por Agente (Barras) -->
-            <div class="chart-card">
-                <h3>📈 Métricas de Rendimiento por Agente</h3>
-                <div class="canvas-container">
-                    <canvas id="agentsBarChart"></canvas>
-                </div>
-            </div>
-
         </div>
 
-        <!-- Lista de Comandos -->
-        <h2 class="section-title">💬 Palabras Clave y Comandos Activos</h2>
-        <div class="keywords-grid">
-            <div class="keyword-card">
-                <strong>Estado de Rendimiento</strong>
-                <code>"reporte de productividad"</code>
-            </div>
-            <div class="keyword-card">
-                <strong>Uso de Hardware</strong>
-                <code>"estado del sistema"</code>
-            </div>
-            <div class="keyword-card">
-                <strong>Métricas de Agentes</strong>
-                <code>"rendimiento de agentes"</code>
-            </div>
-            <div class="keyword-card">
-                <strong>Limpieza de Recursos</strong>
-                <code>"optimiza memoria"</code>
+        <!-- COMANDOS ACTIVOS -->
+        <div class="keywords-section">
+            <div class="chart-title">💬 Palabras Clave y Comandos Activos</div>
+            <div class="keywords-grid">
+                <div class="kw-card">
+                    <div class="kw-title">Estado de Rendimiento</div>
+                    <span class="tag">"reporte de productividad"</span>
+                </div>
+                <div class="kw-card">
+                    <div class="kw-title">Uso de Hardware</div>
+                    <span class="tag">"estado del sistema"</span>
+                </div>
+                <div class="kw-card">
+                    <div class="kw-title">Métricas de Agentes</div>
+                    <span class="tag">"rendimiento de agentes"</span>
+                </div>
             </div>
         </div>
     </div>
-    <script>
-        // Configurar fuentes globales de Chart.js
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
 
-        // 1. Inicialización Gráfica Hardware
-        const ctxHardware = document.getElementById('hardwareChart').getContext('2d');
-        const hardwareChart = new Chart(ctxHardware, {
+    <script>
+        // Deshabilitar animaciones para cero parpadeos
+        Chart.defaults.animation = false;
+
+        const maxPoints = 12;
+        // Iniciar gráfico de líneas en cero/vacío
+        const initialLabels = Array(maxPoints).fill('--:--:--');
+
+        // 1. Inicializar Gráfica Hardware
+        const hwCtx = document.getElementById('hardwareChart').getContext('2d');
+        const hardwareChart = new Chart(hwCtx, {
             type: 'line',
             data: {
-                labels: [],
+                labels: [...initialLabels],
                 datasets: [
                     {
                         label: 'CPU (%)',
-                        data: [],
+                        data: Array(maxPoints).fill(0),
                         borderColor: '#00f0ff',
-                        backgroundColor: 'rgba(0, 240, 255, 0.1)',
+                        backgroundColor: 'rgba(0, 240, 255, 0.15)',
                         borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
+                        tension: 0.3,
                         fill: true,
-                        tension: 0.3
+                        pointRadius: 2
                     },
                     {
                         label: 'RAM (%)',
-                        data: [],
+                        data: Array(maxPoints).fill(0),
                         borderColor: '#ff0055',
-                        backgroundColor: 'rgba(255, 0, 85, 0.1)',
+                        backgroundColor: 'rgba(255, 0, 85, 0.15)',
                         borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
+                        tension: 0.3,
                         fill: true,
-                        tension: 0.3
+                        pointRadius: 2
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false,
-                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        max: 100, 
-                        grid: { color: 'rgba(0, 240, 255, 0.08)' },
-                        ticks: { color: '#64748b' }
-                    },
-                    x: { 
-                        grid: { color: 'rgba(0, 240, 255, 0.08)' },
-                        ticks: { color: '#64748b', maxRotation: 0 }
-                    }
+                    y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } },
+                    x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b' } }
                 },
-                plugins: {
-                    legend: { labels: { color: '#ffffff', boxWidth: 12 } }
-                }
+                plugins: { legend: { labels: { color: '#e2e8f0' } } }
             }
         });
 
-        // 2. Inicialización Gráfica Agentes
-        const ctxAgents = document.getElementById('agentsChart').getContext('2d');
-        const agentsChart = new Chart(ctxAgents, {
+        // 2. Inicializar Gráfica Agentes (Barras)
+        const agCtx = document.getElementById('agentsChart').getContext('2d');
+        const agentsChart = new Chart(agCtx, {
             type: 'bar',
             data: {
                 labels: ['Coder', 'Creative', 'System', 'Orchestrator'],
                 datasets: [{
                     label: 'Tareas Procesadas',
                     data: [0, 0, 0, 0],
-                    backgroundColor: ['#00f0ff', '#7000ff', '#ff0055', '#00ff66'],
+                    backgroundColor: ['#00f0ff', '#ff0055', '#00ffaa', '#ffaa00'],
                     borderRadius: 4
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false,
                 scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        grid: { color: 'rgba(0, 240, 255, 0.08)' },
-                        ticks: { color: '#64748b', precision: 0 }
-                    },
-                    x: { 
-                        grid: { display: false },
-                        ticks: { color: '#ffffff' }
-                    }
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', precision: 0 } },
+                    x: { grid: { display: false }, ticks: { color: '#e2e8f0' } }
                 },
                 plugins: { legend: { display: false } }
             }
         });
 
-        // Conexión WebSocket
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+        // CONEXIÓN WEBSOCKET 100% REAL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-        const valWs = document.getElementById('valWs');
-
-        socket.onopen = () => {
-            valWs.innerText = 'CONECTADO';
-            valWs.style.color = '#00ff66';
+        socket.onopen = function() {
+            document.getElementById('kpi-ws').innerText = 'CONECTADO';
+            document.getElementById('kpi-ws').style.color = '#00ffaa';
         };
 
-        socket.onclose = () => {
-            valWs.innerText = 'DESCONECTADO';
-            valWs.style.color = '#ff0055';
+        socket.onclose = function() {
+            document.getElementById('kpi-ws').innerText = 'DESCONECTADO';
+            document.getElementById('kpi-ws').style.color = '#ff0055';
         };
 
-        socket.onmessage = (event) => {
+        // AL RECIBIR DATOS REALES DE PYTHON
+        socket.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
+                const d = data.datos || data.data || data;
 
-                if (data.tipo === 'rendimiento_update') {
-                    const metrics = data.datos || {};
+                const hora = new Date().toLocaleTimeString().split(' ')[0];
 
-                    // Extraer valores con parseo seguro para prevenir NaN y concatenaciones tipo [object Object]
-                    const rawCpu = metrics.cpu !== undefined ? metrics.cpu : (metrics.cpu_usage || 0);
-                    const rawRam = metrics.ram !== undefined ? metrics.ram : (metrics.ram_usage || 0);
-                    
-                    const valCpu = Number(rawCpu) || 0;
-                    const valRam = Number(rawRam) || 0;
+                // --- A) ACTUALIZAR CPU Y RAM ---
+                let cpuVal = d.cpu?.porcentaje ?? d.cpu ?? d.cpu_percent;
+                let ramVal = d.ram?.porcentaje_uso ?? d.ram ?? d.ram_percent;
 
-                    // Actualizar indicadores superiores
-                    document.getElementById('valCpu').innerText = `${Math.round(valCpu)}%`;
-                    document.getElementById('valRam').innerText = `${Math.round(valRam)}%`;
+                if (cpuVal !== undefined && ramVal !== undefined) {
+                    cpuVal = Math.round(Number(cpuVal));
+                    ramVal = Math.round(Number(ramVal));
 
-                    // Parseo seguro de tareas de agentes
-                    let totalTareas = 0;
-                    let agentValues = [0, 0, 0, 0];
+                    document.getElementById('kpi-cpu').innerText = `${cpuVal}%`;
+                    document.getElementById('kpi-ram').innerText = `${ramVal}%`;
 
-                    if (metrics.agentes && typeof metrics.agentes === 'object') {
-                        const ag = metrics.agentes;
-                        
-                        // Si vienen como números
-                        const coder = Number(ag.coder || ag.Coder || 0);
-                        const creative = Number(ag.creative || ag.Creative || 0);
-                        const system = Number(ag.system || ag.System || 0);
-                        const orchestrator = Number(ag.orchestrator || ag.Orchestrator || 0);
-
-                        agentValues = [coder, creative, system, orchestrator];
-                        totalTareas = coder + creative + system + orchestrator;
-                    }
-
-                    document.getElementById('valTotalAgentes').innerText = totalTareas;
-
-                    // Formato limpio de tiempo para el Eje X (Solo HH:MM:SS)
-                    let horaTexto = metrics.timestamp || new Date().toLocaleTimeString();
-                    if (horaTexto.includes(' ')) {
-                        horaTexto = horaTexto.split(' ')[1]; // Si traía fecha completa "2026-08-11 13:16:38"
-                    }
-
-                    // Limitar a máximo 8 muestras para que las columnas/puntos queden espaciados uniformemente
-                    if (hardwareChart.data.labels.length >= 8) {
-                        hardwareChart.data.labels.shift();
-                        hardwareChart.data.datasets[0].data.shift();
-                        hardwareChart.data.datasets[1].data.shift();
-                    }
-
-                    // Insertar puntos uniformes
-                    hardwareChart.data.labels.push(horaTexto);
-                    hardwareChart.data.datasets[0].data.push(valCpu);
-                    hardwareChart.data.datasets[1].data.push(valRam);
-                    hardwareChart.update();
-
-                    // Actualizar gráfica de barras de Agentes
-                    agentsChart.data.datasets[0].data = agentValues;
-                    agentsChart.update();
+                    hardwareChart.data.labels.shift();
+                    hardwareChart.data.labels.push(hora);
+                    hardwareChart.data.datasets[0].data.shift();
+                    hardwareChart.data.datasets[0].data.push(cpuVal);
+                    hardwareChart.data.datasets[1].data.shift();
+                    hardwareChart.data.datasets[1].data.push(ramVal);
+                    hardwareChart.update('none');
                 }
-            } catch (err) {
-                console.error("Error procesando telemetría:", err);
+
+                // --- B) ACTUALIZAR AGENTES REALES ---
+                if (d.agentes) {
+                    const coder = Number(d.agentes.coder || 0);
+                    const creative = Number(d.agentes.creative || 0);
+                    const system = Number(d.agentes.system || 0);
+                    const orchestrator = Number(d.agentes.orchestrator || 0);
+
+                    agentsChart.data.datasets[0].data = [coder, creative, system, orchestrator];
+                    agentsChart.update('none');
+
+                    document.getElementById('kpi-agentes').innerText = coder + creative + system + orchestrator;
+                }
+
+            } catch (e) {
+                console.error("Error leyendo datos del WebSocket:", e);
             }
         };
     </script>

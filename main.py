@@ -60,7 +60,7 @@ PALABRAS_CLAVE_ACCION = [
     "teams", "outlook", "vscode", "meet", "drive", "trabajo",
     "imagen", "dibujar", "sensor", "electronica", "hardware", "placa", "microcontrolador",
     "componente", "pin", "voltaje", "circuito", "gpio","rendimiento", "productividad", "cpu", "ram", "memoria",
-    "reporte", "metricas", "optimiza", "recursos", "sistema", "agentes"
+    "reporte", "metricas", "optimiza", "recursos", "sistema"
 ]
 
 def quitar_acentos(texto: str) -> str:
@@ -669,7 +669,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "redes")
             _hablar_y_mostrar(analizar_red())
             return
-
         sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
         palabras_abrir_app = ["abre", "abrir", "inicia", "iniciar", "lanza", "lanzar"]
         if any(p in orden_limpia_sin_acentos.split() for p in palabras_abrir_app):
