@@ -1,6 +1,8 @@
 import os
 import json
 import asyncio
+import time
+import psutil
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -12,13 +14,52 @@ loop_real_servidor = None
 manejador_comando_texto_callback = None
 manejador_comando_coder_callback = None
 manejador_comando_creative_callback = None
+# Contador global de actividad por agente/módulo
+METRICAS_AGENTES = {
+    "coder": 0,
+    "creative": 0,
+    "system": 0,
+    "orchestrator": 0
+}
+
+def registrar_actividad_agente(agente: str):
+    """Incrementa el contador de llamadas cuando un agente procesa un comando."""
+    clave = agente.lower()
+    if clave in METRICAS_AGENTES:
+        METRICAS_AGENTES[clave] += 1
+
+async def bucle_telemetria_rendimiento():
+    """Toma datos reales del hardware y agentes en segundo plano y los emite cada 2 segundos."""
+    while True:
+        try:
+            if conexiones_activas:
+                cpu = psutil.cpu_percent(interval=None)
+                ram = psutil.virtual_memory().percent
+                hora_actual = time.strftime("%H:%M:%S")
+
+                datos_snapshot = {
+                    "timestamp": hora_actual,
+                    "cpu": cpu,
+                    "ram": ram,
+                    "agentes": METRICAS_AGENTES
+                }
+
+                await actualizar_rendimiento(datos_snapshot)
+        except Exception as e:
+            print(f"[Telemetria Error]: {e}")
+
+        await asyncio.sleep(2)
 
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
     global loop_real_servidor
     loop_real_servidor = asyncio.get_running_loop()
     print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
+    
+    # Inicia la recolección continua de telemetría
+    tarea_telemetria = asyncio.create_task(bucle_telemetria_rendimiento())
     yield
+    tarea_telemetria.cancel()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -141,7 +182,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     conexiones_activas.add(websocket)
-    print("[WebSocket]: Cliente (Dashboard/Esfera/Coder/Creative) conectado al canal de control.")
+    print("[WebSocket]: Cliente (Dashboard/Esfera/Coder/Creative/Productividad) conectado al canal de control.")
 
     try:
         while True:
@@ -165,6 +206,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif tipo_mensaje == "coder_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Coder]: Orden recibida desde UI dedicada -> '{prompt}'")
+                    registrar_actividad_agente("coder")
 
                     if manejador_comando_coder_callback and prompt:
                         if asyncio.iscoroutinefunction(manejador_comando_coder_callback):
@@ -176,6 +218,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif tipo_mensaje == "creative_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Creative]: Orden recibida desde UI dedicada -> '{prompt}'")
+                    registrar_actividad_agente("creative")
 
                     if manejador_comando_creative_callback and prompt:
                         if asyncio.iscoroutinefunction(manejador_comando_creative_callback):
