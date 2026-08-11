@@ -267,12 +267,12 @@
             </div>
         </div>
     </div>
-
     <script>
         // Configurar fuentes globales de Chart.js
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
-        // 1. Inicialización Gráfica Hardware (Line Chart)
+
+        // 1. Inicialización Gráfica Hardware
         const ctxHardware = document.getElementById('hardwareChart').getContext('2d');
         const hardwareChart = new Chart(ctxHardware, {
             type: 'line',
@@ -285,26 +285,28 @@
                         borderColor: '#00f0ff',
                         backgroundColor: 'rgba(0, 240, 255, 0.1)',
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
                         fill: true,
-                        tension: 0.2
+                        tension: 0.3
                     },
                     {
                         label: 'RAM (%)',
                         data: [],
                         borderColor: '#ff0055',
                         backgroundColor: 'rgba(255, 0, 85, 0.1)',
-                        borderWidth: 6,
-                        pointRadius: 2,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
                         fill: true,
-                        tension: 0.2
+                        tension: 0.3
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false, // Desactivar animación en update para evitar comportamiento raro
+                animation: false,
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                     y: { 
@@ -324,7 +326,7 @@
             }
         });
 
-        // 2. Inicialización Gráfica Agentes (Bar Chart)
+        // 2. Inicialización Gráfica Agentes
         const ctxAgents = document.getElementById('agentsChart').getContext('2d');
         const agentsChart = new Chart(ctxAgents, {
             type: 'bar',
@@ -355,6 +357,7 @@
                 plugins: { legend: { display: false } }
             }
         });
+
         // Conexión WebSocket
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
@@ -376,50 +379,63 @@
                 const data = JSON.parse(event.data);
 
                 if (data.tipo === 'rendimiento_update') {
-                    const metrics = data.datos;
+                    const metrics = data.datos || {};
 
-                    // Actualizar métricas textuales
-                    document.getElementById('valCpu').innerText = `${Math.round(metrics.cpu)}%`;
-                    document.getElementById('valRam').innerText = `${Math.round(metrics.ram)}%`;
+                    // Extraer valores con parseo seguro para prevenir NaN y concatenaciones tipo [object Object]
+                    const rawCpu = metrics.cpu !== undefined ? metrics.cpu : (metrics.cpu_usage || 0);
+                    const rawRam = metrics.ram !== undefined ? metrics.ram : (metrics.ram_usage || 0);
+                    
+                    const valCpu = Number(rawCpu) || 0;
+                    const valRam = Number(rawRam) || 0;
 
+                    // Actualizar indicadores superiores
+                    document.getElementById('valCpu').innerText = `${Math.round(valCpu)}%`;
+                    document.getElementById('valRam').innerText = `${Math.round(valRam)}%`;
+
+                    // Parseo seguro de tareas de agentes
                     let totalTareas = 0;
-                    if (metrics.agentes) {
-                        totalTareas = Object.values(metrics.agentes).reduce((a, b) => a + b, 0);
+                    let agentValues = [0, 0, 0, 0];
+
+                    if (metrics.agentes && typeof metrics.agentes === 'object') {
+                        const ag = metrics.agentes;
+                        
+                        // Si vienen como números
+                        const coder = Number(ag.coder || ag.Coder || 0);
+                        const creative = Number(ag.creative || ag.Creative || 0);
+                        const system = Number(ag.system || ag.System || 0);
+                        const orchestrator = Number(ag.orchestrator || ag.Orchestrator || 0);
+
+                        agentValues = [coder, creative, system, orchestrator];
+                        totalTareas = coder + creative + system + orchestrator;
                     }
+
                     document.getElementById('valTotalAgentes').innerText = totalTareas;
 
-                    // Formatear timestamp enviando solo HORA (HH:MM:SS) si viene largo
-                    let labelHora = metrics.timestamp;
-                    if (labelHora.includes(' ')) {
-                        labelHora = labelHora.split(' ')[1];
+                    // Formato limpio de tiempo para el Eje X (Solo HH:MM:SS)
+                    let horaTexto = metrics.timestamp || new Date().toLocaleTimeString();
+                    if (horaTexto.includes(' ')) {
+                        horaTexto = horaTexto.split(' ')[1]; // Si traía fecha completa "2026-08-11 13:16:38"
                     }
 
-                    // Limitar gráfica a un máximo de 10 muestras
-                    if (hardwareChart.data.labels.length >= 10) {
+                    // Limitar a máximo 8 muestras para que las columnas/puntos queden espaciados uniformemente
+                    if (hardwareChart.data.labels.length >= 8) {
                         hardwareChart.data.labels.shift();
                         hardwareChart.data.datasets[0].data.shift();
                         hardwareChart.data.datasets[1].data.shift();
                     }
 
-                    // Insertar nuevos datos y refrescar de forma fluida
-                    hardwareChart.data.labels.push(labelHora);
-                    hardwareChart.data.datasets[0].data.push(metrics.cpu);
-                    hardwareChart.data.datasets[1].data.push(metrics.ram);
+                    // Insertar puntos uniformes
+                    hardwareChart.data.labels.push(horaTexto);
+                    hardwareChart.data.datasets[0].data.push(valCpu);
+                    hardwareChart.data.datasets[1].data.push(valRam);
                     hardwareChart.update();
 
                     // Actualizar gráfica de barras de Agentes
-                    if (metrics.agentes) {
-                        agentsChart.data.datasets[0].data = [
-                            metrics.agentes.coder || 0,
-                            metrics.agentes.creative || 0,
-                            metrics.agentes.system || 0,
-                            metrics.agentes.orchestrator || 0
-                        ];
-                        agentsChart.update();
-                    }
+                    agentsChart.data.datasets[0].data = agentValues;
+                    agentsChart.update();
                 }
             } catch (err) {
-                console.error("Error al procesar paquete WebSocket:", err);
+                console.error("Error procesando telemetría:", err);
             }
         };
     </script>
