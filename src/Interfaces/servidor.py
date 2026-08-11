@@ -231,6 +231,14 @@ async def enviar_respuesta_creative(texto: str):
         try: await ws.send_text(paquete)
         except Exception: conexiones_activas.discard(ws)
 
+async def actualizar_rendimiento(datos: dict):
+    """Envía el snapshot de rendimiento (hardware/agentes/módulos) al dashboard."""
+    if not conexiones_activas: return
+    paquete = json.dumps({"tipo": "rendimiento_update", "datos": datos})
+    for ws in list(conexiones_activas):
+        try: await ws.send_text(paquete)
+        except Exception: conexiones_activas.discard(ws)
+
 # --- PUENTES MULTIHILO EXTERNOS ---
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     global loop_real_servidor
@@ -257,6 +265,11 @@ def transmitir_respuesta_creative_desde_hilo_externo(texto: str):
     global loop_real_servidor
     if loop_real_servidor and loop_real_servidor.is_running():
         asyncio.run_coroutine_threadsafe(enviar_respuesta_creative(texto), loop_real_servidor)
+
+def transmitir_rendimiento_desde_hilo_externo(datos: dict):
+    global loop_real_servidor
+    if loop_real_servidor and loop_real_servidor.is_running():
+        asyncio.run_coroutine_threadsafe(actualizar_rendimiento(datos), loop_real_servidor)
 
 def iniciar_servidor_ui():
     config = uvicorn.Config(app=app, host="127.0.0.1", port=8000, log_level="warning")
