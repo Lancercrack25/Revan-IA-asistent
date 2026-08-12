@@ -154,7 +154,20 @@ class RevanCameraManager:
         self.cerrar_camara()
 
     def _ejecutar_analisis_llava(self, frame, voz_ia, sincronizar_estado_esfera):
-        """Ejecuta la visión por API y actualiza la tarjeta gráfica del HUD."""
+        """Ejecuta la visión por API y actualiza la tarjeta gráfica del HUD.
+
+        'voz_ia' se espera que sea un callable hablar(texto) -no un objeto
+        con .hablar()-. Antes esta función marcaba HABLANDO/ESPERA a mano
+        con sincronizar_estado_esfera(), sin tocar la bandera 'esta_hablando'
+        de main.py: el bucle de escucha de voz no se enteraba de que REVAN
+        estaba hablando durante un análisis de cámara y podía pisar el
+        color con ESCUCHANDO en cualquier momento -mismo bug de
+        desincronización que se corrigió para el resto de las respuestas,
+        pero que en este módulo quedaba fuera-. Ahora quien llama pasa un
+        callback ya envuelto en hablar_sincronizado() (ver main.py), así
+        que aquí ya no se toca el estado de la esfera para la parte de
+        hablar; solo se anuncia el estado PROCESANDO antes del análisis.
+        """
         if sincronizar_estado_esfera:
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
 
@@ -165,14 +178,8 @@ class RevanCameraManager:
             self.ultimo_resultado_txt = resultado
             self.tiempo_mostrar_resultado = time.time()
 
-        if sincronizar_estado_esfera:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            
         if voz_ia:
-            voz_ia.hablar(resultado)
-            
-        if sincronizar_estado_esfera:
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            voz_ia(resultado)
 
     def activar_vigilancia(self, activar=True):
         self.vigilancia_activa = activar

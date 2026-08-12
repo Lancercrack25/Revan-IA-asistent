@@ -156,6 +156,17 @@ def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
     escritorio = obtener_ruta_escritorio()
     ruta_objetivo = os.path.join(escritorio, nombre_carpeta)
 
+    # Antes esta función no validaba la ruta resultante: un nombre_carpeta
+    # como '..\\..\\Windows\\System32' escapaba del Escritorio (os.path.join
+    # lo permite) y terminaba abriéndose en Explorer sin ninguna objeción,
+    # a diferencia de crear_carpeta_sistema() -que sí llama a
+    # _es_ruta_base_segura()-. Se aplica la misma validación aquí.
+    if not _es_ruta_base_segura(ruta_objetivo):
+        return (
+            f"Señor, no voy a abrir '{nombre_carpeta}' porque la ruta resultante "
+            f"queda fuera de su carpeta de usuario."
+        )
+
     # 1. Intento directo
     if os.path.exists(ruta_objetivo) and os.path.isdir(ruta_objetivo):
         os.startfile(ruta_objetivo)
@@ -167,22 +178,19 @@ def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
         for elemento in os.listdir(escritorio):
             if elemento.lower() == nombre_carpeta.lower():
                 ruta_coincidencia = os.path.join(escritorio, elemento)
-                if os.path.isdir(ruta_coincidencia):
+                if os.path.isdir(ruta_coincidencia) and _es_ruta_base_segura(ruta_coincidencia):
                     os.startfile(ruta_coincidencia)
                     guardar_ruta_actual(ruta_coincidencia)
                     return f"Carpeta '{elemento}' localizada y abierta exitosamente."
     except Exception as e:
         print(f"Error en búsqueda secundaria: {e}")
-
     return f"Negativo, Señor. No se localizó la carpeta '{nombre_carpeta}' en el Escritorio."
-
 
 def _sanear_nombre_carpeta(nombre: str) -> str:
     """Quita caracteres inválidos en rutas de Windows para evitar que os.makedirs falle."""
     invalidos = '<>:"/\\|?*'
     limpio = "".join(c for c in nombre if c not in invalidos).strip()
     return limpio or "Contenedor_Táctico"
-
 
 def _es_ruta_base_segura(ruta_absoluta: str) -> bool:
     """Delegado a src/Security/sanitizador.py -una sola fuente de verdad
@@ -264,12 +272,10 @@ def obtener_diagnostico_hardware() -> str:
     except Exception as e:
         return f"Error al leer sensores de rendimiento: {e}"
 
-
 # --- MÓDULO DE VISIÓN NATIVE API (NVIDIA NIM / GEMINI FALLBACK) ---
 def _analizar_frame_con_llava(frame) -> str:
     try:
         creds = cargar_credenciales() or {}
-        
         # Detectar la clave de NVIDIA considerando tu nombre en el config ("NVIDIA_NIM_API_KEY")
         nvidia_key = (
             creds.get("NVIDIA_NIM_API_KEY") 
