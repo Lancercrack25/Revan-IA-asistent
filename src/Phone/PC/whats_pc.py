@@ -56,7 +56,8 @@ def preparar_envio_pc(destinatario: str, mensaje: str) -> dict:
 def ejecutar_abrir_whatsapp(url_app: str):
     """Ejecuta la apertura directa del protocolo en Windows"""
     try:
-        # Usa el comando start de Windows para invocar la URI directamente
-        os.system(f'start "" "{url_app}"')
+        # Sin shell=True: url_app viaja como un único argumento de subprocess,
+        # no como string que una shell podría reinterpretar.
+        subprocess.Popen(["cmd", "/c", "start", "", url_app], shell=False)
     except Exception as e:
         print(f"Error al abrir WhatsApp: {e}")

@@ -13,9 +13,7 @@ whatsapp_service.py: interpretar "si"/"no" como substring en cualquier
 parte de una frase no relacionada).
 
 Uso típico:
-
     gestor = GestorConfirmacion(ttl_segundos=60)
-
     def _ejecutar():
         return hacer_la_accion_real()
 
@@ -32,14 +30,8 @@ Uso típico:
 
 import time
 from typing import Callable, Optional
-
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
 
-
-# Frases cortas reconocidas como confirmación/cancelación explícita. Se
-# comparan por IGUALDAD EXACTA (tras limpiar la frase), nunca por substring
-# -así una orden larga no relacionada que contenga "si" o "no" en medio de
-# otra palabra o frase nunca dispara una acción por accidente.
 FRASES_CONFIRMAR = {
     "confirma", "confirmar", "confirmalo", "confírmalo", "procede", "adelante",
     "si", "sí", "si porfavor", "sí por favor", "ejecuta", "ejecutalo",
@@ -104,21 +96,10 @@ class GestorConfirmacion:
         return self._pendiente["descripcion"] if self.hay_pendiente() else None
 
     def procesar_respuesta(self, texto_respuesta: str) -> Optional[str]:
-        """
-        Devuelve el resultado de confirmar/cancelar si 'texto_respuesta' es
-        una respuesta corta y exacta a una de las frases reconocidas.
-        Devuelve None si no hay nada pendiente, si expiró, o si la respuesta
-        es en realidad una orden distinta no relacionada con la
-        confirmación (en cuyo caso NO se toca la acción pendiente, sigue
-        esperando).
-        """
         if not self.hay_pendiente():
             return None
-
         respuesta = (texto_respuesta or "").lower().strip().rstrip(".!¡¿?")
 
-        # Respuestas largas = el usuario está pidiendo otra cosa, no
-        # confirmando ni cancelando. No interceptamos.
         if len(respuesta.split()) > _MAX_PALABRAS_RESPUESTA_CORTA:
             return None
 
@@ -153,6 +134,25 @@ class GestorConfirmacion:
             return "No hay ninguna acción pendiente que cancelar, Señor."
         accion = self._pendiente
         self._pendiente = None
+        registrar_evento(
+            modulo="confirmacion",
+            accion="cancelar_manual",
+            resultado=f"Usuario canceló: {accion['descripcion']}",
+            nivel=NIVEL_INFO,
+        )
         if accion["cancelar"]:
             return accion["cancelar"]()
         return "Acción cancelada, Señor."
+
+    def confirmar_manual(self) -> str:
+        if not self.hay_pendiente():
+            return "No hay ninguna acción pendiente por confirmar, Señor."
+        accion = self._pendiente
+        self._pendiente = None
+        registrar_evento(
+            modulo="confirmacion",
+            accion="confirmar_manual",
+            resultado=f"Usuario confirmó: {accion['descripcion']}",
+            nivel=NIVEL_INFO,
+        )
+        return accion["confirmar"]()
