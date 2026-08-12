@@ -9,7 +9,7 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
 from src.Core.NimClient import NimClient
-from src.Core.Elevenlabs_client import ElevenLabsClient, hablar_en_hilo_seguro
+from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
 from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
 from src.Core.text_utils import limpiar_texto_para_voz
@@ -33,7 +33,8 @@ from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
 from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
 from src.Sounds.sounds_main import reproducir_sfx
 from src.Sounds.music_detector.detector import identificar_y_abrir_cancion
-from src.Coder_agent.coder_agent import ejecutar_tarea_codigo
+from src.Coder_agent.coder_agent import ejecutar_tarea_codigo, procesar_confirmacion_codigo
+from src.Core.NimClient import procesar_confirmacion_serial
 from src.Creative_agent.creative_agent import generar_imagen
 
 cerebro_ia = None
@@ -43,11 +44,11 @@ oidos_ia = None
 titulo = "Señor"
 sistema_activo = False
 esta_hablando = False
+lock_estado_habla = threading.Lock()
 ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
-    # --- Módulo de Aplicaciones & Archivos ---
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
@@ -79,7 +80,6 @@ def es_intencion_de_comando(texto: str) -> bool:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
-        
     return es_orden
 
 def hilo_servidor_web():
@@ -95,6 +95,29 @@ def sincronizar_estado_esfera(estado, color_hex):
     except Exception as e:
         print(f" Error al sincronizar esfera: {e}")
 
+def hablar_sincronizado(accion_de_voz):
+    global esta_hablando
+    with lock_estado_habla:
+        esta_hablando = True
+    sincronizar_estado_esfera("HABLANDO", "#ff0055")
+
+    def _tarea():
+        global esta_hablando
+        try:
+            accion_de_voz()
+        except Exception as err_voz:
+            print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
+        finally:
+            time.sleep(0.3)
+            with lock_estado_habla:
+                esta_hablando = False
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+
+    threading.Thread(target=_tarea, daemon=True).start()
+
+def hablar_filler(texto: str):
+    hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
+
 def sincronizar_chat_dashboard(rol: str, texto: str):
     try:
         transmitir_chat_desde_hilo_externo(rol, texto)
@@ -103,7 +126,6 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
 
 def activar_kill_switch() -> str:
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
-
     acciones_detenidas = []
 
     try:
@@ -170,7 +192,6 @@ def apagar_sistema():
 def procesar_comando_coder(prompt: str):
     if not prompt or not prompt.strip():
         return
-
     print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
 
     def _tarea():
@@ -229,19 +250,12 @@ def encender_sistemas():
         reproducir_sfx("welcome", "Bienvenida",volumen=1.2)
 
         def saludo_inicial():
-            global esta_hablando
-            esta_hablando = True
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
             if voz_ia:
                 voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?")
-            time.sleep(0.3)
-            esta_hablando = False
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
 
-        threading.Thread(target=saludo_inicial, daemon=True).start()
+        hablar_sincronizado(saludo_inicial)
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
-
         hilo_rendimiento = threading.Thread(target=bucle_rendimiento_hilo, daemon=True)
         hilo_rendimiento.start()
 
@@ -256,13 +270,6 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
-    """
-    Cada 'intervalo_segundos' toma un snapshot de hardware/agentes/módulos
-    y lo transmite por WebSocket -alimenta las gráficas en tiempo real de
-    la página de Rendimiento en el dashboard-. Corre mientras el sistema
-    esté activo; si algo falla en una vuelta, no tumba el hilo, solo lo
-    reporta y sigue en la siguiente.
-    """
     global sistema_activo
     while sistema_activo:
         try:
@@ -309,15 +316,9 @@ def procesar_ciclo_voz():
 
         if not orden_limpia:
             def responder_listo():
-                global esta_hablando
-                esta_hablando = True
-                sincronizar_estado_esfera("HABLANDO", "#ff0055")
                 if voz_ia:
                     voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
-                time.sleep(0.3)
-                esta_hablando = False
-                sincronizar_estado_esfera("ESPERA", "#0077ff")
-            threading.Thread(target=responder_listo, daemon=True).start()
+            hablar_sincronizado(responder_listo)
             ultima_interaccion = time.time()
             return
         ejecutar_orden(orden_limpia, orden_mostrar=orden_sucia)
@@ -345,30 +346,18 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
     def _hablar_y_mostrar(texto_respuesta: str):
         """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
-        global ultima_interaccion, esta_hablando
+        global ultima_interaccion
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
-        def tarea_sincronizada_voz():
-            global esta_hablando
-            esta_hablando = True
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            
+        def _hablar():
             if voz_ia:
-                try:
-                    texto_voz = limpiar_texto_para_voz(texto_respuesta)
-                    voz_ia.hablar(texto_voz)
-                except Exception as err_voz:
-                    print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
-            
-            time.sleep(0.3)
-            esta_hablando = False
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-        threading.Thread(target=tarea_sincronizada_voz, daemon=True).start()
+                texto_voz = limpiar_texto_para_voz(texto_respuesta)
+                voz_ia.hablar(texto_voz)
+        hablar_sincronizado(_hablar)
         ultima_interaccion = time.time()
 
     try:
-        # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
             "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
@@ -386,7 +375,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
             _hablar_y_mostrar(activar_kill_switch())
             return
-
         # --- MÓDULO APPS DE TRABAJO: frases fijas, sin pasar por el LLM ---
         if "hora de la junta" in orden_limpia_sin_acentos:
             reproducir_sfx("modules", "Automation")
@@ -411,7 +399,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
             reproducir_sfx("modules", "Sonidos")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            hablar_en_hilo_seguro(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
+            hablar_filler(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
             respuesta_musica = identificar_y_abrir_cancion()
             _hablar_y_mostrar(respuesta_musica)
             return
@@ -453,7 +441,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_correo:
             reproducir_sfx("modules", "emails")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            hablar_en_hilo_seguro(f"Revisando su buzón de entrada, {titulo}...")
+            hablar_filler(f"Revisando su buzón de entrada, {titulo}...")
             resumenes = leer_ultimos_correos(max_resultados=3)
             _hablar_y_mostrar("Señor, " + " ".join(resumenes))
             return
@@ -538,6 +526,19 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
         es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
         es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
+
+        if es_confirmacion or es_cancelacion:
+            resultado_codigo = procesar_confirmacion_codigo(orden_limpia)
+            if resultado_codigo is not None:
+                reproducir_sfx("modules", "Agente programador")
+                _hablar_y_mostrar(resultado_codigo)
+                return
+
+            resultado_serial = procesar_confirmacion_serial(orden_limpia)
+            if resultado_serial is not None:
+                reproducir_sfx("modules", "Electro")
+                _hablar_y_mostrar(resultado_serial)
+                return
 
         if es_confirmacion:
             reproducir_sfx("modules", "whats")
@@ -627,7 +628,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_velocidad:
             reproducir_sfx("modules", "redes")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            hablar_en_hilo_seguro("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
+            hablar_filler("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
             resultado_red = probar_velocidad_con_navegador()
             _hablar_y_mostrar(resultado_red)
             return
@@ -652,7 +653,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_marcar_conocidos:
             reproducir_sfx("modules", "redes")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red...")
+            hablar_filler("Un momento, Señor, estoy escaneando su red...")
             resultado_marcado = marcar_todos_como_conocidos()
             _hablar_y_mostrar(resultado_marcado)
             return
@@ -660,7 +661,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if es_consulta_intrusos:
             reproducir_sfx("modules", "redes")
             sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            hablar_en_hilo_seguro("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
+            hablar_filler("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
             resultado_intrusos = detectar_intrusos(abrir_terminal=True)
             _hablar_y_mostrar(resultado_intrusos)
             return
