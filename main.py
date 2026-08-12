@@ -49,6 +49,7 @@ ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
+    # --- Módulo de Aplicaciones & Archivos ---
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
@@ -79,7 +80,7 @@ def es_intencion_de_comando(texto: str) -> bool:
     if es_orden:
         print("Clasificado localmente -> ORDEN")
     else:
-        print("Clasificado localmente -> CONVERSACIÓN")
+        print("Clasificado localmente -> CONVERSACIÓN")  
     return es_orden
 
 def hilo_servidor_web():
@@ -112,7 +113,6 @@ def hablar_sincronizado(accion_de_voz):
             with lock_estado_habla:
                 esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
-
     threading.Thread(target=_tarea, daemon=True).start()
 
 def hablar_filler(texto: str):
@@ -185,13 +185,13 @@ def apagar_sistema():
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
-
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
 def procesar_comando_coder(prompt: str):
     if not prompt or not prompt.strip():
         return
+
     print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
 
     def _tarea():
@@ -202,13 +202,11 @@ def procesar_comando_coder(prompt: str):
 
     threading.Thread(target=_tarea, daemon=True).start()
 
-
 def procesar_comando_creative(prompt: str):
     if not prompt or not prompt.strip():
         return
 
     print(f"[Creative Agent - UI dedicada]: '{prompt.strip()}'")
-
     def _tarea():
         sincronizar_estado_esfera("PROCESANDO", "#ff00ff")
         resultado = generar_imagen(prompt.strip())
@@ -358,6 +356,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         ultima_interaccion = time.time()
 
     try:
+        # --- 1. SALUDOS BÁSICOS ---
         saludos_basicos = [
             "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
             "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
@@ -375,6 +374,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
             _hablar_y_mostrar(activar_kill_switch())
             return
+
         # --- MÓDULO APPS DE TRABAJO: frases fijas, sin pasar por el LLM ---
         if "hora de la junta" in orden_limpia_sin_acentos:
             reproducir_sfx("modules", "Automation")
@@ -573,7 +573,11 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
             reproducir_sfx("modules", "Cam")
-            if iniciar_vigilancia(voz_ia, sincronizar_estado_esfera):
+
+            def _hablar_desde_camara(texto):
+                hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
+
+            if iniciar_vigilancia(_hablar_desde_camara, sincronizar_estado_esfera):
                 _hablar_y_mostrar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
             else:
                 _hablar_y_mostrar("La vigilancia ya estaba activa, Señor.")
