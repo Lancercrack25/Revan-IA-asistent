@@ -1,17 +1,11 @@
 #este archivo se encargara de mostrar el rendimiento del hardware
 """
 rendimiento_hardware.py — snapshot de recursos del sistema (CPU/RAM/disco).
-
 Usa psutil, que ya es dependencia del proyecto (Network/analize_network.py
 y otros ya lo usan).
 """
 import psutil
 def obtener_rendimiento_hardware() -> dict:
-    """
-    Snapshot instantáneo de CPU, RAM y disco. cpu_percent con interval
-    corto (0.1s) para no bloquear demasiado si esto se llama seguido
-    desde un hilo de sondeo periódico.
-    """
     memoria = psutil.virtual_memory()
     disco = psutil.disk_usage("/")
 

@@ -9,7 +9,6 @@ class RevanCameraManager:
         self.is_running = False
         self.vigilancia_activa = False
         self.lock = threading.Lock()
-        # Frames en memoria
         self.current_frame = None
         self.frame_referencia = None
         self._thread_camera = None
@@ -17,7 +16,6 @@ class RevanCameraManager:
         self.cooldown_seg = 10.0
         self.intervalo_seg = 1.5
         self.ultimo_analisis = 0.0
-        # --- ESTADO HUD Y RESULTADOS VISUALES ---
         self.ultimo_resultado_txt = ""
         self.tiempo_mostrar_resultado = 0.0  # Timestamp para ocultar la tarjeta tras 8s
 
@@ -270,7 +268,6 @@ class RevanCameraManager:
             self.cap.release()
         cv2.destroyAllWindows()
         print("[CAM]: Sistema de cámara liberado.")
-# Instancia Global del Módulo
 revan_cam = RevanCameraManager()
 
 def iniciar_vigilancia(voz_ia=None, sincronizar_estado_esfera=None) -> bool:

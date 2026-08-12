@@ -15,7 +15,6 @@ proteger una API pública de miles de usuarios) es más que suficiente.
 import time
 import threading
 from collections import defaultdict
-
 from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
 
 _lock = threading.Lock()
@@ -38,12 +37,6 @@ LIMITES_POR_DEFECTO = {
 
 
 def permitir_accion(categoria: str) -> bool:
-    """
-    Devuelve True si la acción puede proceder, False si ya se alcanzó el
-    límite para esa categoría en la ventana de tiempo configurada. Cada
-    rechazo queda registrado en auditoría, para poder revisar después si
-    hubo un patrón de uso anormal.
-    """
     limite, ventana = LIMITES_POR_DEFECTO.get(categoria, LIMITES_POR_DEFECTO["default"])
     ahora = time.time()
 
@@ -62,7 +55,6 @@ def permitir_accion(categoria: str) -> bool:
 
         llamadas.append(ahora)
         return True
-
 
 def resetear(categoria: str = None) -> None:
     """Utilidad de depuración/pruebas: limpia el registro de una categoría o de todas."""

@@ -35,20 +35,10 @@ _PATRONES_SOSPECHOSOS = [
     re.compile(r"actua\s+como\s+", re.IGNORECASE),
 ]
 
-
 def _contiene_patron_sospechoso(texto: str) -> bool:
     return any(p.search(texto) for p in _PATRONES_SOSPECHOSOS)
 
-
 def envolver_contenido_externo(texto: str, fuente: str) -> str:
-    """
-    Envuelve contenido que viene de una fuente EXTERNA (no de la voz/texto
-    directo del usuario) con delimitadores explícitos, para que el LLM lo
-    trate como datos a reportar, nunca como instrucciones a ejecutar.
-
-    'fuente' es una descripción corta de dónde vino (ej. "correo electrónico",
-    "página web").
-    """
     if not texto:
         return texto
 

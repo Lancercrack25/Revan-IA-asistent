@@ -3,15 +3,8 @@
 rendimiento_agentes.py — estadísticas reales de uso de los agentes
 (Coder_agent, Creative_agent, Electronics) a partir del log de auditoría
 de seguridad que YA se está escribiendo (src/Security/auditoria.py).
-
-No se instrumenta nada nuevo en los agentes: cada llamada a
-registrar_evento(modulo=..., nivel=...) que ya hacen coder_agent.py,
-creative_agent.py y conexion_creaciones.py queda en
-logs/security_audit.log, y aquí solo se lee y resume ese log.
 """
-
 from collections import defaultdict
-
 from src.Security.auditoria import leer_eventos_recientes
 _AGENTES_MONITOREADOS = ["coder_agent", "creative_agent", "electronics", "social_discord"]
 

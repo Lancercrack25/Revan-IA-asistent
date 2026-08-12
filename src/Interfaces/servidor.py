@@ -201,7 +201,6 @@ async def websocket_endpoint(websocket: WebSocket):
                             asyncio.create_task(manejador_comando_texto_callback(prompt))
                         else:
                             manejador_comando_texto_callback(prompt)
-
                 # Comando escrito en la terminal dedicada del Coder Agent (/coder)
                 elif tipo_mensaje == "coder_command":
                     prompt = data.get("content")

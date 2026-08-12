@@ -4,13 +4,10 @@ import email
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
 # Importación del cargador de credenciales del proyecto
 from src.Core.Config_loader import cargar_credenciales
-
 # Variable global en memoria para pausar envíos hasta confirmación explícita
 borrador_correo_pendiente = None
-
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
     """Envía un correo electrónico mediante SMTP usando las credenciales cargadas."""
@@ -112,12 +109,7 @@ def leer_ultimos_correos(max_resultados: int = 3) -> list:
     except Exception as e:
         print(f"[IMAP Error - Leer]: {e}")
         return ["Hubo un problema al intentar conectar con el servidor de correo."]
-
-
-# =========================================================================
-# 🛡️ CAPA DE SEGURIDAD Y CONFIRMACIÓN EN 2 PASOS
-# =========================================================================
-
+    
 def preparar_borrador_correo(destinatario: str, asunto: str, cuerpo: str) -> str:
     """Almacena temporalmente los datos del correo sin realizar el envío."""
     global borrador_correo_pendiente
@@ -137,15 +129,12 @@ def confirmar_envio_correo() -> str:
 
     datos = borrador_correo_pendiente
     exito = enviar_correo(datos["destinatario"], datos["asunto"], datos["cuerpo"])
-    
-    # Limpieza del borrador tras procesar la orden
     borrador_correo_pendiente = None 
 
     if exito:
         return f"Correo entregado exitosamente a {datos['destinatario']}."
     else:
         return "No se pudo entregar el correo. Por favor revise la conexión o sus credenciales."
-
 
 def cancelar_borrador_correo() -> str:
     """Elimina el borrador en espera de confirmación."""

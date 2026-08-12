@@ -3,10 +3,6 @@ import json
 
 
 def cargar_configuracion_json() -> dict:
-    """
-    Busca y carga las credenciales desde el archivo de configuración JSON 
-    en las rutas más comunes del proyecto REVAN.
-    """
     # Rutas donde REVAN buscará tu archivo de claves
     posibles_rutas = [
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json")),
@@ -34,8 +30,6 @@ def obtener_credenciales_email() -> tuple[str, str]:
     Retorna: (EMAIL_USER, EMAIL_PASSWORD)
     """
     config = cargar_configuracion_json()
-
-    # Soporta varios nombres de llaves comunes por si cambiaste la etiqueta en el JSON
     user = (
         config.get("EMAIL_USER") 
         or config.get("EMAIL") 
