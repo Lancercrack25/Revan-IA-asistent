@@ -149,18 +149,9 @@ def obtener_ruta_actual() -> str:
 
 
 def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
-    """
-    Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
-    la abre en Windows Explorer y actualiza la ruta activa en PostgreSQL.
-    """
     escritorio = obtener_ruta_escritorio()
     ruta_objetivo = os.path.join(escritorio, nombre_carpeta)
 
-    # Antes esta función no validaba la ruta resultante: un nombre_carpeta
-    # como '..\\..\\Windows\\System32' escapaba del Escritorio (os.path.join
-    # lo permite) y terminaba abriéndose en Explorer sin ninguna objeción,
-    # a diferencia de crear_carpeta_sistema() -que sí llama a
-    # _es_ruta_base_segura()-. Se aplica la misma validación aquí.
     if not _es_ruta_base_segura(ruta_objetivo):
         return (
             f"Señor, no voy a abrir '{nombre_carpeta}' porque la ruta resultante "

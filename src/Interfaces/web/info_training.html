@@ -220,7 +220,6 @@
     </style>
 </head>
 <body>
-
     <div class="telemetry-container">
         <!-- HEADER -->
         <div class="header">
@@ -287,7 +286,6 @@
             </div>
         </div>
     </div>
-
     <script>
         // Deshabilitar animaciones para cero parpadeos
         Chart.defaults.animation = false;
@@ -401,7 +399,6 @@
                     hardwareChart.data.datasets[1].data.push(ramVal);
                     hardwareChart.update('none');
                 }
-
                 // --- B) ACTUALIZAR AGENTES REALES ---
                 if (d.agentes) {
                     const coder = Number(d.agentes.coder || 0);

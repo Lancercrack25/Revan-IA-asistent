@@ -3,7 +3,6 @@ import os
 import urllib.parse
 import requests
 from bs4 import BeautifulSoup
-
 sys.dont_write_bytecode = True
 
 def buscar_y_resumir_tema(termino_busqueda: str):
