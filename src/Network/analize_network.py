@@ -4,6 +4,8 @@ import requests
 import os
 import subprocess
 
+from src.Security.sanitizador import sanitizar_o_rechazar, EntradaNoSeguraError
+
 # Ruta absoluta a la carpeta de scripts .bat
 SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
 
@@ -69,11 +71,26 @@ def listar_interfaces_red():
         return {}
 
 def abrir_terminal_ping(target: str = "8.8.8.8") -> str:
-    """Ejecuta el script net_ping.bat en una terminal externa."""
+    """Ejecuta el script net_ping.bat en una terminal externa.
+
+    'target' llega desde lo que dice el usuario/LLM. Antes se interpolaba
+    directo en un string con shell=True: un target como
+    '8.8.8.8 & del /f /q C:\\algo' se habría ejecutado tal cual. Ahora se
+    valida contra caracteres de shell y se pasa como argv separado (nunca
+    shell=True), así que aunque contuviera esos caracteres no tendrían
+    efecto especial.
+    """
     bat_path = os.path.join(SCRIPTS_DIR, "net_ping.bat")
     try:
-        subprocess.Popen(f'start cmd /k "{bat_path} {target}"', shell=True)
-        return f"Desplegando diagnóstico de Ping hacia {target}."
+        target_seguro = sanitizar_o_rechazar(target, contexto="target de ping")
+    except EntradaNoSeguraError:
+        return "Señor, ese destino contiene caracteres no permitidos. Indíqueme una IP o dominio válido."
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "REVAN - Ping", "cmd", "/k", bat_path, target_seguro],
+            shell=False,
+        )
+        return f"Desplegando diagnóstico de Ping hacia {target_seguro}."
     except Exception as e:
         return f"Error al abrir la terminal de Ping: {e}"
 
@@ -81,7 +98,10 @@ def abrir_terminal_scan() -> str:
     """Ejecuta el script net_scan.bat en una terminal externa."""
     bat_path = os.path.join(SCRIPTS_DIR, "net_scan.bat")
     try:
-        subprocess.Popen(f'start cmd /k "{bat_path}"', shell=True)
+        subprocess.Popen(
+            ["cmd", "/c", "start", "REVAN - Scan", "cmd", "/k", bat_path],
+            shell=False,
+        )
         return "Desplegando escaneo de sockets y puertos en terminal externa."
     except Exception as e:
         return f"Error al abrir la terminal de escaneo: {e}"

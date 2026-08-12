@@ -72,7 +72,7 @@ def probar_velocidad_con_navegador() -> str:
     try:
         if "windows" in sistema:
             # Abre Brave directamente pasando la URL de inicio automático
-            subprocess.Popen(f'start brave "{url_speedtest}"', shell=True)
+            subprocess.Popen(["cmd", "/c", "start", "brave", url_speedtest], shell=False)
         elif "darwin" in sistema:  # macOS
             subprocess.Popen(["open", "-a", "Brave Browser", url_speedtest])
         else:  # Linux

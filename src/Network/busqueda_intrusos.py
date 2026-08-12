@@ -12,7 +12,10 @@ def abrir_terminal_intrusos():
     """Lanza la ventana táctil de comandos net_search_intrusos.bat"""
     bat_path = os.path.join(SCRIPTS_DIR, "net_search_intrusos.bat")
     try:
-        subprocess.Popen(f'start cmd /k "{bat_path}"', shell=True)
+        subprocess.Popen(
+            ["cmd", "/c", "start", "REVAN - Intrusos", "cmd", "/k", bat_path],
+            shell=False,
+        )
     except Exception as e:
         print(f"[BusquedaIntrusos]: No se pudo abrir la terminal externa: {e}")
 

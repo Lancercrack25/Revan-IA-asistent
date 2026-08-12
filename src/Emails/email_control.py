@@ -6,8 +6,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 # Importación del cargador de credenciales del proyecto
 from src.Core.Config_loader import cargar_credenciales
-# Variable global en memoria para pausar envíos hasta confirmación explícita
-borrador_correo_pendiente = None
+from src.Security.confirmation import GestorConfirmacion
+
+# Antes esto era una variable global suelta ('borrador_correo_pendiente')
+# sin expiración: un borrador quedaba pendiente para siempre y un 'confirma'
+# dicho horas después, fuera de contexto, disparaba el envío. Se usa el
+# gestor centralizado (mismo que Coder_agent/Electrónica) para heredar TTL
+# de 60s y auditoría automática.
+_gestor_correo = GestorConfirmacion(ttl_segundos=60)
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
     """Envía un correo electrónico mediante SMTP usando las credenciales cargadas."""
@@ -111,35 +117,26 @@ def leer_ultimos_correos(max_resultados: int = 3) -> list:
         return ["Hubo un problema al intentar conectar con el servidor de correo."]
     
 def preparar_borrador_correo(destinatario: str, asunto: str, cuerpo: str) -> str:
-    """Almacena temporalmente los datos del correo sin realizar el envío."""
-    global borrador_correo_pendiente
-    borrador_correo_pendiente = {
-        "destinatario": destinatario,
-        "asunto": asunto,
-        "cuerpo": cuerpo
-    }
-    return f"Tengo listo el borrador para {destinatario}, con asunto '{asunto}'. El contenido es: '{cuerpo}'. ¿Desea que proceda con el envío, Señor?"
+    """Almacena temporalmente los datos del correo sin realizar el envío. Expira en 60s."""
+
+    def _confirmar():
+        exito = enviar_correo(destinatario, asunto, cuerpo)
+        if exito:
+            return f"Correo entregado exitosamente a {destinatario}."
+        return "No se pudo entregar el correo. Por favor revise la conexión o sus credenciales."
+
+    def _cancelar():
+        return "Borrador de correo cancelado y descartado."
+
+    descripcion = f"enviar un correo a {destinatario} con asunto '{asunto}': \"{cuerpo}\""
+    return _gestor_correo.solicitar(descripcion, callback_confirmar=_confirmar, callback_cancelar=_cancelar)
 
 
 def confirmar_envio_correo() -> str:
-    """Ejecuta el envío definitivo del borrador almacenado tras la orden explícita."""
-    global borrador_correo_pendiente
-    if not borrador_correo_pendiente:
-        return "No hay ningún borrador de correo pendiente por enviar, Señor."
+    """Ejecuta el envío definitivo del borrador almacenado tras la orden explícita (respeta TTL)."""
+    return _gestor_correo.confirmar_manual()
 
-    datos = borrador_correo_pendiente
-    exito = enviar_correo(datos["destinatario"], datos["asunto"], datos["cuerpo"])
-    borrador_correo_pendiente = None 
-
-    if exito:
-        return f"Correo entregado exitosamente a {datos['destinatario']}."
-    else:
-        return "No se pudo entregar el correo. Por favor revise la conexión o sus credenciales."
 
 def cancelar_borrador_correo() -> str:
     """Elimina el borrador en espera de confirmación."""
-    global borrador_correo_pendiente
-    if borrador_correo_pendiente:
-        borrador_correo_pendiente = None
-        return "Borrador de correo cancelado y descartado."
-    return "No había ningún correo pendiente por cancelar."
+    return _gestor_correo.cancelar_manual()
