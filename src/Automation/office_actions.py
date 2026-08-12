@@ -5,13 +5,13 @@ def ejecutar_aplicacion_office(aplicacion):
     try:
         app = aplicacion.lower()
         if "word" in app:
-            subprocess.Popen("start winword", shell=True)
+            subprocess.Popen(["cmd", "/c", "start", "winword"], shell=False)
             return "Desplegando Microsoft Word en este momento, Señor."
         elif "excel" in app:
-            subprocess.Popen("start excel", shell=True)
+            subprocess.Popen(["cmd", "/c", "start", "excel"], shell=False)
             return "Inicializando hojas de cálculo de Microsoft Excel, Señor."
         elif "powerpoint" in app or "power" in app:
-            subprocess.Popen("start powerpnt", shell=True)
+            subprocess.Popen(["cmd", "/c", "start", "powerpnt"], shell=False)
             return "Abriendo Microsoft PowerPoint, Señor."
         else:
             return "Aplicación de Office no identificada."

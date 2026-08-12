@@ -2,6 +2,7 @@ import os
 import subprocess
 from src.Services.os_service import obtener_ruta_escritorio
 from src.Automation.games_actions import _normalizar, _listar_accesos, _buscar_mejor_coincidencia
+from src.Security.sanitizador import sanitizar_o_rechazar, EntradaNoSeguraError
 
 APPS_PROTOCOLO_ESPECIAL = {
     "discord": r'start "" "%LocalAppData%\Discord\Update.exe" --processStart Discord.exe',
@@ -25,6 +26,10 @@ def lanzar_aplicacion_usuario(nombre_app) -> str:
 
     if not app_normalizada:
         return "Señor, no reconozco qué aplicación desea ejecutar."
+    try:
+        app_normalizada = sanitizar_o_rechazar(app_normalizada, contexto="nombre de aplicación")
+    except EntradaNoSeguraError:
+        return "Señor, ese nombre de aplicación contiene caracteres no permitidos."
 
     # 2. Primero buscar en la carpeta Escritorio/Plataformas/
     carpeta_plataformas = os.path.join(obtener_ruta_escritorio(), "Plataformas")
@@ -38,7 +43,6 @@ def lanzar_aplicacion_usuario(nombre_app) -> str:
             return f"Inicializando la plataforma {nombre_mostrado} desde su cuadrante, Señor."
         except Exception as e:
             return f"No se pudo inicializar {nombre_real}: {str(e)}"
-
     # 3. Si no está en la carpeta, probar protocolos nativos especiales
     for clave, comando in APPS_PROTOCOLO_ESPECIAL.items():
         if clave in app_normalizada:
@@ -47,10 +51,8 @@ def lanzar_aplicacion_usuario(nombre_app) -> str:
                 return f"Desplegando {nombre_real}, Señor."
             except Exception as e:
                 return f"No se pudo abrir {nombre_real}: {str(e)}"
-
-    # 4. Intento genérico de emergencia mediante comando 'start' de Windows
     try:
-        os.system(f'start "" "{app_normalizada}"')
+        subprocess.Popen(["cmd", "/c", "start", "", app_normalizada], shell=False)
         return f"Intentando forzar la ejecución externa de {nombre_real}, Señor."
     except Exception as e:
         return f"No se pudo inicializar la aplicación debido a un error: {str(e)}"

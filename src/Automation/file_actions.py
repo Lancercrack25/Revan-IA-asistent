@@ -18,7 +18,6 @@ def abrir_carpeta_sistema(nombre_carpeta):
     try:
         carpeta = nombre_carpeta.lower().strip()
         escritorio = obtener_ruta_escritorio()
-        # Mapeo exacto de las carpetas que tienes en tu Escritorio
         mapeo_carpetas = {
             "codigos": "Codigos programacion",
             "codigos programacion": "Codigos programacion",
@@ -36,8 +35,7 @@ def abrir_carpeta_sistema(nombre_carpeta):
             ruta_final = os.path.join(escritorio, mapeo_carpetas[carpeta])
             
             if os.path.exists(ruta_final):
-                # 'explorer' abre la carpeta nativamente en una ventana de Windows
-                subprocess.Popen(f'explorer "{ruta_final}"', shell=True)
+                subprocess.Popen(["explorer", ruta_final], shell=False)
                 return f"Abriendo la carpeta '{mapeo_carpetas[carpeta]}' en el explorador, Señor."
             else:
                 return f"Señor, la ruta '{ruta_final}' no parece existir en el almacenamiento actual."
