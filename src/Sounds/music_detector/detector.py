@@ -1,5 +1,6 @@
 import os
 import asyncio
+import urllib.parse
 import webbrowser
 import sounddevice as sd
 from scipy.io.wavfile import write
@@ -121,9 +122,7 @@ def identificar_y_abrir_cancion() -> str:
 
         titulo = track.get("title", "Desconocida")
         artista = track.get("subtitle", "Artista Desconocido")
-        
-        # Abrir resultado en YouTube
-        query = f"{titulo} {artista}".replace(" ", "+")
+        query = urllib.parse.quote_plus(f"{titulo} {artista}")
         webbrowser.open(f"https://www.youtube.com/results?search_query={query}")
 
         return f"La canción es '{titulo}' de {artista}. Abrí la búsqueda en YouTube para usted, Señor."
