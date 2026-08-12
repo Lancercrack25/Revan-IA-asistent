@@ -21,8 +21,6 @@ def obtener_telemetria_hardware() -> Dict[str, Any]:
     }
 
 def obtener_rendimiento_agentes() -> Dict[str, Any]:
-    """Retorna las estadísticas acumuladas del desempeño de los agentes."""
-    # Aquí puedes conectar las llamadas reales de tus agentes
     return {
         "coder_agent_tasks": HISTORIAL_RENDIMIENTO["agentes"]["coder"],
         "creative_agent_tasks": HISTORIAL_RENDIMIENTO["agentes"]["creative"],
