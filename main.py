@@ -771,6 +771,6 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         apagar_sistema()
-        
+         
 if __name__ == "__main__":
     main()

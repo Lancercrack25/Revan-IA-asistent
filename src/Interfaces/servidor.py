@@ -21,7 +21,6 @@ async def lifespan(app_fastapi: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-
 # Mapeo Absoluto Adaptado al Árbol de Trabajo Real
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
@@ -49,7 +48,6 @@ def servir_html_modulo(nombre_archivo: str):
         content=f"<h1>Error: {nombre_archivo} no encontrado en src/Interfaces/web</h1>",
         status_code=404,
     )
-
 # --- RUTAS PRINCIPALES DE NAVEGACIÓN ---
 @app.get("/")
 async def obtener_dashboard():
@@ -160,7 +158,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             asyncio.create_task(manejador_comando_texto_callback(prompt))
                         else:
                             manejador_comando_texto_callback(prompt)
-                # Comando escrito en la terminal dedicada del Coder Agent (/coder)
+
                 elif tipo_mensaje == "coder_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Coder]: Orden recibida desde UI dedicada -> '{prompt}'")
@@ -171,7 +169,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         else:
                             manejador_comando_coder_callback(prompt)
 
-                # Prompt escrito en la terminal dedicada del Creative Agent (/creative)
                 elif tipo_mensaje == "creative_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Creative]: Orden recibida desde UI dedicada -> '{prompt}'")
@@ -191,7 +188,6 @@ async def websocket_endpoint(websocket: WebSocket):
         conexiones_activas.discard(websocket)
         print("[WebSocket]: Cliente desconectado.")
 
-# --- TRANSMISIONES BROADCAST ---
 async def cambiar_estado_esfera(estado: str, color_hex: str):
     if not conexiones_activas: return
     paquete = json.dumps({"tipo": "estado", "estado": estado, "color": color_hex})
