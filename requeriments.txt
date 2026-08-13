@@ -15,6 +15,12 @@ google-genai==0.3.0             # opcional: solo si activas el bloque de respald
 # --- Coder_agent / Electrónica ---
 pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
 bleak==0.22.3                  # detección opcional de dispositivos Bluetooth (BLE)
+WMI==1.5.1                     # Windows únicamente. Opcional: detección de tarjetas/USB
+                                # conectadas (Electronics components/functionality.py). El
+                                # código ya lo envuelve en try/except ImportError -si no lo
+                                # instalas, esa detección simplemente devuelve una lista
+                                # vacía en silencio en vez de tronar-. Trae pywin32 solo,
+                                # como dependencia propia; no hace falta listarlo aparte.
 
 # --- Servidor web / dashboard ---
 fastapi==0.115.0
@@ -54,13 +60,6 @@ psutil==6.0.0
 # --- Ciencia / gráficos (Inspector_asistent) ---
 scipy==1.14.1
 matplotlib==3.9.2
-
-# --- GUI legada (Gui/Dashboard.py) ---
-# Descomenta esta línea SOLO si sigues usando la GUI de escritorio antigua
-# (Gui/Dashboard.py). Ya no está conectada a main.py -ver el hallazgo de
-# código muerto de la revisión anterior-, así que si la vas a borrar, no
-# hace falta instalar esto.
-# customtkinter==5.2.2
 
 # --- Librerías de la librería estándar de Python que NO van aquí ---
 # (no requieren instalación, ya vienen con Python): os, sys, time, json,
