@@ -220,6 +220,7 @@
     </style>
 </head>
 <body>
+
     <div class="telemetry-container">
         <!-- HEADER -->
         <div class="header">
@@ -286,6 +287,7 @@
             </div>
         </div>
     </div>
+
     <script>
         // Deshabilitar animaciones para cero parpadeos
         Chart.defaults.animation = false;
@@ -335,13 +337,17 @@
         });
 
         // 2. Inicializar Gráfica Agentes (Barras)
+        // Las etiquetas de abajo (Coder Agent, Creative Agent, Electronics,
+        // Social (Discord)) son las mismas que usa
+        // Productividad/rendimiento_agentes.py -que lee del log real de
+        // auditoría (Security/auditoria.py), no un contador ficticio-.
         const agCtx = document.getElementById('agentsChart').getContext('2d');
         const agentsChart = new Chart(agCtx, {
             type: 'bar',
             data: {
-                labels: ['Coder', 'Creative', 'System', 'Orchestrator'],
+                labels: ['Coder Agent', 'Creative Agent', 'Electronics', 'Social (Discord)'],
                 datasets: [{
-                    label: 'Tareas Procesadas',
+                    label: 'Eventos registrados',
                     data: [0, 0, 0, 0],
                     backgroundColor: ['#00f0ff', '#ff0055', '#00ffaa', '#ffaa00'],
                     borderRadius: 4
@@ -376,13 +382,21 @@
         socket.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
-                const d = data.datos || data.data || data;
+                if (data.tipo !== 'rendimiento_update' || !data.datos) return;
+                const d = data.datos;
 
                 const hora = new Date().toLocaleTimeString().split(' ')[0];
 
                 // --- A) ACTUALIZAR CPU Y RAM ---
-                let cpuVal = d.cpu?.porcentaje ?? d.cpu ?? d.cpu_percent;
-                let ramVal = d.ram?.porcentaje_uso ?? d.ram ?? d.ram_percent;
+                // Antes leía d.cpu / d.cpu_percent (nivel superior) porque
+                // así los mandaba un emisor duplicado que había en
+                // servidor.py; ese emisor se eliminó (era redundante y
+                // mandaba datos con otra forma que la real). La forma real
+                // que manda main.py -> Productividad/rendimiento_general.py
+                // es d.hardware.cpu_percent / d.hardware.ram_percent.
+                const hardware = d.hardware || {};
+                let cpuVal = hardware.cpu_percent;
+                let ramVal = hardware.ram_percent;
 
                 if (cpuVal !== undefined && ramVal !== undefined) {
                     cpuVal = Math.round(Number(cpuVal));
@@ -399,17 +413,21 @@
                     hardwareChart.data.datasets[1].data.push(ramVal);
                     hardwareChart.update('none');
                 }
-                // --- B) ACTUALIZAR AGENTES REALES ---
-                if (d.agentes) {
-                    const coder = Number(d.agentes.coder || 0);
-                    const creative = Number(d.agentes.creative || 0);
-                    const system = Number(d.agentes.system || 0);
-                    const orchestrator = Number(d.agentes.orchestrator || 0);
 
-                    agentsChart.data.datasets[0].data = [coder, creative, system, orchestrator];
+                // --- B) ACTUALIZAR AGENTES REALES ---
+                // Antes esperaba d.agentes.coder/.creative/.system/.orchestrator
+                // (números planos) -esa forma tampoco la manda main.py; la
+                // manda Productividad/rendimiento_agentes.py como
+                // {"Coder Agent": {"eventos": N, ...}, ...}, leído del log
+                // de auditoría real.
+                if (d.agentes) {
+                    const claves = ['Coder Agent', 'Creative Agent', 'Electronics', 'Social (Discord)'];
+                    const valores = claves.map(clave => Number(d.agentes[clave]?.eventos || 0));
+
+                    agentsChart.data.datasets[0].data = valores;
                     agentsChart.update('none');
 
-                    document.getElementById('kpi-agentes').innerText = coder + creative + system + orchestrator;
+                    document.getElementById('kpi-agentes').innerText = valores.reduce((a, b) => a + b, 0);
                 }
 
             } catch (e) {

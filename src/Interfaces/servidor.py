@@ -12,19 +12,6 @@ loop_real_servidor = None
 manejador_comando_texto_callback = None
 manejador_comando_coder_callback = None
 manejador_comando_creative_callback = None
-# Contador global de actividad por agente/módulo
-METRICAS_AGENTES = {
-    "coder": 0,
-    "creative": 0,
-    "system": 0,
-    "orchestrator": 0
-}
-
-def registrar_actividad_agente(agente: str):
-    """Incrementa el contador de llamadas cuando un agente procesa un comando."""
-    clave = agente.lower()
-    if clave in METRICAS_AGENTES:
-        METRICAS_AGENTES[clave] += 1
 
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
@@ -34,6 +21,7 @@ async def lifespan(app_fastapi: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
 # Mapeo Absoluto Adaptado al Árbol de Trabajo Real
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
@@ -176,7 +164,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif tipo_mensaje == "coder_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Coder]: Orden recibida desde UI dedicada -> '{prompt}'")
-                    registrar_actividad_agente("coder")
 
                     if manejador_comando_coder_callback and prompt:
                         if asyncio.iscoroutinefunction(manejador_comando_coder_callback):
@@ -188,7 +175,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif tipo_mensaje == "creative_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Creative]: Orden recibida desde UI dedicada -> '{prompt}'")
-                    registrar_actividad_agente("creative")
 
                     if manejador_comando_creative_callback and prompt:
                         if asyncio.iscoroutinefunction(manejador_comando_creative_callback):
@@ -252,7 +238,6 @@ async def actualizar_rendimiento(datos: dict):
         try: await ws.send_text(paquete)
         except Exception: conexiones_activas.discard(ws)
 
-# --- PUENTES MULTIHILO EXTERNOS ---
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     global loop_real_servidor
     if loop_real_servidor and loop_real_servidor.is_running():
