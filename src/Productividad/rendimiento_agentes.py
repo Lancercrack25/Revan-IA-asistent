@@ -6,23 +6,16 @@ de seguridad que YA se está escribiendo (src/Security/auditoria.py).
 """
 from collections import defaultdict
 from src.Security.auditoria import leer_eventos_recientes
-_AGENTES_MONITOREADOS = ["coder_agent", "creative_agent", "electronics", "social_discord"]
+_AGENTES_MONITOREADOS = ["coder_agent", "creative_agent", "actions_agent", "Revan"]
 
 _ETIQUETAS_LEGIBLES = {
     "coder_agent": "Coder Agent",
     "creative_agent": "Creative Agent",
-    "electronics": "Electronics",
-    "social_discord": "Social (Discord)",
+    "actions_agent": "Actions Agent",
+    "Revan": "Revan"
 }
 
 def obtener_rendimiento_agentes(ventana_eventos: int = 300) -> dict:
-    """
-    Resume, por agente, cuántos eventos tuvo, cuántos fueron advertencia/
-    error, y el timestamp del último evento -sobre los últimos
-    'ventana_eventos' registros del log de auditoría (no filtra por
-    tiempo, sino por cantidad de líneas recientes, que es más barato de
-    leer que parsear todas las fechas)-.
-    """
     eventos = leer_eventos_recientes(ventana_eventos)
 
     resumen = {
@@ -44,5 +37,4 @@ def obtener_rendimiento_agentes(ventana_eventos: int = 300) -> dict:
         elif nivel == "CRITICO":
             resumen[etiqueta]["criticos"] += 1
         resumen[etiqueta]["ultimo_evento"] = ev.get("timestamp")
-
     return resumen
