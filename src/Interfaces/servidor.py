@@ -1,8 +1,6 @@
 import os
 import json
 import asyncio
-import time
-import psutil
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -28,41 +26,14 @@ def registrar_actividad_agente(agente: str):
     if clave in METRICAS_AGENTES:
         METRICAS_AGENTES[clave] += 1
 
-async def bucle_telemetria_rendimiento():
-    """Toma datos reales del hardware y agentes en segundo plano y los emite cada 2 segundos."""
-    while True:
-        try:
-            if conexiones_activas:
-                cpu = psutil.cpu_percent(interval=None)
-                ram = psutil.virtual_memory().percent
-                hora_actual = time.strftime("%H:%M:%S")
-
-                datos_snapshot = {
-                    "timestamp": hora_actual,
-                    "cpu": cpu,
-                    "ram": ram,
-                    "agentes": METRICAS_AGENTES
-                }
-
-                await actualizar_rendimiento(datos_snapshot)
-        except Exception as e:
-            print(f"[Telemetria Error]: {e}")
-
-        await asyncio.sleep(2)
-
 @asynccontextmanager
 async def lifespan(app_fastapi: FastAPI):
     global loop_real_servidor
     loop_real_servidor = asyncio.get_running_loop()
     print("[Servidor Web]: Event Loop de FastAPI vinculado con éxito.")
-    
-    # Inicia la recolección continua de telemetría
-    tarea_telemetria = asyncio.create_task(bucle_telemetria_rendimiento())
     yield
-    tarea_telemetria.cancel()
 
 app = FastAPI(lifespan=lifespan)
-
 # Mapeo Absoluto Adaptado al Árbol de Trabajo Real
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")

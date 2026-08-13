@@ -246,15 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    setInterval(() => {
-        const cpu = Math.floor(Math.random() * 25) + 20;
-        const ram = Math.floor(Math.random() * 15) + 55;
-        const cpuFill = document.getElementById('cpu-fill');
-        const ramFill = document.getElementById('ram-fill');
-        if (cpuFill) cpuFill.style.width = `${cpu}%`;
-        if (ramFill) ramFill.style.width = `${ram}%`;
-    }, 2500);
-
     if (typeof particlesJS !== 'undefined') {
         particlesJS('particles-js', {
             "particles": {

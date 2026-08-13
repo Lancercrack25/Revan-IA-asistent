@@ -283,6 +283,8 @@ function conectarWebSocket() {
             if (data.tipo === "chat" || data.tipo === "log") {
                 const tag = data.rol ? data.rol.toUpperCase() : "SYS";
                 addLog(`[${tag}]: ${data.texto}`, data.rol || "system");
+            } else if (data.tipo === "rendimiento_update" && data.datos) {
+                window.dispatchEvent(new CustomEvent("revan:rendimiento", { detail: data.datos }));
             }
         } catch (e) {
             addLog(`> RAW: ${event.data}`, "system");
@@ -351,14 +353,23 @@ function addLog(msg, type = "system") {
 }
 
 function startMetricsSimulation() {
+    // Antes: número aleatorio cada 2.5s (función se llamaba literalmente
+    // "Simulation"). El backend ya transmite datos reales de CPU/RAM por
+    // WebSocket cada 4s (main.py -> bucle_rendimiento_hilo ->
+    // Productividad/rendimiento_general.obtener_snapshot_completo()); solo
+    // faltaba que este archivo los escuchara. Se hace aquí, sin necesidad
+    // de un setInterval propio. (El HTML solo tiene barra de CPU, no de
+    // RAM -si se agrega una '.ram-fill' en el futuro, este listener ya
+    // manda el dato real en evento.detail.hardware.ram_percent).
     const cpuFill = document.querySelector(".cpu-fill");
-    
-    setInterval(() => {
-        if (cpuFill) {
-            const randomCpu = Math.floor(Math.random() * (65 - 28 + 1)) + 28;
-            cpuFill.style.width = `${randomCpu}%`;
+
+    window.addEventListener("revan:rendimiento", (evento) => {
+        const hardware = evento.detail && evento.detail.hardware;
+        if (!hardware || !cpuFill) return;
+        if (typeof hardware.cpu_percent === "number") {
+            cpuFill.style.width = `${hardware.cpu_percent}%`;
         }
-    }, 2500);
+    });
 }
 
 function updateLiveBeacon(online) {
@@ -379,9 +390,3 @@ function updateLiveBeacon(online) {
         }
     }
 }
-
-let testClick = new Audio(window.location.origin + '/src/Sounds/welcome/clicks.mp3');
-testClick.volume = 1.0;
-testClick.play()
-    .then(() => console.log("✅ EL MP3 SÍ EXISTE Y SÍ SUENA"))
-    .catch(err => console.error("❌ ERROR AL REPRODUCIR:", err));

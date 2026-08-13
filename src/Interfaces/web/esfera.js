@@ -104,7 +104,12 @@ function generarPolvoCosmico() {
 }
 
 function conectarServidorCore() {
-    const socket = new WebSocket("ws://127.0.0.1:8000/ws");
+    // Antes: URL fija "ws://127.0.0.1:8000/ws". Los otros 3 archivos JS
+    // (dashboard.js, coder.js, creative.js) ya arman la URL dinámicamente
+    // desde window.location.host -si el puerto de servidor.py cambia
+    // algún día, esos tres siguen funcionando y este se rompe en silencio-.
+    // Se unifica al mismo patrón.
+    const socket = new WebSocket(`ws://${window.location.host}/ws`);
     const hudTexto = document.getElementById("status-text");
     const hudContenedor = document.getElementById("hud-banner");
 
@@ -206,7 +211,6 @@ function bucleAnimacion() {
     // Sincronizar rotaciones
     nodosSinapticos.rotation.y = redNeuronal.rotation.y;
     nodosSinapticos.rotation.x = redNeuronal.rotation.x;
-
     // Deformación Orgánica de Vértices
     const posAttr = redNeuronal.geometry.attributes.position;
     const posOrig = redNeuronal.geometry.userData.posOriginales;
