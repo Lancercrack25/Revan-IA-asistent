@@ -299,11 +299,8 @@
     <script>
         // Deshabilitar animaciones para cero parpadeos
         Chart.defaults.animation = false;
-
         const maxPoints = 12;
-        // Iniciar gráfico de líneas en cero/vacío
         const initialLabels = Array(maxPoints).fill('--:--:--');
-
         // 1. Inicializar Gráfica Hardware
         const hwCtx = document.getElementById('hardwareChart').getContext('2d');
         const hardwareChart = new Chart(hwCtx, {
@@ -344,11 +341,6 @@
             }
         });
 
-        // 2. Inicializar Gráfica Agentes (Barras)
-        // Las etiquetas de abajo (Coder Agent, Creative Agent, Electronics,
-        // Social (Discord)) son las mismas que usa
-        // Productividad/rendimiento_agentes.py -que lee del log real de
-        // auditoría (Security/auditoria.py), no un contador ficticio-.
         const agCtx = document.getElementById('agentsChart').getContext('2d');
         const agentsChart = new Chart(agCtx, {
             type: 'bar',
@@ -372,12 +364,6 @@
             }
         });
 
-        // 3. Inicializar Gráfica Módulos (Barras horizontales)
-        // 'modulos' es un dict con claves dinámicas -el nombre exacto de
-        // cada acción que ya se registra en Database (accion_ejecutada de
-        // historial_interacciones)-, no una lista fija como los agentes.
-        // Se muestran las 8 más usadas, ordenadas de mayor a menor (el
-        // backend ya las manda en ese orden, ver rendimiento_modulos.py).
         const modCtx = document.getElementById('modulesChart').getContext('2d');
         const modulesChart = new Chart(modCtx, {
             type: 'bar',
@@ -422,16 +408,7 @@
                 const data = JSON.parse(event.data);
                 if (data.tipo !== 'rendimiento_update' || !data.datos) return;
                 const d = data.datos;
-
                 const hora = new Date().toLocaleTimeString().split(' ')[0];
-
-                // --- A) ACTUALIZAR CPU Y RAM ---
-                // Antes leía d.cpu / d.cpu_percent (nivel superior) porque
-                // así los mandaba un emisor duplicado que había en
-                // servidor.py; ese emisor se eliminó (era redundante y
-                // mandaba datos con otra forma que la real). La forma real
-                // que manda main.py -> Productividad/rendimiento_general.py
-                // es d.hardware.cpu_percent / d.hardware.ram_percent.
                 const hardware = d.hardware || {};
                 let cpuVal = hardware.cpu_percent;
                 let ramVal = hardware.ram_percent;
@@ -452,14 +429,8 @@
                     hardwareChart.update('none');
                 }
 
-                // --- B) ACTUALIZAR AGENTES REALES ---
-                // Antes esperaba d.agentes.coder/.creative/.system/.orchestrator
-                // (números planos) -esa forma tampoco la manda main.py; la
-                // manda Productividad/rendimiento_agentes.py como
-                // {"Coder Agent": {"eventos": N, ...}, ...}, leído del log
-                // de auditoría real.
                 if (d.agentes) {
-                    const claves = ['Coder Agent', 'Creative Agent', 'Electronics', 'Social (Discord)'];
+                    const claves = ['Coder Agent', 'Creative Agent', 'Actions Agent', 'Revan'];
                     const valores = claves.map(clave => Number(d.agentes[clave]?.eventos || 0));
 
                     agentsChart.data.datasets[0].data = valores;
