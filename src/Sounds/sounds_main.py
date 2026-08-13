@@ -17,22 +17,14 @@ def _play_audio(ruta_archivo: str, volumen: float = 1.0):
     try:
         if HAS_PYGAME:
             sonido = pygame.mixer.Sound(ruta_archivo)
-            # Aplica el volumen entre 0.0 (silencio) y 1.0 (100%)
             sonido.set_volume(volumen)
             sonido.play()
         elif ruta_archivo.endswith(".wav"):
-            # Nota: winsound es la API nativa de Windows y no soporta control de volumen por software
             winsound.PlaySound(ruta_archivo, winsound.SND_FILENAME | winsound.SND_ASYNC)
     except Exception as e:
         print(f"[Sound FX Error]: {e}")
 
 def reproducir_sfx(categoria: str, nombre_efecto: str, volumen: float = 1.0):
-    """
-    Reproduce un efecto de sonido local.
-    :param categoria: Subcarpeta dentro del directorio de SFX.
-    :param nombre_efecto: Nombre del archivo sin extensión.
-    :param volumen: (Opcional) Nivel de audio de 0.0 a 1.0. Por defecto es 1.0.
-    """
     carpeta_destino = os.path.join(BASE_DIR, categoria)
     ruta_wav = os.path.join(carpeta_destino, f"{nombre_efecto}.wav")
     ruta_mp3 = os.path.join(carpeta_destino, f"{nombre_efecto}.mp3")
