@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -150,7 +151,7 @@
         /* CHARTS SECTION */
         .charts-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
             gap: 20px;
         }
 
@@ -266,6 +267,13 @@
                     <canvas id="agentsChart" height="260"></canvas>
                 </div>
             </div>
+
+            <div class="chart-box">
+                <div class="chart-title">🧩 Uso por Módulo</div>
+                <div class="chart-wrapper">
+                    <canvas id="modulesChart" height="260"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- COMANDOS ACTIVOS -->
@@ -364,6 +372,36 @@
             }
         });
 
+        // 3. Inicializar Gráfica Módulos (Barras horizontales)
+        // 'modulos' es un dict con claves dinámicas -el nombre exacto de
+        // cada acción que ya se registra en Database (accion_ejecutada de
+        // historial_interacciones)-, no una lista fija como los agentes.
+        // Se muestran las 8 más usadas, ordenadas de mayor a menor (el
+        // backend ya las manda en ese orden, ver rendimiento_modulos.py).
+        const modCtx = document.getElementById('modulesChart').getContext('2d');
+        const modulesChart = new Chart(modCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Usos recientes',
+                    data: [],
+                    backgroundColor: '#00ffaa',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', precision: 0 } },
+                    y: { grid: { display: false }, ticks: { color: '#e2e8f0' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
         // CONEXIÓN WEBSOCKET 100% REAL
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
@@ -428,6 +466,14 @@
                     agentsChart.update('none');
 
                     document.getElementById('kpi-agentes').innerText = valores.reduce((a, b) => a + b, 0);
+                }
+
+                // --- C) ACTUALIZAR MÓDULOS REALES ---
+                if (d.modulos) {
+                    const entradas = Object.entries(d.modulos).slice(0, 8);
+                    modulesChart.data.labels = entradas.map(([nombre]) => nombre);
+                    modulesChart.data.datasets[0].data = entradas.map(([, info]) => Number(info.usos || 0));
+                    modulesChart.update('none');
                 }
 
             } catch (e) {

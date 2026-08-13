@@ -9,12 +9,18 @@ const SOUND_PATHS = {
 };
 
 let userInteracted = false;
+const AUDIO_CACHE = {
+    hover: new Audio(SOUND_PATHS.hover),
+    click: new Audio(SOUND_PATHS.click),
+    section: new Audio(SOUND_PATHS.section),
+};
+Object.values(AUDIO_CACHE).forEach(a => { a.preload = 'auto'; });
 
 function unlockAudioEngine() {
     if (userInteracted) return;
     userInteracted = true;
     
-    const dummy = new Audio(SOUND_PATHS.click);
+    const dummy = AUDIO_CACHE.click.cloneNode();
     dummy.volume = 0.01;
     dummy.play().then(() => dummy.pause()).catch(() => {});
     
@@ -27,9 +33,9 @@ window.addEventListener('keydown', unlockAudioEngine);
 
 // Reproduce audio normal (Hover/Section)
 function playDirectSound(type, volume = 0.8) {
-    if (!SOUND_PATHS[type]) return;
+    if (!AUDIO_CACHE[type]) return;
     try {
-        const snd = new Audio(SOUND_PATHS[type]);
+        const snd = AUDIO_CACHE[type].cloneNode();
         snd.volume = volume;
         snd.play().catch(() => {});
     } catch (e) {}
@@ -40,7 +46,7 @@ function playClickAndNavigate(callbackUrl = null) {
     unlockAudioEngine();
     
     try {
-        const clickAudio = new Audio(SOUND_PATHS.click);
+        const clickAudio = AUDIO_CACHE.click.cloneNode();
         clickAudio.volume = 1.1;
 
         // Si hay una redirección, esperamos a que el audio inicie/avance
@@ -72,7 +78,7 @@ function playClickAndNavigate(callbackUrl = null) {
 }
 
 function playHoverSFX() { playDirectSound('hover', 0.6); }
-function playSectionSFX() { playDirectSound('section', 0.8); }
+function playSectionSFX() { playDirectSound('click', 0.8); }
 
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
@@ -353,14 +359,6 @@ function addLog(msg, type = "system") {
 }
 
 function startMetricsSimulation() {
-    // Antes: número aleatorio cada 2.5s (función se llamaba literalmente
-    // "Simulation"). El backend ya transmite datos reales de CPU/RAM por
-    // WebSocket cada 4s (main.py -> bucle_rendimiento_hilo ->
-    // Productividad/rendimiento_general.obtener_snapshot_completo()); solo
-    // faltaba que este archivo los escuchara. Se hace aquí, sin necesidad
-    // de un setInterval propio. (El HTML solo tiene barra de CPU, no de
-    // RAM -si se agrega una '.ram-fill' en el futuro, este listener ya
-    // manda el dato real en evento.detail.hardware.ram_percent).
     const cpuFill = document.querySelector(".cpu-fill");
 
     window.addEventListener("revan:rendimiento", (evento) => {
