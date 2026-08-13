@@ -2,6 +2,7 @@
 # Generado escaneando los imports reales de todo el proyecto (no es una
 # lista genérica). Instalar con:
 #   pip install -r requirements.txt
+#
 # Nota: varias librerías (opencv, mediapipe, pygame, sounddevice) requieren
 # que el sistema tenga las dependencias nativas correspondientes (drivers de
 # audio/video). Si algo falla al instalar, primero revisa el mensaje de error
@@ -13,6 +14,13 @@ google-genai==0.3.0             # opcional: solo si activas el bloque de respald
 
 # --- Coder_agent / Electrónica ---
 pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
+bleak==0.22.3                  # detección opcional de dispositivos Bluetooth (BLE)
+WMI==1.5.1                     # Windows únicamente. Opcional: detección de tarjetas/USB
+                                # conectadas (Electronics components/functionality.py). El
+                                # código ya lo envuelve en try/except ImportError -si no lo
+                                # instalas, esa detección simplemente devuelve una lista
+                                # vacía en silencio en vez de tronar-. Trae pywin32 solo,
+                                # como dependencia propia; no hace falta listarlo aparte.
 
 # --- Servidor web / dashboard ---
 fastapi==0.115.0

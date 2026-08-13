@@ -21,7 +21,6 @@ async def lifespan(app_fastapi: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-
 # Mapeo Absoluto Adaptado al Árbol de Trabajo Real
 CARPETA_INTERFACES = os.path.dirname(os.path.abspath(__file__))
 CARPETA_WEB = os.path.join(CARPETA_INTERFACES, "web")
@@ -49,7 +48,6 @@ def servir_html_modulo(nombre_archivo: str):
         content=f"<h1>Error: {nombre_archivo} no encontrado en src/Interfaces/web</h1>",
         status_code=404,
     )
-
 # --- RUTAS PRINCIPALES DE NAVEGACIÓN ---
 @app.get("/")
 async def obtener_dashboard():
@@ -141,7 +139,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     conexiones_activas.add(websocket)
-    print("[WebSocket]: Cliente (Dashboard/Esfera/Coder/Creative) conectado al canal de control.")
+    print("[WebSocket]: Cliente (Dashboard/Esfera/Coder/Creative/Productividad) conectado al canal de control.")
 
     try:
         while True:
@@ -161,7 +159,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         else:
                             manejador_comando_texto_callback(prompt)
 
-                # Comando escrito en la terminal dedicada del Coder Agent (/coder)
                 elif tipo_mensaje == "coder_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Coder]: Orden recibida desde UI dedicada -> '{prompt}'")
@@ -172,7 +169,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         else:
                             manejador_comando_coder_callback(prompt)
 
-                # Prompt escrito en la terminal dedicada del Creative Agent (/creative)
                 elif tipo_mensaje == "creative_command":
                     prompt = data.get("content")
                     print(f"[WebSocket Creative]: Orden recibida desde UI dedicada -> '{prompt}'")
@@ -192,7 +188,6 @@ async def websocket_endpoint(websocket: WebSocket):
         conexiones_activas.discard(websocket)
         print("[WebSocket]: Cliente desconectado.")
 
-# --- TRANSMISIONES BROADCAST ---
 async def cambiar_estado_esfera(estado: str, color_hex: str):
     if not conexiones_activas: return
     paquete = json.dumps({"tipo": "estado", "estado": estado, "color": color_hex})
@@ -231,7 +226,14 @@ async def enviar_respuesta_creative(texto: str):
         try: await ws.send_text(paquete)
         except Exception: conexiones_activas.discard(ws)
 
-# --- PUENTES MULTIHILO EXTERNOS ---
+async def actualizar_rendimiento(datos: dict):
+    """Envía el snapshot de rendimiento (hardware/agentes/módulos) al dashboard."""
+    if not conexiones_activas: return
+    paquete = json.dumps({"tipo": "rendimiento_update", "datos": datos})
+    for ws in list(conexiones_activas):
+        try: await ws.send_text(paquete)
+        except Exception: conexiones_activas.discard(ws)
+
 def transmitir_desde_hilo_externo(estado: str, color_hex: str):
     global loop_real_servidor
     if loop_real_servidor and loop_real_servidor.is_running():
@@ -257,6 +259,11 @@ def transmitir_respuesta_creative_desde_hilo_externo(texto: str):
     global loop_real_servidor
     if loop_real_servidor and loop_real_servidor.is_running():
         asyncio.run_coroutine_threadsafe(enviar_respuesta_creative(texto), loop_real_servidor)
+
+def transmitir_rendimiento_desde_hilo_externo(datos: dict):
+    global loop_real_servidor
+    if loop_real_servidor and loop_real_servidor.is_running():
+        asyncio.run_coroutine_threadsafe(actualizar_rendimiento(datos), loop_real_servidor)
 
 def iniciar_servidor_ui():
     config = uvicorn.Config(app=app, host="127.0.0.1", port=8000, log_level="warning")

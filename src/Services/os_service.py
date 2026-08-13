@@ -72,7 +72,6 @@ def normalizar_si_apunta_a_escritorio(ruta_absoluta: str) -> str:
 
     return ruta_absoluta
 
-
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
@@ -81,7 +80,6 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
     conn = obtener_conexion_pool()
     if not conn:
         return False
-
     try:
         cur = conn.cursor()
         query = """
@@ -99,9 +97,7 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
     finally:
         liberar_conexion(conn)
 
-
 # --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
-
 def guardar_ruta_actual(ruta_absoluta: str) -> bool:
     """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""
     conn = obtener_conexion_pool()
@@ -153,12 +149,14 @@ def obtener_ruta_actual() -> str:
 
 
 def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
-    """
-    Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
-    la abre en Windows Explorer y actualiza la ruta activa en PostgreSQL.
-    """
     escritorio = obtener_ruta_escritorio()
     ruta_objetivo = os.path.join(escritorio, nombre_carpeta)
+
+    if not _es_ruta_base_segura(ruta_objetivo):
+        return (
+            f"Señor, no voy a abrir '{nombre_carpeta}' porque la ruta resultante "
+            f"queda fuera de su carpeta de usuario."
+        )
 
     # 1. Intento directo
     if os.path.exists(ruta_objetivo) and os.path.isdir(ruta_objetivo):
@@ -171,22 +169,19 @@ def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
         for elemento in os.listdir(escritorio):
             if elemento.lower() == nombre_carpeta.lower():
                 ruta_coincidencia = os.path.join(escritorio, elemento)
-                if os.path.isdir(ruta_coincidencia):
+                if os.path.isdir(ruta_coincidencia) and _es_ruta_base_segura(ruta_coincidencia):
                     os.startfile(ruta_coincidencia)
                     guardar_ruta_actual(ruta_coincidencia)
                     return f"Carpeta '{elemento}' localizada y abierta exitosamente."
     except Exception as e:
         print(f"Error en búsqueda secundaria: {e}")
-
     return f"Negativo, Señor. No se localizó la carpeta '{nombre_carpeta}' en el Escritorio."
-
 
 def _sanear_nombre_carpeta(nombre: str) -> str:
     """Quita caracteres inválidos en rutas de Windows para evitar que os.makedirs falle."""
     invalidos = '<>:"/\\|?*'
     limpio = "".join(c for c in nombre if c not in invalidos).strip()
     return limpio or "Contenedor_Táctico"
-
 
 def _es_ruta_base_segura(ruta_absoluta: str) -> bool:
     """Delegado a src/Security/sanitizador.py -una sola fuente de verdad
@@ -195,17 +190,7 @@ def _es_ruta_base_segura(ruta_absoluta: str) -> bool:
     from src.Security.sanitizador import es_ruta_segura
     return es_ruta_segura(ruta_absoluta)
 
-
 def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") -> str:
-    """
-    Crea una carpeta física.
-    ruta_base admite:
-      - "actual"    -> dentro del foco de trabajo activo (última ruta usada, en PostgreSQL)
-      - algo que contenga "escritorio" / "desktop" -> directo en el Escritorio
-      - algo que contenga "documento" -> directo en Documentos
-      - una ruta absoluta DENTRO del directorio del usuario -> se usa tal cual
-      - una ruta absoluta FUERA del directorio del usuario -> se rechaza
-    """
     nombre_nueva_carpeta = _sanear_nombre_carpeta(nombre_nueva_carpeta)
     base = (ruta_base or "actual").lower().strip()
     if "escritorio" in base or "desktop" in base:
@@ -278,12 +263,10 @@ def obtener_diagnostico_hardware() -> str:
     except Exception as e:
         return f"Error al leer sensores de rendimiento: {e}"
 
-
 # --- MÓDULO DE VISIÓN NATIVE API (NVIDIA NIM / GEMINI FALLBACK) ---
 def _analizar_frame_con_llava(frame) -> str:
     try:
         creds = cargar_credenciales() or {}
-        
         # Detectar la clave de NVIDIA considerando tu nombre en el config ("NVIDIA_NIM_API_KEY")
         nvidia_key = (
             creds.get("NVIDIA_NIM_API_KEY") 
@@ -366,28 +349,6 @@ def _analizar_frame_con_llava(frame) -> str:
         return f"Error al procesar la imagen con el servicio de visión: {e}"
 
 def analizar_entorno_vision() -> str:
-    """
-    Punto de entrada usado por la tool 'analizar_camara' de NimClient
-    (comando de voz/texto: 'qué ves', 'enciende la cámara y dime qué ves').
-
-    ANTES: esta función tenía su propia lógica de apertura de cámara,
-    duplicando -de forma más simple y sin ventana en vivo- lo que ya existía
-    en src/Camara/open_camera.py (RevanCameraManager), que es el módulo que
-    también maneja el modo vigilancia. Eran dos pipelines de cámara
-    desconectados entre sí.
-
-    AHORA: delega en RevanCameraManager.capturar_y_analizar(), que:
-      1. Si la cámara ya está activa (p. ej. vigilancia corriendo), reutiliza
-         ese mismo feed en vivo sin abrir una segunda ventana.
-      2. Si está apagada, la abre, muestra el HUD con video en tiempo real
-         durante unos segundos (con warm-up de frames para evitar imágenes
-         oscuras/mal expuestas), toma el último frame estable, y la cierra
-         automáticamente al terminar.
-
-    El import es local (no a nivel de módulo) para evitar un import
-    circular: open_camera.py ya importa _analizar_frame_con_llava desde
-    este mismo archivo.
-    """
     from src.Camara.open_camera import revan_cam
 
     return revan_cam.capturar_y_analizar(duracion_segundos=3.0)

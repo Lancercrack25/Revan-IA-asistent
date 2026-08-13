@@ -39,20 +39,13 @@ def _cargar_env_desde_config_json():
             except Exception:
                 pass
 
-
 _cargar_env_desde_config_json()
-
 _SYSTEM_PROMPT_CREATIVE = (
     "Eres el módulo creativo de REVAN. Genera ideas, historias, conceptos "
     "o textos creativos según la solicitud del usuario. Sé original, conciso y "
     "ve directo al grano sin introducciones innecesarias ni rellenos."
     "no hables la ruta de la carpeta ni de la ubicación del archivo, solo entrega el contenido generado."
 )
-
-
-# ============================================================================
-# 1. GENERACIÓN DE TEXTO
-# ============================================================================
 
 def generar_contenido_creativo(descripcion_tarea: str, api_key: str = None,
                                modelo: str = "meta/llama-3.1-70b-instruct") -> str:
@@ -76,11 +69,6 @@ def generar_contenido_creativo(descripcion_tarea: str, api_key: str = None,
 
     return (respuesta.choices[0].message.content or "").strip()
 
-
-# ============================================================================
-# 2. GENERACIÓN DE IMÁGENES (Con sistema Fallback de Respaldo)
-# ============================================================================
-
 def _generar_imagen_nvidia(prompt_imagen: str, api_key: str) -> str:
     """Intenta generar la imagen utilizando el endpoint de NVIDIA NIM (SD3)."""
     url = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-medium"
@@ -90,7 +78,6 @@ def _generar_imagen_nvidia(prompt_imagen: str, api_key: str) -> str:
         "Content-Type": "application/json"
     }
     
-    # Payload estandarizado de NVIDIA Cloud Functions
     payload = {
         "prompt": prompt_imagen,
         "mode": "text-to-image",
@@ -109,7 +96,6 @@ def _generar_imagen_nvidia(prompt_imagen: str, api_key: str) -> str:
 
     raise Exception(f"HTTP {response.status_code}: {response.text}")
 
-
 def _generar_imagen_fallback(prompt_imagen: str) -> bytes:
     """Motor de respaldo instantáneo cuando la API de NVIDIA no tiene activa la función."""
     prompt_encoded = requests.utils.quote(prompt_imagen)
@@ -120,13 +106,7 @@ def _generar_imagen_fallback(prompt_imagen: str) -> bytes:
         return resp.content
     raise Exception(f"Fallback HTTP {resp.status_code}")
 
-
 def generar_imagen(prompt_imagen: str, api_key: str = None) -> str:
-    """
-    Función principal para solicitar la síntesis de una imagen.
-    Intenta NVIDIA NIM primero; si la cuenta carece del permiso/retorna 404,
-    conmuta al motor alternativo garantizando que la imagen siempre se cree.
-    """
     if not permitir_accion("creative_agent"):
         return "Señor, alcancé el límite de generación creativa en el último minuto."
 
@@ -140,7 +120,6 @@ def generar_imagen(prompt_imagen: str, api_key: str = None) -> str:
 
     contenido_bytes = None
     metodo_usado = ""
-
     # Intento 1: NVIDIA NIM
     if api_key:
         try:
@@ -154,7 +133,6 @@ def generar_imagen(prompt_imagen: str, api_key: str = None) -> str:
                 resultado=f"Fallo NVIDIA API ({e}). Usando motor de respaldo...",
                 nivel=NIVEL_ADVERTENCIA,
             )
-
     # Intento 2: Fallback (si el intento 1 falló o no había API Key)
     if not contenido_bytes:
         try:
@@ -168,7 +146,6 @@ def generar_imagen(prompt_imagen: str, api_key: str = None) -> str:
                 nivel=NIVEL_ADVERTENCIA,
             )
             return f"Señor, no fue posible sintetizar la imagen en este momento: {e}"
-
     # Guardar en disco
     try:
         ruta_guardado = guardar_bytes_imagen(contenido_bytes, prompt_limpio)
@@ -181,11 +158,6 @@ def generar_imagen(prompt_imagen: str, api_key: str = None) -> str:
         return f"Señor, la imagen de '{prompt_limpio}' fue sintetizada con éxito [{metodo_usado}] y guardada en:\n{ruta_guardado}"
     except Exception as e:
         return f"La imagen se generó pero hubo un error al guardar en disco: {e}"
-
-
-# ============================================================================
-# PERSISTENCIA
-# ============================================================================
 
 def _slug_desde_tarea(descripcion_tarea: str) -> str:
     slug = re.sub(r'[^a-zA-Z0-9]+', '_', descripcion_tarea.strip().lower())
@@ -206,7 +178,6 @@ def guardar_texto_generado(contenido: str, descripcion_tarea: str) -> str:
 
     return ruta_completa
 
-
 def guardar_bytes_imagen(contenido_bytes: bytes, prompt_imagen: str) -> str:
     """Guarda directamente los bytes de la imagen en formato PNG/JPG en el Escritorio."""
     from src.Services.os_service import obtener_ruta_escritorio
@@ -221,7 +192,6 @@ def guardar_bytes_imagen(contenido_bytes: bytes, prompt_imagen: str) -> str:
         f.write(contenido_bytes)
 
     return ruta_completa
-
 
 def ejecutar_tarea_creativa(descripcion_tarea: str, api_key: str = None) -> str:
     """Punto de entrada principal para tareas creativas de texto."""
@@ -244,6 +214,5 @@ def ejecutar_tarea_creativa(descripcion_tarea: str, api_key: str = None) -> str:
         ruta_guardado = guardar_texto_generado(contenido, descripcion_tarea)
     except Exception:
         ruta_guardado = None
-
     ubicacion = f"\n\n(Guardado en: {ruta_guardado})" if ruta_guardado else ""
     return f"{contenido}{ubicacion}"

@@ -11,12 +11,15 @@ límite fijo es más fácil de razonar, depurar, y ajustar que un algoritmo
 sofisticado, y para este caso de uso (evitar loops descontrolados, no
 proteger una API pública de miles de usuarios) es más que suficiente.
 """
+
 import time
 import threading
 from collections import defaultdict
 from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
 _lock = threading.Lock()
 _registro_llamadas = defaultdict(list)  # categoria -> lista de timestamps
+
 # (límite de acciones, ventana en segundos) por categoría.
 LIMITES_POR_DEFECTO = {
     "whatsapp": (5, 60),
@@ -26,10 +29,12 @@ LIMITES_POR_DEFECTO = {
     "documentos": (8, 60),
     "coder_agent": (5, 60),
     "creative_agent": (5, 60),
+    "electronics": (10, 60),
     "limpieza_sistema": (3, 60),
     "comando_sistema": (10, 60),
     "default": (10, 60),
 }
+
 
 def permitir_accion(categoria: str) -> bool:
     limite, ventana = LIMITES_POR_DEFECTO.get(categoria, LIMITES_POR_DEFECTO["default"])

@@ -77,20 +77,5 @@ def estado_conexion() -> str:
 
     return "Estado de conexión del teléfono Fallida, Señor."
 
-# --- GESTIÓN DE ACCIONES PENDIENTES ---
-def guardar_accion_pendiente(tipo: str, datos: dict):
-    global _accion_pendiente
-    _accion_pendiente = {"tipo": tipo, "datos": datos}
-
-def obtener_accion_pendiente():
-    return _accion_pendiente
-
-def limpiar_accion_pendiente():
-    global _accion_pendiente
-    _accion_pendiente = None
-
-def hay_accion_pendiente() -> bool:
-    return _accion_pendiente is not None
-
 if __name__ == "__main__":
     print(estado_conexion())

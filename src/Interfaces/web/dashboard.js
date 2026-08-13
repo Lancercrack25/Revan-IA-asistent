@@ -9,12 +9,18 @@ const SOUND_PATHS = {
 };
 
 let userInteracted = false;
+const AUDIO_CACHE = {
+    hover: new Audio(SOUND_PATHS.hover),
+    click: new Audio(SOUND_PATHS.click),
+    section: new Audio(SOUND_PATHS.section),
+};
+Object.values(AUDIO_CACHE).forEach(a => { a.preload = 'auto'; });
 
 function unlockAudioEngine() {
     if (userInteracted) return;
     userInteracted = true;
     
-    const dummy = new Audio(SOUND_PATHS.click);
+    const dummy = AUDIO_CACHE.click.cloneNode();
     dummy.volume = 0.01;
     dummy.play().then(() => dummy.pause()).catch(() => {});
     
@@ -27,9 +33,9 @@ window.addEventListener('keydown', unlockAudioEngine);
 
 // Reproduce audio normal (Hover/Section)
 function playDirectSound(type, volume = 0.8) {
-    if (!SOUND_PATHS[type]) return;
+    if (!AUDIO_CACHE[type]) return;
     try {
-        const snd = new Audio(SOUND_PATHS[type]);
+        const snd = AUDIO_CACHE[type].cloneNode();
         snd.volume = volume;
         snd.play().catch(() => {});
     } catch (e) {}
@@ -40,7 +46,7 @@ function playClickAndNavigate(callbackUrl = null) {
     unlockAudioEngine();
     
     try {
-        const clickAudio = new Audio(SOUND_PATHS.click);
+        const clickAudio = AUDIO_CACHE.click.cloneNode();
         clickAudio.volume = 1.1;
 
         // Si hay una redirección, esperamos a que el audio inicie/avance
@@ -72,7 +78,7 @@ function playClickAndNavigate(callbackUrl = null) {
 }
 
 function playHoverSFX() { playDirectSound('hover', 0.6); }
-function playSectionSFX() { playDirectSound('section', 0.8); }
+function playSectionSFX() { playDirectSound('click', 0.8); }
 
 document.addEventListener("DOMContentLoaded", () => {
     initParticles();
@@ -283,6 +289,8 @@ function conectarWebSocket() {
             if (data.tipo === "chat" || data.tipo === "log") {
                 const tag = data.rol ? data.rol.toUpperCase() : "SYS";
                 addLog(`[${tag}]: ${data.texto}`, data.rol || "system");
+            } else if (data.tipo === "rendimiento_update" && data.datos) {
+                window.dispatchEvent(new CustomEvent("revan:rendimiento", { detail: data.datos }));
             }
         } catch (e) {
             addLog(`> RAW: ${event.data}`, "system");
@@ -352,13 +360,14 @@ function addLog(msg, type = "system") {
 
 function startMetricsSimulation() {
     const cpuFill = document.querySelector(".cpu-fill");
-    
-    setInterval(() => {
-        if (cpuFill) {
-            const randomCpu = Math.floor(Math.random() * (65 - 28 + 1)) + 28;
-            cpuFill.style.width = `${randomCpu}%`;
+
+    window.addEventListener("revan:rendimiento", (evento) => {
+        const hardware = evento.detail && evento.detail.hardware;
+        if (!hardware || !cpuFill) return;
+        if (typeof hardware.cpu_percent === "number") {
+            cpuFill.style.width = `${hardware.cpu_percent}%`;
         }
-    }, 2500);
+    });
 }
 
 function updateLiveBeacon(online) {
@@ -379,9 +388,3 @@ function updateLiveBeacon(online) {
         }
     }
 }
-
-let testClick = new Audio(window.location.origin + '/src/Sounds/welcome/clicks.mp3');
-testClick.volume = 1.0;
-testClick.play()
-    .then(() => console.log("✅ EL MP3 SÍ EXISTE Y SÍ SUENA"))
-    .catch(err => console.error("❌ ERROR AL REPRODUCIR:", err));

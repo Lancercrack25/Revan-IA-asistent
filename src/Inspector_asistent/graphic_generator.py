@@ -25,16 +25,13 @@ def _cargar_historial() -> dict:
         "warnings": [18, 12, 9]
     }
 
-
 def registrar_nuevo_escaneo(errores: int, warnings: int, max_puntos: int = 7) -> dict:
     """Registra los resultados de una nueva inspección en el JSON local."""
     historial = _cargar_historial()
-    
     num_escaneo = len(historial["labels"]) + 1
     historial["labels"].append(f"Escan {num_escaneo}")
     historial["errores"].append(errores)
     historial["warnings"].append(warnings)
-
     # Limitar la cantidad de puntos en el eje X para mantener la gráfica scannable
     if len(historial["labels"]) > max_puntos:
         historial["labels"] = historial["labels"][-max_puntos:]
@@ -46,16 +43,13 @@ def registrar_nuevo_escaneo(errores: int, warnings: int, max_puntos: int = 7) ->
             json.dump(historial, f, indent=4)
     except Exception as e:
         print(f"[INSPECTOR GRAPHIC]: Error al guardar historial: {e}")
-
     return historial
-
 
 def _renderizar_y_mostrar(historico_labels, historico_errores, historico_warnings, guardar_en_disco, mostrar_pantalla, ruta_salida):
     """Función interna que crea la figura de Matplotlib."""
     fig, ax = plt.subplots(figsize=(9, 4.5), dpi=120)
     fig.patch.set_facecolor('#0a0f19')  # Fondo externo muy oscuro
     ax.set_facecolor('#0d1322')         # Fondo interno del plot
-
     # Trazar líneas de neón
     ax.plot(
         historico_labels, historico_errores, 
@@ -132,7 +126,6 @@ def generar_grafica_telemetria_inspector(
         _renderizar_y_mostrar(*args_render)
 
     return ruta_salida
-
 
 if __name__ == "__main__":
     print("Prueba directa del módulo gráfico...")

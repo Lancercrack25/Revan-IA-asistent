@@ -31,19 +31,11 @@ import subprocess
 import tempfile
 import shutil
 import uuid
-
 from src.Security.sanitizador import sanitizar_o_rechazar, EntradaNoSeguraError
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA, NIVEL_CRITICO
 
 TIMEOUT_SEGUNDOS_DEFAULT = 15
 LIMITE_SALIDA_CARACTERES = 4000
-
-# Lista blanca de ejecutables permitidos en ejecutar_comando_sistema. Esto es
-# MÁS estricto que solo filtrar caracteres peligrosos (sanitizador.py): en
-# vez de "prohíbo lo que reconozco como malo", es "permito solo lo que
-# reconozco como necesario". Para algo que va a ejecutar comandos elegidos
-# por un LLM (Coder_agent), lista blanca es bastante más seguro que lista
-# negra. Amplía esta lista solo con lo que realmente vayas a necesitar.
 COMANDOS_PERMITIDOS = {
     "git", "python", "python3", "pip", "pip3", "node", "npm", "npx",
 }
@@ -63,11 +55,6 @@ class ResultadoSandbox:
 
 
 def ejecutar_codigo_python(codigo: str, timeout_segundos: int = TIMEOUT_SEGUNDOS_DEFAULT) -> ResultadoSandbox:
-    """
-    Ejecuta un fragmento de código Python en un subproceso aislado dentro
-    de un directorio temporal exclusivo (que se borra al terminar, exista
-    o no error), con timeout obligatorio.
-    """
     if not codigo or not codigo.strip():
         return ResultadoSandbox(False, "", "No se proporcionó código para ejecutar.", -1)
 
@@ -140,11 +127,6 @@ def ejecutar_comando_sistema(comando: list, timeout_segundos: int = TIMEOUT_SEGU
     """
     if not isinstance(comando, list) or not comando:
         return ResultadoSandbox(False, "", "El comando debe ser una lista de argumentos, no un string.", -1)
-
-    # Lista blanca: el ejecutable (comando[0]) tiene que estar en
-    # COMANDOS_PERMITIDOS. Se compara por el nombre base, sin ruta ni
-    # extensión, para que tanto "python" como "/usr/bin/python3.11" o
-    # "python.exe" sean reconocidos.
     ejecutable = os.path.basename(str(comando[0])).lower()
     ejecutable_sin_extension = ejecutable.rsplit(".", 1)[0] if "." in ejecutable else ejecutable
 

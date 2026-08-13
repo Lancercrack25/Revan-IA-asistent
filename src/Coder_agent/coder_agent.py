@@ -6,19 +6,16 @@ Genera código en Python, C++, C#, Java, Rust, Go, JS, etc.
   - Lenguajes compilados/web (C++, C#, Rust, JS, etc.): Se guardan con su extensión
     correspondiente en 'Escritorio/Codigos_REVAN/'.
 """
-
 import re
 import os
 import time
 import json
 from pathlib import Path
 import requests
-
 from src.Security.sandbox import ejecutar_codigo_python
 from src.Security.confirmation import GestorConfirmacion
 from src.Security.rate_limiter import permitir_accion
 from src.Security.auditoria import registrar_evento, NIVEL_INFO, NIVEL_ADVERTENCIA
-
 
 def _cargar_env_desde_config_json():
     """Carga variables desde la carpeta 'config' asignando las API Keys."""
@@ -58,12 +55,10 @@ _SYSTEM_PROMPT_CODER = (
     "no hables la ruta de la carpeta ni de la ubicación del archivo, solo entrega el contenido generado."
 )
 
-
 def _obtener_api_key() -> str:
     """Obtiene únicamente la API Key configurada para el Coder Agent."""
     _cargar_env_desde_config_json()
     return os.getenv("CODER_API_KEY", "").strip()
-
 
 def _limpiar_codigo_generado(texto: str) -> str:
     """Quita envoltorios de markdown si el modelo los incluyó por error."""
@@ -71,7 +66,6 @@ def _limpiar_codigo_generado(texto: str) -> str:
     texto = re.sub(r'^```(?:python|cpp|c\+\+|cs|csharp|java|rust|go|javascript|js|html|php|ino)?\s*\n?', '', texto)
     texto = re.sub(r'\n?```$', '', texto)
     return texto.strip()
-
 
 def generar_codigo(descripcion_tarea: str, api_key: str = None,
                    modelo: str = "meta/llama-3.1-8b-instruct") -> str:
@@ -108,7 +102,6 @@ def generar_codigo(descripcion_tarea: str, api_key: str = None,
     else:
         raise Exception(f"Error HTTP {response.status_code}: {response.text}")
 
-
 def detectar_formato(codigo: str):
     """Determina la sintaxis y extensión adecuada para el lenguaje generado."""
     c_str = codigo.lower()
@@ -141,7 +134,6 @@ def detectar_formato(codigo: str):
     # Por defecto, se asume Python
     return "Python", ".py"
 
-
 def detectar_riesgo(codigo: str):
     """Analiza el código Python buscando operaciones sensibles."""
     categorias_detectadas = []
@@ -151,11 +143,9 @@ def detectar_riesgo(codigo: str):
 
     return (len(categorias_detectadas) > 0), categorias_detectadas
 
-
 def _slug_desde_tarea(descripcion_tarea: str) -> str:
     slug = re.sub(r'[^a-zA-Z0-9]+', '_', descripcion_tarea.strip().lower())
     return slug.strip('_')[:40] or "tarea"
-
 
 def guardar_codigo_generado(codigo: str, descripcion_tarea: str, extension: str) -> str:
     """Guarda copia permanente en Escritorio/Codigos_REVAN."""
@@ -171,7 +161,6 @@ def guardar_codigo_generado(codigo: str, descripcion_tarea: str, extension: str)
         f.write(codigo)
 
     return ruta_completa
-
 
 def _ejecutar_y_formatear(codigo: str, ruta_guardado: str) -> str:
     resultado_sandbox = ejecutar_codigo_python(codigo)
@@ -256,7 +245,6 @@ def ejecutar_tarea_codigo(descripcion_tarea: str, api_key: str = None) -> str:
         )
     
     return _ejecutar_y_formatear(codigo, ruta_guardado)
-
 
 def procesar_confirmacion_codigo(texto_respuesta: str):
     return _gestor_confirmacion_codigo.procesar_respuesta(texto_respuesta)

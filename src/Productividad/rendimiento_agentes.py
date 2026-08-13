@@ -1,0 +1,40 @@
+#este archivo se hara cargoi de mostrar el rendimiento de los agentes de manera mas detallada y con graficas, para poder ver el rendimiento de cada agente y poder compararlos entre si, ademas de poder ver el rendimiento de cada agente en diferentes momentos del dia, para poder ver si hay algun agente que este teniendo un rendimiento bajo en algun momento del dia y poder tomar medidas al respecto.
+"""
+rendimiento_agentes.py — estadísticas reales de uso de los agentes
+(Coder_agent, Creative_agent, Electronics) a partir del log de auditoría
+de seguridad que YA se está escribiendo (src/Security/auditoria.py).
+"""
+from collections import defaultdict
+from src.Security.auditoria import leer_eventos_recientes
+_AGENTES_MONITOREADOS = ["coder_agent", "creative_agent", "actions_agent", "Revan"]
+
+_ETIQUETAS_LEGIBLES = {
+    "coder_agent": "Coder Agent",
+    "creative_agent": "Creative Agent",
+    "actions_agent": "Actions Agent",
+    "Revan": "Revan"
+}
+
+def obtener_rendimiento_agentes(ventana_eventos: int = 300) -> dict:
+    eventos = leer_eventos_recientes(ventana_eventos)
+
+    resumen = {
+        etiqueta: {"eventos": 0, "advertencias": 0, "criticos": 0, "ultimo_evento": None}
+        for etiqueta in [_ETIQUETAS_LEGIBLES[m] for m in _AGENTES_MONITOREADOS]
+    }
+
+    for ev in eventos:
+        modulo = ev.get("modulo", "")
+        if modulo not in _AGENTES_MONITOREADOS:
+            continue
+
+        etiqueta = _ETIQUETAS_LEGIBLES[modulo]
+        nivel = ev.get("nivel", "INFO")
+
+        resumen[etiqueta]["eventos"] += 1
+        if nivel == "ADVERTENCIA":
+            resumen[etiqueta]["advertencias"] += 1
+        elif nivel == "CRITICO":
+            resumen[etiqueta]["criticos"] += 1
+        resumen[etiqueta]["ultimo_evento"] = ev.get("timestamp")
+    return resumen

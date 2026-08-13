@@ -8,15 +8,10 @@ class GeminiClient:
     a Llama 3.1 8B Instruct en NVIDIA NIM para evitar errores de cuotas de Google.
     """
     def __init__(self):
-        credenciales = cargar_credenciales()
-        ajustes = cargar_ajustes()
-
-        # Toma la nueva API Key de respaldo o la principal de NVIDIA
+        credenciales = cargar_credenciales() or {}
+        ajustes = cargar_ajustes() or {}
         api_key = (
-            credenciales.get("NVIDIA_NIM_RESPALDO_KEY") or 
-            credenciales.get("NVIDIA_NIM_API_KEY") or 
-            os.environ.get("NVIDIA_NIM_RESPALDO_KEY") or
-            os.environ.get("NVIDIA_NIM_API_KEY")
+            credenciales.get("GEMINI_API_KEY")
         )
 
         if not api_key:

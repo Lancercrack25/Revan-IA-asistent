@@ -34,12 +34,12 @@ def cargar_ajustes():
         print('El archivo settings.json tiene un formato json dañado favor de arreglarlo')
         return None
 
-    if __name__ == "__main__":
-        datos = cargar_credenciales()
-        ajustes = cargar_ajustes()
-        if datos:
-            print("Credenciales cargadas correctamente:")
-        if ajustes:
-            print("Ajustes cargados correctamente:")
-        else:
-            print("No se pudieron cargar las credenciales o ajustes.")
+if __name__ == "__main__":
+    datos = cargar_credenciales()
+    ajustes = cargar_ajustes()
+    if datos:
+        print("Credenciales cargadas correctamente:")
+    if ajustes:
+        print("Ajustes cargados correctamente:")
+    else:
+        print("No se pudieron cargar las credenciales o ajustes.")
