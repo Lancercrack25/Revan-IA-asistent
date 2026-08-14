@@ -198,9 +198,6 @@ class ElevenLabsClient:
                 )
                 print("[Voz]: OmniVoice precalentado.")
             except Exception:
-                # Si no está corriendo, no pasa nada -el primer hablar()
-                # real de todos modos hará su propio intento y caerá al
-                # respaldo si sigue sin responder.
                 pass
 
         threading.Thread(target=_tarea, daemon=True).start()
@@ -210,10 +207,6 @@ class ElevenLabsClient:
 client_voz = ElevenLabsClient()
 
 def hablar_en_hilo_seguro(texto: str):
-    """
-    Despacha la reproducción de voz a un hilo demonio independiente.
-    Garantiza que el envío de respuestas por WebSocket y UI sea instantáneo.
-    """
     threading.Thread(
         target=client_voz.hablar,
         args=(texto,),

@@ -44,12 +44,6 @@ oidos_ia = None
 titulo = "Señor"
 sistema_activo = False
 esta_hablando = False
-# 'esta_hablando' se lee/escribe desde el hilo de escucha (bucle_escucha_hilo)
-# y desde cada hilo que reproduce voz. El lock evita la ventana de carrera
-# donde el hilo de escucha revisa la bandera justo en el instante en que
-# otro hilo todavía no ha terminado de marcarla -eso era lo que hacía que
-# la esfera a veces no se pusiera roja al hablar, o no volviera a azul al
-# terminar-.
 lock_estado_habla = threading.Lock()
 ultima_interaccion = 0
 TIEMPO_ATENCION = 18
