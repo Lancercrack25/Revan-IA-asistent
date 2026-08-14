@@ -49,7 +49,6 @@ ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
-    # --- Módulo de Aplicaciones & Archivos ---
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
@@ -81,7 +80,6 @@ def es_intencion_de_comando(texto: str) -> bool:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
-        
     return es_orden
 
 def hilo_servidor_web():

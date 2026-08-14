@@ -22,7 +22,7 @@ class ElevenLabsClient:
 
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
-        self.timeout_omnivoice = 2
+        self.timeout_omnivoice = 1
         # Código ISO 639-1 para OmniVoice Studio. Confirmado contra el
         # esquema real de /v1/audio/speech (ver docs de OmniVoice Studio en
         # http://127.0.0.1:3900/docs): el campo se llama 'language' y espera
