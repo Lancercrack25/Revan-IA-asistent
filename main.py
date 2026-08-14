@@ -49,6 +49,7 @@ ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
+    # --- Módulo de Aplicaciones & Archivos ---
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
@@ -80,6 +81,7 @@ def es_intencion_de_comando(texto: str) -> bool:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
+        
     return es_orden
 
 def hilo_servidor_web():
@@ -96,6 +98,22 @@ def sincronizar_estado_esfera(estado, color_hex):
         print(f" Error al sincronizar esfera: {e}")
 
 def hablar_sincronizado(accion_de_voz):
+    """
+    Reemplaza los 5 bloques repetidos de 'esta_hablando = True; sincronizar
+    HABLANDO; ...; esta_hablando = False; sincronizar ESPERA' que había
+    sueltos por el archivo (incluidas las llamadas que iban directo a
+    hablar_en_hilo_seguro sin tocar el estado de la esfera en absoluto).
+
+    La bandera y el color HABLANDO se fijan de forma SÍNCRONA, en el hilo
+    que llama a esta función, ANTES de lanzar el hilo que realmente
+    reproduce el audio. Así, cuando bucle_escucha_hilo vuelve a revisar
+    'esta_hablando' en su siguiente vuelta (cada ~0.05s), la bandera ya
+    está en True sin ninguna ventana de tiempo en la que pueda leerla como
+    False por error -que era la causa real de la desincronización-.
+
+    'accion_de_voz' es un callable sin argumentos que hace la reproducción
+    real (una llamada a voz_ia.hablar(...), por ejemplo).
+    """
     global esta_hablando
     with lock_estado_habla:
         esta_hablando = True
@@ -281,13 +299,6 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
-    """
-    Cada 'intervalo_segundos' toma un snapshot de hardware/agentes/módulos
-    y lo transmite por WebSocket -alimenta las gráficas en tiempo real de
-    la página de Rendimiento en el dashboard-. Corre mientras el sistema
-    esté activo; si algo falla en una vuelta, no tumba el hilo, solo lo
-    reporta y sigue en la siguiente.
-    """
     global sistema_activo
     while sistema_activo:
         try:
@@ -545,8 +556,15 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             return
         # --- 5. MÓDULO WHATSAPP ---
         palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
-        es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in ["confirma", "confirmar", "envialo", "mandalo", "si envialo", "si mandala"])
-        es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in ["cancela", "cancelar", "aborta", "abortar", "no lo envies"])
+        es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in [
+            "confirma", "confirmar", "confirmalo", "envialo", "mandalo",
+            "si envialo", "si mandala", "procede", "adelante", "ejecuta",
+            "ejecutalo", "hazlo", "dale",
+        ])
+        es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in [
+            "cancela", "cancelar", "cancelalo", "aborta", "abortar",
+            "no lo envies", "detente", "mejor no",
+        ])
 
         if es_confirmacion or es_cancelacion:
             resultado_codigo = procesar_confirmacion_codigo(orden_limpia)

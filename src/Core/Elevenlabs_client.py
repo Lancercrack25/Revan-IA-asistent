@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import asyncio
 import threading
 import requests
@@ -23,14 +24,6 @@ class ElevenLabsClient:
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
         self.timeout_omnivoice = 1
-        # Código ISO 639-1 para OmniVoice Studio. Confirmado contra el
-        # esquema real de /v1/audio/speech (ver docs de OmniVoice Studio en
-        # http://127.0.0.1:3900/docs): el campo se llama 'language' y espera
-        # un código de 2 letras, no el nombre completo del idioma. Antes el
-        # payload no mandaba este campo -sin él, el motor generaba con el
-        # idioma por defecto (no español), lo que sonaba con acento/fonética
-        # de otro idioma sobre la voz clonada, aunque la voz en sí ya estaba
-        # guardada correctamente como español en su perfil.
         self.idioma_tts = "es"
 
         if not pygame.mixer.get_init():
@@ -79,6 +72,7 @@ class ElevenLabsClient:
         output_filename = "output.mp3"
 
         try:
+            t_inicio = time.time()
             # Timeout de conexión muy reducido (1.5s) si OmniVoice no está corriendo
             respuesta = requests.post(
                 self.url_api, json=payload,
@@ -87,7 +81,7 @@ class ElevenLabsClient:
             )
 
             if respuesta.status_code != 200:
-                print(f"[Voz]: OmniVoice devolvió error {respuesta.status_code}.")
+                print(f"[Voz]: OmniVoice devolvió error {respuesta.status_code}: {respuesta.text[:200]}")
                 return False
 
             with open(output_filename, "wb") as f:
@@ -95,7 +89,7 @@ class ElevenLabsClient:
                     if chunk:
                         f.write(chunk)
 
-            print("🎵 [OmniVoice]: Audio generado con éxito. Reproduciendo...")
+            print(f"🎵 [OmniVoice]: Audio generado en {time.time() - t_inicio:.2f}s. Reproduciendo...")
             pygame.mixer.music.load(output_filename)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
@@ -110,11 +104,21 @@ class ElevenLabsClient:
 
             return True
 
-        except requests.exceptions.Timeout:
-            print(f"[Voz]: OmniVoice tardó demasiado, cambiando a respaldo rápido...")
+        except requests.exceptions.ConnectTimeout:
+            print("[Voz]: OmniVoice no respondió a la conexión en 1.5s -¿está la app corriendo?- usando respaldo...")
             return False
-        except Exception:
-            # OmniVoice fuera de línea -> saltar suavemente al respaldo
+        except requests.exceptions.ReadTimeout:
+            print(f"[Voz]: OmniVoice conectó pero no terminó de generar el audio en {self.timeout_omnivoice}s, usando respaldo...")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            print(f"[Voz]: No se pudo conectar a OmniVoice ({e}), usando respaldo...")
+            return False
+        except Exception as e:
+            # Antes esto era 'except Exception: return False' sin imprimir
+            # nada -cualquier error que no fuera timeout quedaba invisible,
+            # imposible de diagnosticar desde la consola. Ahora se imprime
+            # el tipo y mensaje real del error.
+            print(f"[Voz]: Error inesperado hablando con OmniVoice ({type(e).__name__}: {e}), usando respaldo...")
             return False
 
     async def _generar_audio_respaldo(self, texto: str, ruta_salida: str):
@@ -192,6 +196,9 @@ class ElevenLabsClient:
                 )
                 print("[Voz]: OmniVoice precalentado.")
             except Exception:
+                # Si no está corriendo, no pasa nada -el primer hablar()
+                # real de todos modos hará su propio intento y caerá al
+                # respaldo si sigue sin responder.
                 pass
 
         threading.Thread(target=_tarea, daemon=True).start()
@@ -201,6 +208,10 @@ class ElevenLabsClient:
 client_voz = ElevenLabsClient()
 
 def hablar_en_hilo_seguro(texto: str):
+    """
+    Despacha la reproducción de voz a un hilo demonio independiente.
+    Garantiza que el envío de respuestas por WebSocket y UI sea instantáneo.
+    """
     threading.Thread(
         target=client_voz.hablar,
         args=(texto,),
