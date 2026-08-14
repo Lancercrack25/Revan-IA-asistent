@@ -32,6 +32,7 @@ LIMITES_POR_DEFECTO = {
     "electronics": (10, 60),
     "limpieza_sistema": (3, 60),
     "comando_sistema": (10, 60),
+    "investigacion": (10, 60),
     "default": (10, 60),
 }
 

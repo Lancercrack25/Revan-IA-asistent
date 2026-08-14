@@ -61,6 +61,7 @@ from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Phone.whatsapp_service import preparar_envio_inteligente, procesar_confirmacion
 from src.Security.rate_limiter import permitir_accion
 from src.Core.text_utils import limpiar_texto_para_voz
+from src.Services.research_service import buscar_y_resumir_tema
 from src.Emails.email_control import contar_correos_sin_leer, leer_ultimos_correos
 from src.Security.proteccion_contenido import envolver_contenido_externo
 
@@ -359,7 +360,10 @@ HERRAMIENTAS = [
                 "Escribe código Python para una tarea de programación (scripts, utilidades, "
                 "apoyo para electrónica/Arduino/ESP32/sensores por puerto serial, cálculos, "
                 "análisis, etc.) y lo ejecuta. Úsala cuando te pidan programar, escribir un "
-                "script, automatizar algo con código, o ayuda técnica de programación."
+                "script, automatizar algo con código, o ayuda técnica de programación. "
+                "NO uses esta herramienta para investigar un tema, redactar texto informativo, "
+                "resúmenes, o responder preguntas de conocimiento general -para eso existe "
+                "'investigar_tema'-."
             ),
             "parameters": {
                 "type": "object",
@@ -370,6 +374,29 @@ HERRAMIENTAS = [
                     }
                 },
                 "required": ["descripcion_tarea"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "investigar_tema",
+            "description": (
+                "Busca información real sobre un tema (Wikipedia) y devuelve un resumen. "
+                "Úsala cuando te pidan 'investigar', 'buscar información sobre', o "
+                "'qué sabes de' un tema -NUNCA para generar código, aunque el tema sea "
+                "técnico (ej. 'investiga sobre agujeros negros' es esta herramienta, no "
+                "generar_y_ejecutar_codigo)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "termino_busqueda": {
+                        "type": "string",
+                        "description": "El tema exacto a investigar, tal como lo pidió el usuario.",
+                    }
+                },
+                "required": ["termino_busqueda"],
             },
         },
     },
@@ -460,6 +487,7 @@ HERRAMIENTAS = [
 
 class NimClient:
     def __init__(self, api_key: str = None, modelo: str = "meta/llama-3.1-8b-instruct"):
+        print("[NimClient] VERSIÓN: fix-toolcall-texto-v2 (max_tokens=2048, detector de JSON crudo activo)")
         self.api_key = api_key or os.getenv("NVIDIA_NIM_API_KEY", "")
         if not self.api_key:
             raise ValueError("Falta la API key de NVIDIA NIM.")
@@ -540,6 +568,7 @@ class NimClient:
         "leer_sensor_serial": "electronics",
         "enviar_comando_electronico": "electronics",
         "crear_documento_word": "documentos",
+        "investigar_tema": "investigacion",
         "crear_hoja_excel": "documentos",
         "contar_correos_no_leidos": "correo",
         "leer_correos_recientes": "correo",
@@ -688,6 +717,14 @@ class NimClient:
                 registrar_accion_sistema(f"coder_agent({descripcion_tarea[:60]})", resultado, "CODER_AGENT")
                 return resultado
 
+            elif nombre == "investigar_tema":
+                termino_busqueda = argumentos.get("termino_busqueda", "")
+                if not termino_busqueda.strip():
+                    return "Señor, ¿sobre qué tema desea que investigue?"
+                resultado = buscar_y_resumir_tema(termino_busqueda)
+                registrar_accion_sistema(f"investigar_tema({termino_busqueda[:60]})", resultado, "RESEARCH")
+                return resultado
+
             elif nombre == "generar_imagen_ia":
                 prompt = argumentos.get("prompt", "")
                 if not prompt.strip():
@@ -761,17 +798,6 @@ class NimClient:
                 tools=HERRAMIENTAS,
                 tool_choice="auto",
                 temperature=0.1,
-                # Antes en 250: apenas alcanza para una respuesta corta de
-                # chat, pero herramientas como crear_documento_word/
-                # crear_hoja_excel necesitan devolver contenido largo
-                # (varios párrafos) dentro del JSON de la llamada. Con 250
-                # el modelo se quedaba a la mitad de una llave sin cerrar
-                # -JSON roto, imposible de recuperar incluso detectando que
-                # 'esto era un tool-call'-. 2048 le da margen real a un
-                # documento de tamaño normal sin disparar el costo/latencia
-                # de forma desproporcionada en las respuestas cortas
-                # normales (el modelo no está obligado a usar todo el
-                # espacio, esto es un techo, no un piso).
                 max_tokens=2048,
             )
             print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
@@ -791,10 +817,6 @@ class NimClient:
                 try:
                     argumentos = json.loads(tool_call.function.arguments or "{}")
                 except json.JSONDecodeError:
-                    # Antes esto quedaba en silencio -la herramienta se
-                    # ejecutaba igual con argumentos={}, por ejemplo
-                    # creando un Word vacío sin avisar que el JSON llegó
-                    # truncado (normalmente por max_tokens insuficiente).
                     print(f"[NimClient] Argumentos de '{nombre_herramienta}' llegaron con JSON inválido/truncado: {tool_call.function.arguments!r}")
                     argumentos = {}
 
@@ -812,15 +834,6 @@ class NimClient:
             return respuesta_directa
 
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
-
-        # A veces el modelo NO usa el mecanismo real de tool_calls (por el
-        # que ya se pasó arriba) y en vez de eso escribe el JSON de la
-        # llamada como si fuera texto normal de respuesta -por ejemplo:
-        # {"name": "crear documento word", "parameters": {...}}. Antes eso
-        # se mandaba tal cual a pantalla/voz, mostrando el JSON crudo en
-        # vez de ejecutar la acción. Se detecta ese patrón y se intenta
-        # ejecutar la herramienta manualmente como si el modelo la hubiera
-        # llamado correctamente.
         intento_manual = self._intentar_ejecutar_tool_call_como_texto(mensaje.content or "")
         if intento_manual is not None:
             self.historial.append({"role": "assistant", "content": intento_manual})
@@ -830,35 +843,19 @@ class NimClient:
         return respuesta_final
 
     def _intentar_ejecutar_tool_call_como_texto(self, texto: str):
-        """
-        Devuelve el resultado de ejecutar la herramienta si 'texto' es en
-        realidad un tool-call mal formateado como JSON plano (patrón
-        {"name": "...", "parameters": {...}}), o None si 'texto' es una
-        respuesta conversacional normal y no debe tocarse.
-        """
         texto = (texto or "").strip()
         if not (texto.startswith("{") and '"name"' in texto and '"parameters"' in texto):
             return None
         try:
             datos = json.loads(texto)
-        except json.JSONDecodeError:
-            # Casi-JSON pero roto (le falta cerrar una llave, etc.) -no hay
-            # forma segura de recuperarlo, mejor devolver None y dejar que
-            # el mensaje de respaldo normal se use en vez de intentar
-            # adivinar y ejecutar algo incorrecto.
+        except json.JSONDecodeError as e:
+            print(f"[NimClient] Detecté un tool-call en texto plano pero el JSON está roto/incompleto ({e}). Últimos 100 caracteres: ...{texto[-100:]!r}")
             return None
 
         nombre_herramienta = datos.get("name")
         argumentos = datos.get("parameters", {})
         if not nombre_herramienta or not isinstance(argumentos, dict):
             return None
-
-        # El modelo a veces escribe el nombre con espacios en vez de guion
-        # bajo ("crear documento word" en vez de "crear_documento_word")
-        # justo cuando falla al mecanismo real de tool_calls. _ejecutar_
-        # herramienta compara por igualdad exacta, así que sin esto el
-        # nombre nunca haría match aunque ya detectáramos que es un
-        # tool-call disfrazado de texto.
         nombre_herramienta = nombre_herramienta.strip().lower().replace(" ", "_")
 
         print(f"[NimClient] Tool-call detectado como texto plano, ejecutando de todos modos -> {nombre_herramienta}({argumentos})")
