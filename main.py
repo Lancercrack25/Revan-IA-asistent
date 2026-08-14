@@ -44,6 +44,12 @@ oidos_ia = None
 titulo = "Señor"
 sistema_activo = False
 esta_hablando = False
+# 'esta_hablando' se lee/escribe desde el hilo de escucha (bucle_escucha_hilo)
+# y desde cada hilo que reproduce voz. El lock evita la ventana de carrera
+# donde el hilo de escucha revisa la bandera justo en el instante en que
+# otro hilo todavía no ha terminado de marcarla -eso era lo que hacía que
+# la esfera a veces no se pusiera roja al hablar, o no volviera a azul al
+# terminar-.
 lock_estado_habla = threading.Lock()
 ultima_interaccion = 0
 TIEMPO_ATENCION = 18
@@ -80,7 +86,8 @@ def es_intencion_de_comando(texto: str) -> bool:
     if es_orden:
         print("Clasificado localmente -> ORDEN")
     else:
-        print("Clasificado localmente -> CONVERSACIÓN")  
+        print("Clasificado localmente -> CONVERSACIÓN")
+        
     return es_orden
 
 def hilo_servidor_web():
@@ -113,9 +120,17 @@ def hablar_sincronizado(accion_de_voz):
             with lock_estado_habla:
                 esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
+
     threading.Thread(target=_tarea, daemon=True).start()
 
 def hablar_filler(texto: str):
+    """
+    Para las frases cortas de relleno ('Un momento, Señor, estoy...') que
+    antes llamaban a hablar_en_hilo_seguro() directo -sin tocar
+    esta_hablando ni la esfera en absoluto-. Usa el mismo voz_ia que el
+    resto del asistente y pasa por hablar_sincronizado() para que la esfera
+    también se ponga roja durante estos mensajes.
+    """
     hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
 
 def sincronizar_chat_dashboard(rol: str, texto: str):
@@ -126,6 +141,7 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
 
 def activar_kill_switch() -> str:
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
     acciones_detenidas = []
 
     try:
@@ -185,6 +201,7 @@ def apagar_sistema():
     esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
+
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
@@ -202,11 +219,13 @@ def procesar_comando_coder(prompt: str):
 
     threading.Thread(target=_tarea, daemon=True).start()
 
+
 def procesar_comando_creative(prompt: str):
     if not prompt or not prompt.strip():
         return
 
     print(f"[Creative Agent - UI dedicada]: '{prompt.strip()}'")
+
     def _tarea():
         sincronizar_estado_esfera("PROCESANDO", "#ff00ff")
         resultado = generar_imagen(prompt.strip())
@@ -233,6 +252,7 @@ def encender_sistemas():
         cerebro_ia = NimClient(api_key=api_key_nim)
         gemini_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
+        voz_ia.precalentar_en_hilo()
         sincronizar_chat_dashboard("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
         try:
             subprocess.Popen(
@@ -254,6 +274,7 @@ def encender_sistemas():
         hablar_sincronizado(saludo_inicial)
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
+
         hilo_rendimiento = threading.Thread(target=bucle_rendimiento_hilo, daemon=True)
         hilo_rendimiento.start()
 
@@ -268,6 +289,13 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
+    """
+    Cada 'intervalo_segundos' toma un snapshot de hardware/agentes/módulos
+    y lo transmite por WebSocket -alimenta las gráficas en tiempo real de
+    la página de Rendimiento en el dashboard-. Corre mientras el sistema
+    esté activo; si algo falla en una vuelta, no tumba el hilo, solo lo
+    reporta y sigue en la siguiente.
+    """
     global sistema_activo
     while sistema_activo:
         try:
@@ -352,6 +380,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             if voz_ia:
                 texto_voz = limpiar_texto_para_voz(texto_respuesta)
                 voz_ia.hablar(texto_voz)
+
         hablar_sincronizado(_hablar)
         ultima_interaccion = time.time()
 
@@ -390,6 +419,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_vscode())
             return
+        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
             "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
@@ -402,6 +432,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             respuesta_musica = identificar_y_abrir_cancion()
             _hablar_y_mostrar(respuesta_musica)
             return
+        # --- 3. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
             p in orden_limpia_sin_acentos for p in [
@@ -571,7 +602,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
             reproducir_sfx("modules", "Cam")
-
             def _hablar_desde_camara(texto):
                 hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
 
@@ -769,6 +799,6 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         apagar_sistema()
-         
+        
 if __name__ == "__main__":
     main()

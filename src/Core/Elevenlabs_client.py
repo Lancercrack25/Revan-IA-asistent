@@ -22,7 +22,13 @@ class ElevenLabsClient:
 
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
-        self.timeout_omnivoice = 12  # segundos antes de rendirse y usar respaldo
+        # Antes en 12s: la primera generación de cada arranque de OmniVoice
+        # Studio incluye cargar el modelo a memoria/VRAM, lo cual puede
+        # tardar más que eso -sobre todo sin GPU dedicada-, así que
+        # constantemente se rendía y caía al respaldo aunque el servidor sí
+        # estuviera respondiendo, solo que lento. Se sube a 40s para darle
+        # margen real a esa carga inicial.
+        self.timeout_omnivoice = 40
         # Código ISO 639-1 para OmniVoice Studio. Confirmado contra el
         # esquema real de /v1/audio/speech (ver docs de OmniVoice Studio en
         # http://127.0.0.1:3900/docs): el campo se llama 'language' y espera
@@ -167,6 +173,37 @@ class ElevenLabsClient:
         exito = self._intentar_omnivoice(texto_limpio)
         if not exito:
             self._hablar_respaldo(texto_limpio)
+
+    def precalentar_en_hilo(self):
+        """
+        Manda una petición mínima a OmniVoice en un hilo aparte, sin
+        reproducir el resultado, solo para forzar que el motor cargue el
+        modelo a memoria/VRAM antes de que el usuario reciba la primera
+        respuesta real -esa carga inicial es la que se comía el timeout
+        (ver self.timeout_omnivoice) y hacía caer al respaldo justo en el
+        saludo de bienvenida.
+        """
+        def _tarea():
+            try:
+                requests.post(
+                    self.url_api,
+                    json={
+                        "model": "tts-1",
+                        "input": "hola",
+                        "voice": self.voice_id,
+                        "response_format": "mp3",
+                        "language": self.idioma_tts,
+                    },
+                    timeout=(1.5, self.timeout_omnivoice),
+                )
+                print("[Voz]: OmniVoice precalentado.")
+            except Exception:
+                # Si no está corriendo, no pasa nada -el primer hablar()
+                # real de todos modos hará su propio intento y caerá al
+                # respaldo si sigue sin responder.
+                pass
+
+        threading.Thread(target=_tarea, daemon=True).start()
 
 
 # --- INSTANCIAS Y FUNCIONES DE COMPATIBILIDAD CON MAIN.PY ---
