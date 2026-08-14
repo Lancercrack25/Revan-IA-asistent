@@ -23,6 +23,15 @@ class ElevenLabsClient:
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
         self.timeout_omnivoice = 12  # segundos antes de rendirse y usar respaldo
+        # Código ISO 639-1 para OmniVoice Studio. Confirmado contra el
+        # esquema real de /v1/audio/speech (ver docs de OmniVoice Studio en
+        # http://127.0.0.1:3900/docs): el campo se llama 'language' y espera
+        # un código de 2 letras, no el nombre completo del idioma. Antes el
+        # payload no mandaba este campo -sin él, el motor generaba con el
+        # idioma por defecto (no español), lo que sonaba con acento/fonética
+        # de otro idioma sobre la voz clonada, aunque la voz en sí ya estaba
+        # guardada correctamente como español en su perfil.
+        self.idioma_tts = "es"
 
         if not pygame.mixer.get_init():
             pygame.mixer.init()
@@ -64,6 +73,7 @@ class ElevenLabsClient:
             "input": texto_limpio,
             "voice": voz_final,
             "response_format": "mp3",
+            "language": self.idioma_tts,
         }
 
         output_filename = "output.mp3"

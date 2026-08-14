@@ -390,7 +390,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             reproducir_sfx("modules", "Automation")
             _hablar_y_mostrar(abrir_vscode())
             return
-        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
         palabras_reconocer_cancion = [
             "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
             "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
@@ -403,7 +402,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             respuesta_musica = identificar_y_abrir_cancion()
             _hablar_y_mostrar(respuesta_musica)
             return
-        # --- 3. MÓDULO EMAIL ---
         es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
         es_consulta_correo = not es_conteo_correo and any(
             p in orden_limpia_sin_acentos for p in [
