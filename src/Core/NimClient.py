@@ -753,11 +753,16 @@ class NimClient:
         if len(self.historial) > 16:
             self.historial = [self.historial[0]] + self.historial[-15:]
 
+        # Skills relevantes al comando actual (ver Core/skills_loader.py).
+        # Se arman como mensajes EXTRA solo para esta llamada -no se
+        # appendean a self.historial-, así no quedan pegados para
+        # siempre en turnos futuros donde ya no apliquen.
+        mensajes_de_esta_llamada = list(self.historial)
         try:
             t0 = time.time()
             respuesta = self.client.chat.completions.create(
                 model=self.modelo,
-                messages=self.historial,
+                messages=mensajes_de_esta_llamada,
                 tools=HERRAMIENTAS,
                 tool_choice="auto",
                 temperature=0.1,
@@ -796,5 +801,28 @@ class NimClient:
             return respuesta_directa
 
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
+        intento_manual = self._intentar_ejecutar_tool_call_como_texto(mensaje.content or "")
+        if intento_manual is not None:
+            self.historial.append({"role": "assistant", "content": intento_manual})
+            return self._limpiar_para_voz(intento_manual)
+
         self.historial.append({"role": "assistant", "content": respuesta_final})
         return respuesta_final
+
+    def _intentar_ejecutar_tool_call_como_texto(self, texto: str):
+        texto = (texto or "").strip()
+        if not (texto.startswith("{") and '"name"' in texto and '"parameters"' in texto):
+            return None
+        try:
+            datos = json.loads(texto)
+        except json.JSONDecodeError:
+            return None
+
+        nombre_herramienta = datos.get("name")
+        argumentos = datos.get("parameters", {})
+        if not nombre_herramienta or not isinstance(argumentos, dict):
+            return None
+        nombre_herramienta = nombre_herramienta.strip().lower().replace(" ", "_")
+
+        print(f"[NimClient] Tool-call detectado como texto plano, ejecutando de todos modos -> {nombre_herramienta}({argumentos})")
+        return self._ejecutar_herramienta(nombre_herramienta, argumentos)
