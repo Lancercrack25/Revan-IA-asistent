@@ -22,13 +22,7 @@ class ElevenLabsClient:
 
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
-        # Antes en 12s: la primera generación de cada arranque de OmniVoice
-        # Studio incluye cargar el modelo a memoria/VRAM, lo cual puede
-        # tardar más que eso -sobre todo sin GPU dedicada-, así que
-        # constantemente se rendía y caía al respaldo aunque el servidor sí
-        # estuviera respondiendo, solo que lento. Se sube a 40s para darle
-        # margen real a esa carga inicial.
-        self.timeout_omnivoice = 40
+        self.timeout_omnivoice = 2
         # Código ISO 639-1 para OmniVoice Studio. Confirmado contra el
         # esquema real de /v1/audio/speech (ver docs de OmniVoice Studio en
         # http://127.0.0.1:3900/docs): el campo se llama 'language' y espera
