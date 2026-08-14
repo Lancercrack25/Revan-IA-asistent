@@ -753,20 +753,26 @@ class NimClient:
         if len(self.historial) > 16:
             self.historial = [self.historial[0]] + self.historial[-15:]
 
-        # Skills relevantes al comando actual (ver Core/skills_loader.py).
-        # Se arman como mensajes EXTRA solo para esta llamada -no se
-        # appendean a self.historial-, así no quedan pegados para
-        # siempre en turnos futuros donde ya no apliquen.
-        mensajes_de_esta_llamada = list(self.historial)
         try:
             t0 = time.time()
             respuesta = self.client.chat.completions.create(
                 model=self.modelo,
-                messages=mensajes_de_esta_llamada,
+                messages=self.historial,
                 tools=HERRAMIENTAS,
                 tool_choice="auto",
                 temperature=0.1,
-                max_tokens=250,
+                # Antes en 250: apenas alcanza para una respuesta corta de
+                # chat, pero herramientas como crear_documento_word/
+                # crear_hoja_excel necesitan devolver contenido largo
+                # (varios párrafos) dentro del JSON de la llamada. Con 250
+                # el modelo se quedaba a la mitad de una llave sin cerrar
+                # -JSON roto, imposible de recuperar incluso detectando que
+                # 'esto era un tool-call'-. 2048 le da margen real a un
+                # documento de tamaño normal sin disparar el costo/latencia
+                # de forma desproporcionada en las respuestas cortas
+                # normales (el modelo no está obligado a usar todo el
+                # espacio, esto es un techo, no un piso).
+                max_tokens=2048,
             )
             print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
         except Exception as e:
@@ -785,6 +791,11 @@ class NimClient:
                 try:
                     argumentos = json.loads(tool_call.function.arguments or "{}")
                 except json.JSONDecodeError:
+                    # Antes esto quedaba en silencio -la herramienta se
+                    # ejecutaba igual con argumentos={}, por ejemplo
+                    # creando un Word vacío sin avisar que el JSON llegó
+                    # truncado (normalmente por max_tokens insuficiente).
+                    print(f"[NimClient] Argumentos de '{nombre_herramienta}' llegaron con JSON inválido/truncado: {tool_call.function.arguments!r}")
                     argumentos = {}
 
                 print(f"[NimClient] Ejecutando Herramienta -> {nombre_herramienta}({argumentos})")
@@ -801,6 +812,15 @@ class NimClient:
             return respuesta_directa
 
         respuesta_final = self._limpiar_para_voz(mensaje.content or "A sus órdenes, Señor.")
+
+        # A veces el modelo NO usa el mecanismo real de tool_calls (por el
+        # que ya se pasó arriba) y en vez de eso escribe el JSON de la
+        # llamada como si fuera texto normal de respuesta -por ejemplo:
+        # {"name": "crear documento word", "parameters": {...}}. Antes eso
+        # se mandaba tal cual a pantalla/voz, mostrando el JSON crudo en
+        # vez de ejecutar la acción. Se detecta ese patrón y se intenta
+        # ejecutar la herramienta manualmente como si el modelo la hubiera
+        # llamado correctamente.
         intento_manual = self._intentar_ejecutar_tool_call_como_texto(mensaje.content or "")
         if intento_manual is not None:
             self.historial.append({"role": "assistant", "content": intento_manual})
@@ -810,18 +830,35 @@ class NimClient:
         return respuesta_final
 
     def _intentar_ejecutar_tool_call_como_texto(self, texto: str):
+        """
+        Devuelve el resultado de ejecutar la herramienta si 'texto' es en
+        realidad un tool-call mal formateado como JSON plano (patrón
+        {"name": "...", "parameters": {...}}), o None si 'texto' es una
+        respuesta conversacional normal y no debe tocarse.
+        """
         texto = (texto or "").strip()
         if not (texto.startswith("{") and '"name"' in texto and '"parameters"' in texto):
             return None
         try:
             datos = json.loads(texto)
         except json.JSONDecodeError:
+            # Casi-JSON pero roto (le falta cerrar una llave, etc.) -no hay
+            # forma segura de recuperarlo, mejor devolver None y dejar que
+            # el mensaje de respaldo normal se use en vez de intentar
+            # adivinar y ejecutar algo incorrecto.
             return None
 
         nombre_herramienta = datos.get("name")
         argumentos = datos.get("parameters", {})
         if not nombre_herramienta or not isinstance(argumentos, dict):
             return None
+
+        # El modelo a veces escribe el nombre con espacios en vez de guion
+        # bajo ("crear documento word" en vez de "crear_documento_word")
+        # justo cuando falla al mecanismo real de tool_calls. _ejecutar_
+        # herramienta compara por igualdad exacta, así que sin esto el
+        # nombre nunca haría match aunque ya detectáramos que es un
+        # tool-call disfrazado de texto.
         nombre_herramienta = nombre_herramienta.strip().lower().replace(" ", "_")
 
         print(f"[NimClient] Tool-call detectado como texto plano, ejecutando de todos modos -> {nombre_herramienta}({argumentos})")
