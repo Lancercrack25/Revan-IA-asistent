@@ -576,24 +576,6 @@ class NimClient:
 
     @staticmethod
     def _normalizar_argumentos_llm(argumentos: dict) -> dict:
-        """
-        Llama 3.1 8B (el modelo usado aquí) es notablemente inconsistente
-        escapando saltos de línea dentro de los argumentos JSON de un
-        tool-call: a veces manda un salto real (correcto), y a veces manda
-        literalmente los dos caracteres '\\' + 'n' como texto plano
-        (incorrecto). El síntoma es visible y confuso en dos herramientas
-        distintas por igual:
-          - crear_hoja_excel: todas las filas terminan pegadas en una sola
-            fila gigantesca, porque csv.reader() nunca encuentra un salto
-            de línea real para separarlas.
-          - crear_documento_word: los encabezados ("# ", "## ") y viñetas
-            ("- ") nunca quedan en su propia línea, así que
-            .split("\\n") no los separa y el documento sale como un solo
-            párrafo plano ("poco contenido").
-        Se normaliza UNA sola vez aquí, para todas las herramientas,
-        en vez de parchar cada función de creación de archivos por
-        separado.
-        """
         return {
             clave: valor.replace("\\n", "\n") if isinstance(valor, str) else valor
             for clave, valor in argumentos.items()
@@ -744,6 +726,10 @@ class NimClient:
                 return resultado
 
             elif nombre == "investigar_tema":
+                # Esta rama no existía -research_service.py existía en el
+                # proyecto pero nunca se había registrado como herramienta
+                # real, así que el LLM no tenía forma de elegirla y
+                # confundía "investiga sobre X" con generar_y_ejecutar_codigo.
                 termino_busqueda = argumentos.get("termino_busqueda", "")
                 if not termino_busqueda.strip():
                     return "Señor, ¿sobre qué tema desea que investigue?"
@@ -824,6 +810,7 @@ class NimClient:
                 tools=HERRAMIENTAS,
                 tool_choice="auto",
                 temperature=0.1,
+                frequency_penalty=0.4,
                 max_tokens=2048,
             )
             print(f"[NIM] Tiempo de respuesta: {time.time() - t0:.2f}s")
@@ -883,6 +870,5 @@ class NimClient:
         if not nombre_herramienta or not isinstance(argumentos, dict):
             return None
         nombre_herramienta = nombre_herramienta.strip().lower().replace(" ", "_")
-
         print(f"[NimClient] Tool-call detectado como texto plano, ejecutando de todos modos -> {nombre_herramienta}({argumentos})")
         return self._ejecutar_herramienta(nombre_herramienta, argumentos)

@@ -20,7 +20,6 @@ class ElevenLabsClient:
         self.url_voces = "http://127.0.0.1:3900/v1/audio/voices"
         self.voice_id = "0b6fd25d"
         self.voice_name_legible = "Voice 06:13 PM — CLONE"
-
         # Voz de respaldo de Microsoft Edge TTS (rápida, sin GPU, sin clon)
         self.voz_respaldo = "es-MX-JorgeNeural"
         self.timeout_omnivoice = 1
@@ -57,8 +56,16 @@ class ElevenLabsClient:
             # Silencioso cuando OmniVoice no está abierto para no saturar consola
             return self.voice_id
 
-    def _intentar_omnivoice(self, texto_limpio: str) -> bool:
-        """Intenta generar y reproducir con la voz clonada. Devuelve True si tuvo éxito."""
+    def _intentar_omnivoice(self, texto_limpio: str, avisar_reproduciendo=None) -> bool:
+        """
+        Intenta generar y reproducir con la voz clonada. Devuelve True si
+        tuvo éxito. 'avisar_reproduciendo' (si se pasa) se llama justo
+        antes de pygame.mixer.music.play() -no antes-, para que quien
+        controla la esfera pueda esperar a ese momento exacto para
+        ponerla en rojo, en vez de ponerla roja desde que arranca la
+        generación (que puede tardar varios segundos EN SILENCIO, lo cual
+        se sentía como esfera desincronizada del audio real).
+        """
         voz_final = self._resolver_voice_id()
 
         payload = {
@@ -90,6 +97,8 @@ class ElevenLabsClient:
                         f.write(chunk)
 
             print(f"🎵 [OmniVoice]: Audio generado en {time.time() - t_inicio:.2f}s. Reproduciendo...")
+            if avisar_reproduciendo:
+                avisar_reproduciendo()
             pygame.mixer.music.load(output_filename)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
@@ -114,10 +123,6 @@ class ElevenLabsClient:
             print(f"[Voz]: No se pudo conectar a OmniVoice ({e}), usando respaldo...")
             return False
         except Exception as e:
-            # Antes esto era 'except Exception: return False' sin imprimir
-            # nada -cualquier error que no fuera timeout quedaba invisible,
-            # imposible de diagnosticar desde la consola. Ahora se imprime
-            # el tipo y mensaje real del error.
             print(f"[Voz]: Error inesperado hablando con OmniVoice ({type(e).__name__}: {e}), usando respaldo...")
             return False
 
@@ -125,7 +130,7 @@ class ElevenLabsClient:
         comunicador = edge_tts.Communicate(texto, self.voz_respaldo)
         await comunicador.save(ruta_salida)
 
-    def _hablar_respaldo(self, texto_limpio: str):
+    def _hablar_respaldo(self, texto_limpio: str, avisar_reproduciendo=None):
         """Respaldo rápido con edge_tts (Microsoft) con gestión asíncrona segura."""
         if not HAS_EDGE_TTS:
             print("[Voz]: No hay respaldo disponible (falta edge_tts). No se pudo hablar.")
@@ -150,6 +155,8 @@ class ElevenLabsClient:
                 asyncio.run(self._generar_audio_respaldo(texto_limpio, output_filename))
 
             # Reproducción de audio con pygame
+            if avisar_reproduciendo:
+                avisar_reproduciendo()
             pygame.mixer.music.load(output_filename)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
@@ -162,15 +169,15 @@ class ElevenLabsClient:
         except Exception as e:
             print(f"[Voz Error]: Falló también la voz de respaldo: {e}")
 
-    def hablar(self, text: str, voice: str = None):
+    def hablar(self, text: str, voice: str = None, avisar_reproduciendo=None):
         texto_limpio = self._limpiar_texto_para_tts(text)
         if not texto_limpio:
             print("[Voz]: Intento de vocalizar un texto vacío. Cancelado.")
             return
 
-        exito = self._intentar_omnivoice(texto_limpio)
+        exito = self._intentar_omnivoice(texto_limpio, avisar_reproduciendo=avisar_reproduciendo)
         if not exito:
-            self._hablar_respaldo(texto_limpio)
+            self._hablar_respaldo(texto_limpio, avisar_reproduciendo=avisar_reproduciendo)
 
     def precalentar_en_hilo(self):
         """
@@ -196,13 +203,9 @@ class ElevenLabsClient:
                 )
                 print("[Voz]: OmniVoice precalentado.")
             except Exception:
-                # Si no está corriendo, no pasa nada -el primer hablar()
-                # real de todos modos hará su propio intento y caerá al
-                # respaldo si sigue sin responder.
                 pass
 
         threading.Thread(target=_tarea, daemon=True).start()
-
 
 # --- INSTANCIAS Y FUNCIONES DE COMPATIBILIDAD CON MAIN.PY ---
 client_voz = ElevenLabsClient()

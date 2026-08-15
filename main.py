@@ -81,6 +81,7 @@ def es_intencion_de_comando(texto: str) -> bool:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
+        
     return es_orden
 
 def hilo_servidor_web():
@@ -100,14 +101,18 @@ def hablar_sincronizado(accion_de_voz):
     global esta_hablando
     with lock_estado_habla:
         esta_hablando = True
-    sincronizar_estado_esfera("HABLANDO", "#ff0055")
+    sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
     t_inicio_habla = time.time()
-    print(f"[Esfera] -> HABLANDO (rojo) a las {time.strftime('%H:%M:%S')}")
+    print(f"[Esfera] -> PROCESANDO (naranja) a las {time.strftime('%H:%M:%S')}")
+
+    def _avisar_reproduciendo():
+        sincronizar_estado_esfera("HABLANDO", "#ff0055")
+        print(f"[Esfera] -> HABLANDO (rojo) a las {time.strftime('%H:%M:%S')}, {time.time() - t_inicio_habla:.2f}s después de decidir hablar (esto ya es cuando el audio suena de verdad)")
 
     def _tarea():
         global esta_hablando
         try:
-            accion_de_voz()
+            accion_de_voz(_avisar_reproduciendo)
         except Exception as err_voz:
             print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
         finally:
@@ -115,11 +120,19 @@ def hablar_sincronizado(accion_de_voz):
             with lock_estado_habla:
                 esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
-            print(f"[Esfera] -> ESPERA (azul) a las {time.strftime('%H:%M:%S')}, {time.time() - t_inicio_habla:.2f}s después de ponerse en rojo")
+            print(f"[Esfera] -> ESPERA (azul) a las {time.strftime('%H:%M:%S')}")
+
     threading.Thread(target=_tarea, daemon=True).start()
 
 def hablar_filler(texto: str):
-    hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
+    """
+    Para las frases cortas de relleno ('Un momento, Señor, estoy...') que
+    antes llamaban a hablar_en_hilo_seguro() directo -sin tocar
+    esta_hablando ni la esfera en absoluto-. Usa el mismo voz_ia que el
+    resto del asistente y pasa por hablar_sincronizado() para que la esfera
+    también se ponga roja durante estos mensajes.
+    """
+    hablar_sincronizado(lambda avisar: voz_ia.hablar(texto, avisar_reproduciendo=avisar) if voz_ia else None)
 
 def sincronizar_chat_dashboard(rol: str, texto: str):
     try:
@@ -129,6 +142,7 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
 
 def activar_kill_switch() -> str:
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
     acciones_detenidas = []
 
     try:
@@ -195,6 +209,7 @@ def apagar_sistema():
 def procesar_comando_coder(prompt: str):
     if not prompt or not prompt.strip():
         return
+
     print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
 
     def _tarea():
@@ -253,9 +268,9 @@ def encender_sistemas():
         registrar_manejador_comando_creative(procesar_comando_creative)
         reproducir_sfx("welcome", "Bienvenida",volumen=1.2)
 
-        def saludo_inicial():
+        def saludo_inicial(avisar):
             if voz_ia:
-                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?")
+                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?", avisar_reproduciendo=avisar)
 
         hablar_sincronizado(saludo_inicial)
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
@@ -275,6 +290,13 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
+    """
+    Cada 'intervalo_segundos' toma un snapshot de hardware/agentes/módulos
+    y lo transmite por WebSocket -alimenta las gráficas en tiempo real de
+    la página de Rendimiento en el dashboard-. Corre mientras el sistema
+    esté activo; si algo falla en una vuelta, no tumba el hilo, solo lo
+    reporta y sigue en la siguiente.
+    """
     global sistema_activo
     while sistema_activo:
         try:
@@ -321,9 +343,9 @@ def procesar_ciclo_voz():
             return
 
         if not orden_limpia:
-            def responder_listo():
+            def responder_listo(avisar):
                 if voz_ia:
-                    voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
+                    voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?", avisar_reproduciendo=avisar)
             hablar_sincronizado(responder_listo)
             ultima_interaccion = time.time()
             return
@@ -356,10 +378,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
 
-        def _hablar():
+        def _hablar(avisar):
             if voz_ia:
                 texto_voz = limpiar_texto_para_voz(texto_respuesta)
-                voz_ia.hablar(texto_voz)
+                voz_ia.hablar(texto_voz, avisar_reproduciendo=avisar)
 
         hablar_sincronizado(_hablar)
         ultima_interaccion = time.time()
@@ -578,7 +600,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     partes_diga = partes_a[1].split(" que diga ", 1)
                     destinatario = partes_diga[0].strip()
                     mensaje_texto = partes_diga[1].strip() if len(partes_diga) > 1 else "Hola"
-
                     respuesta_prep = preparar_envio_inteligente(destinatario, mensaje_texto)
                     _hablar_y_mostrar(respuesta_prep)
                     return
@@ -589,9 +610,8 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
             reproducir_sfx("modules", "Cam")
-    
             def _hablar_desde_camara(texto):
-                hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
+                hablar_sincronizado(lambda avisar: voz_ia.hablar(texto, avisar_reproduciendo=avisar) if voz_ia else None)
 
             if iniciar_vigilancia(_hablar_desde_camara, sincronizar_estado_esfera):
                 _hablar_y_mostrar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
