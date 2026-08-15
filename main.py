@@ -81,7 +81,6 @@ def es_intencion_de_comando(texto: str) -> bool:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
-        
     return es_orden
 
 def hilo_servidor_web():
@@ -98,26 +97,12 @@ def sincronizar_estado_esfera(estado, color_hex):
         print(f" Error al sincronizar esfera: {e}")
 
 def hablar_sincronizado(accion_de_voz):
-    """
-    Reemplaza los 5 bloques repetidos de 'esta_hablando = True; sincronizar
-    HABLANDO; ...; esta_hablando = False; sincronizar ESPERA' que había
-    sueltos por el archivo (incluidas las llamadas que iban directo a
-    hablar_en_hilo_seguro sin tocar el estado de la esfera en absoluto).
-
-    La bandera y el color HABLANDO se fijan de forma SÍNCRONA, en el hilo
-    que llama a esta función, ANTES de lanzar el hilo que realmente
-    reproduce el audio. Así, cuando bucle_escucha_hilo vuelve a revisar
-    'esta_hablando' en su siguiente vuelta (cada ~0.05s), la bandera ya
-    está en True sin ninguna ventana de tiempo en la que pueda leerla como
-    False por error -que era la causa real de la desincronización-.
-
-    'accion_de_voz' es un callable sin argumentos que hace la reproducción
-    real (una llamada a voz_ia.hablar(...), por ejemplo).
-    """
     global esta_hablando
     with lock_estado_habla:
         esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
+    t_inicio_habla = time.time()
+    print(f"[Esfera] -> HABLANDO (rojo) a las {time.strftime('%H:%M:%S')}")
 
     def _tarea():
         global esta_hablando
@@ -130,17 +115,10 @@ def hablar_sincronizado(accion_de_voz):
             with lock_estado_habla:
                 esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
-
+            print(f"[Esfera] -> ESPERA (azul) a las {time.strftime('%H:%M:%S')}, {time.time() - t_inicio_habla:.2f}s después de ponerse en rojo")
     threading.Thread(target=_tarea, daemon=True).start()
 
 def hablar_filler(texto: str):
-    """
-    Para las frases cortas de relleno ('Un momento, Señor, estoy...') que
-    antes llamaban a hablar_en_hilo_seguro() directo -sin tocar
-    esta_hablando ni la esfera en absoluto-. Usa el mismo voz_ia que el
-    resto del asistente y pasa por hablar_sincronizado() para que la esfera
-    también se ponga roja durante estos mensajes.
-    """
     hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
 
 def sincronizar_chat_dashboard(rol: str, texto: str):
@@ -151,7 +129,6 @@ def sincronizar_chat_dashboard(rol: str, texto: str):
 
 def activar_kill_switch() -> str:
     from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
-
     acciones_detenidas = []
 
     try:
@@ -218,7 +195,6 @@ def apagar_sistema():
 def procesar_comando_coder(prompt: str):
     if not prompt or not prompt.strip():
         return
-
     print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
 
     def _tarea():
@@ -315,6 +291,7 @@ def procesar_ciclo_voz():
             time.sleep(0.2)
             return
         sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
+        print(f"[Esfera] -> ESCUCHANDO (verde) a las {time.strftime('%H:%M:%S')} (esta_hablando={esta_hablando})")
         print("\n[REVAN]: Escuchando...")
         orden_sucia = oidos_ia.escuchar()
 
@@ -612,6 +589,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
             reproducir_sfx("modules", "Cam")
+    
             def _hablar_desde_camara(texto):
                 hablar_sincronizado(lambda: voz_ia.hablar(texto) if voz_ia else None)
 

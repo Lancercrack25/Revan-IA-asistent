@@ -574,7 +574,33 @@ class NimClient:
         "leer_correos_recientes": "correo",
     }
 
+    @staticmethod
+    def _normalizar_argumentos_llm(argumentos: dict) -> dict:
+        """
+        Llama 3.1 8B (el modelo usado aquí) es notablemente inconsistente
+        escapando saltos de línea dentro de los argumentos JSON de un
+        tool-call: a veces manda un salto real (correcto), y a veces manda
+        literalmente los dos caracteres '\\' + 'n' como texto plano
+        (incorrecto). El síntoma es visible y confuso en dos herramientas
+        distintas por igual:
+          - crear_hoja_excel: todas las filas terminan pegadas en una sola
+            fila gigantesca, porque csv.reader() nunca encuentra un salto
+            de línea real para separarlas.
+          - crear_documento_word: los encabezados ("# ", "## ") y viñetas
+            ("- ") nunca quedan en su propia línea, así que
+            .split("\\n") no los separa y el documento sale como un solo
+            párrafo plano ("poco contenido").
+        Se normaliza UNA sola vez aquí, para todas las herramientas,
+        en vez de parchar cada función de creación de archivos por
+        separado.
+        """
+        return {
+            clave: valor.replace("\\n", "\n") if isinstance(valor, str) else valor
+            for clave, valor in argumentos.items()
+        }
+
     def _ejecutar_herramienta(self, nombre: str, argumentos: dict) -> str:
+        argumentos = self._normalizar_argumentos_llm(argumentos)
         categoria = self._CATEGORIA_RATE_LIMIT.get(nombre, "default")
         if not permitir_accion(categoria):
             return (
