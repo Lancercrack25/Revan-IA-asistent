@@ -15,10 +15,13 @@ def preparar_envio_android(destinatario: str, mensaje: str, lista_contactos: dic
     """Valida la presencia del contacto en Android y prepara el paquete URI."""
     if not destinatario or not mensaje:
         return {"exito": False, "error": "Destinatario o mensaje vacíos."}
-
-    # Verificar si el teléfono está conectado por ADB
     dispositivos = _ejecutar_adb("devices")
-    if "device" not in dispositivos.replace("List of devices attached", ""):
+    lineas_dispositivo = [
+        linea for linea in dispositivos.splitlines()
+        if linea.strip() and not linea.startswith("List of devices")
+        and linea.split()[-1] == "device"
+    ]
+    if not lineas_dispositivo:
         return {"exito": False, "error": "Dispositivo Android no detectado por ADB."}
 
     # Si se pasa lista de contactos, usar la búsqueda normalizada
@@ -35,6 +38,8 @@ def preparar_envio_android(destinatario: str, mensaje: str, lista_contactos: dic
         
         nombre_contacto, datos = coincidencias[0]
         telefono = datos.get("telefono", destinatario)
+    elif not any(c.isdigit() for c in destinatario):
+        return {"exito": False, "error": f"Sin lista de contactos de Android cargada; no se puede resolver el nombre '{destinatario}' por este canal."}
 
     # Limpiar número de teléfono
     telefono_clean = ''.join(filter(str.isdigit, str(telefono)))
@@ -55,8 +60,6 @@ def confirmar_envio_android(datos: dict) -> str:
     try:
         cmd = f'shell am start -a android.intent.action.VIEW -d "{datos["uri"]}"'
         _ejecutar_adb(cmd)
-        
-        # Eliminada simulación ciega de teclado para prevenir enviar a contactos equivocados
         return (
             f"Señor, el chat de *{datos['contacto_nombre']}* se ha abierto en su teléfono "
             f"con el borrador listo. Por seguridad, presione el botón Enviar en pantalla."
