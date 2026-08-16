@@ -13,21 +13,14 @@ NIVEL_INFO = "INFO"
 NIVEL_ADVERTENCIA = "ADVERTENCIA"
 NIVEL_CRITICO = "CRITICO"
 
-
 def _asegurar_directorio():
     try:
         os.makedirs(_DIR_LOGS, exist_ok=True)
     except Exception as e:
         print(f"[Auditoría]: No se pudo crear el directorio de logs: {e}")
 
-
 def registrar_evento(modulo: str, accion: str, resultado: str,
                       nivel: str = NIVEL_INFO, detalles: dict = None) -> None:
-    """
-    Registra un evento de seguridad. Nunca lanza excepción hacia arriba
-    (un fallo al escribir el log de auditoría no debe tumbar la acción
-    real que se estaba auditando) — si falla, solo lo imprime en consola.
-    """
     evento = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
         "nivel": nivel,

@@ -19,7 +19,6 @@ from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
 
 _lock = threading.Lock()
 _registro_llamadas = defaultdict(list)  # categoria -> lista de timestamps
-
 # (límite de acciones, ventana en segundos) por categoría.
 LIMITES_POR_DEFECTO = {
     "whatsapp": (5, 60),

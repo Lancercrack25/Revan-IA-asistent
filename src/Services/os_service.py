@@ -39,22 +39,6 @@ def obtener_ruta_escritorio() -> str:
 
 
 def normalizar_si_apunta_a_escritorio(ruta_absoluta: str) -> str:
-    """
-    Si una ruta absoluta apunta a una subcarpeta llamada literalmente
-    'Desktop' o 'Escritorio' justo debajo del home del usuario, la
-    redirige a la ubicación REAL del escritorio (obtener_ruta_escritorio,
-    que sabe si está redirigido por OneDrive), preservando cualquier
-    subcarpeta que venga después.
-
-    Por qué existe: si el modelo arma él mismo una ruta absoluta como
-    'C:\\Users\\Nombre\\Desktop\\Carpeta_X' (en vez de solo decir
-    "Carpeta_X" y dejar que el código resuelva la ubicación), esa ruta
-    pasa la validación de "está dentro del home" sin problema, pero
-    apunta a una carpeta 'Desktop' que puede no ser el escritorio que el
-    usuario realmente ve (si su escritorio está redirigido por OneDrive).
-    Esto se aplica DESPUÉS de confirmar que la ruta es segura (dentro del
-    home), no la reemplaza.
-    """
     home = os.path.realpath(os.path.expanduser("~"))
     ruta_resuelta = os.path.realpath(ruta_absoluta)
 
@@ -69,7 +53,6 @@ def normalizar_si_apunta_a_escritorio(ruta_absoluta: str) -> str:
         if subcarpetas_extra:
             return os.path.join(obtener_ruta_escritorio(), *subcarpetas_extra)
         return obtener_ruta_escritorio()
-
     return ruta_absoluta
 
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:

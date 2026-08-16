@@ -19,11 +19,6 @@ en tu equipo:
     resto del sistema de archivos por accidente.
   - Cualquier argumento externo pasa por el validador de
     src/Security/sanitizador.py antes de construir el comando.
-
-Recomendación para cuando integres Coder_agent: antes de llamar a
-ejecutar_codigo_python(), pasa el código generado por el modelo por
-GestorConfirmacion (src/Security/confirmacion.py) para que el usuario
-apruebe explícitamente qué se va a correr.
 """
 
 import os

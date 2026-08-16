@@ -15,13 +15,6 @@ ARCHIVOS_SENSIBLES: tuple[str, ...] = (
 
 
 def _permisos_demasiado_abiertos(ruta: Path) -> bool:
-    """
-    En sistemas tipo Unix, revisa si el archivo es legible/escribible por
-    'otros' (no el dueño). En Windows esta comprobación no aplica de la
-    misma forma -el permiso de archivo ahí se maneja por ACL, no por modo
-    octal-, así que en Windows esta función siempre devuelve False y la
-    verificación real que importa es la de 'vacío o no existe', abajo.
-    """
     if os.name == "nt":
         return False
     try:
@@ -31,7 +24,6 @@ def _permisos_demasiado_abiertos(ruta: Path) -> bool:
 
     return bool(modo & stat.S_IROTH or modo & stat.S_IWOTH)
 
-
 def _registrar_aviso(accion: str, mensaje: str) -> None:
     registrar_evento(
         modulo="verificacion_permisos",
@@ -39,7 +31,6 @@ def _registrar_aviso(accion: str, mensaje: str) -> None:
         resultado=mensaje,
         nivel=NIVEL_ADVERTENCIA,
     )
-
 
 def verificar_archivos_sensibles(directorio_base: str = ".") -> list[str]:
     base = Path(directorio_base)
