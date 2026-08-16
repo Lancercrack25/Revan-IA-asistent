@@ -565,6 +565,10 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "no lo envies", "detente", "mejor no",
         ])
 
+        if len(orden_limpia_sin_acentos.split()) > 4:
+            es_confirmacion = False
+            es_cancelacion = False
+
         if es_confirmacion or es_cancelacion:
             resultado_codigo = procesar_confirmacion_codigo(orden_limpia)
             if resultado_codigo is not None:
@@ -600,6 +604,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     partes_diga = partes_a[1].split(" que diga ", 1)
                     destinatario = partes_diga[0].strip()
                     mensaje_texto = partes_diga[1].strip() if len(partes_diga) > 1 else "Hola"
+
                     respuesta_prep = preparar_envio_inteligente(destinatario, mensaje_texto)
                     _hablar_y_mostrar(respuesta_prep)
                     return
@@ -610,6 +615,7 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
 
         if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
             reproducir_sfx("modules", "Cam")
+    
             def _hablar_desde_camara(texto):
                 hablar_sincronizado(lambda avisar: voz_ia.hablar(texto, avisar_reproduciendo=avisar) if voz_ia else None)
 

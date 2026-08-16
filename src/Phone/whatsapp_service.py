@@ -8,8 +8,6 @@ _gestor_whatsapp = GestorConfirmacion(ttl_segundos=60)
 def _ejecutar_envio(datos_preparacion: dict):
     if datos_preparacion["canal"] == "android":
         return confirmar_envio_android(datos_preparacion)
-    # Ejecutado sin shell=True: el protocolo whatsapp:// ya viene con el
-    # texto codificado por urllib.parse.quote en whats_pc.py.
     subprocess.Popen(["cmd", "/c", "start", "", datos_preparacion["url_app"]], shell=False)
     return (
         f"Señor, he desplegado WhatsApp PC con el chat de *{datos_preparacion['contacto_nombre']}* "
@@ -33,15 +31,12 @@ def preparar_envio_inteligente(destinatario: str, mensaje: str) -> str:
         callback_cancelar=lambda: "Acción cancelada, Señor. El borrador ha sido descartado.",
     )
 
-
 def confirmar_envio_inteligente() -> str:
     """Ejecuta la acción de confirmación si hay algo pendiente y dentro del TTL."""
     return _gestor_whatsapp.confirmar_manual()
 
-
 def cancelar_envio_pendiente() -> str:
     return _gestor_whatsapp.cancelar_manual()
-
 
 def procesar_confirmacion(orden: str) -> str:
     """Mantiene compatibilidad cuando el usuario responde por texto completo (ej. 'si, hazlo')."""
