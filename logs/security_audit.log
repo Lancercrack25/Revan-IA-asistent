@@ -128,3 +128,5 @@
 {"timestamp": "2026-08-14 19:33:09", "nivel": "INFO", "modulo": "confirmacion", "accion": "confirmar_manual", "resultado": "Usuario confirmó: enviar por WhatsApp a pana miguel diciendo [revan]: are you ready?: \"Hola\"", "detalles": {}}
 {"timestamp": "2026-08-14 19:34:52", "nivel": "INFO", "modulo": "confirmacion", "accion": "solicitar", "resultado": "Acción pendiente registrada: enviar por WhatsApp a pana miguel diciendo estas listo bro?: \"Hola\"", "detalles": {}}
 {"timestamp": "2026-08-14 19:35:10", "nivel": "INFO", "modulo": "confirmacion", "accion": "confirmar_manual", "resultado": "Usuario confirmó: enviar por WhatsApp a pana miguel diciendo estas listo bro?: \"Hola\"", "detalles": {}}
+{"timestamp": "2026-08-16 17:09:20", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}
+{"timestamp": "2026-08-16 17:37:25", "nivel": "INFO", "modulo": "verificacion_permisos", "accion": "chequeo_arranque", "resultado": "Todos los archivos sensibles presentes están OK.", "detalles": {}}

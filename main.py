@@ -49,7 +49,6 @@ ultima_interaccion = 0
 TIEMPO_ATENCION = 18
 
 PALABRAS_CLAVE_ACCION = [
-    # --- Módulo de Aplicaciones & Archivos ---
     "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
     "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
     "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
@@ -81,7 +80,6 @@ def es_intencion_de_comando(texto: str) -> bool:
         print("Clasificado localmente -> ORDEN")
     else:
         print("Clasificado localmente -> CONVERSACIÓN")
-        
     return es_orden
 
 def hilo_servidor_web():
@@ -121,17 +119,9 @@ def hablar_sincronizado(accion_de_voz):
                 esta_hablando = False
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             print(f"[Esfera] -> ESPERA (azul) a las {time.strftime('%H:%M:%S')}")
-
     threading.Thread(target=_tarea, daemon=True).start()
 
 def hablar_filler(texto: str):
-    """
-    Para las frases cortas de relleno ('Un momento, Señor, estoy...') que
-    antes llamaban a hablar_en_hilo_seguro() directo -sin tocar
-    esta_hablando ni la esfera en absoluto-. Usa el mismo voz_ia que el
-    resto del asistente y pasa por hablar_sincronizado() para que la esfera
-    también se ponga roja durante estos mensajes.
-    """
     hablar_sincronizado(lambda avisar: voz_ia.hablar(texto, avisar_reproduciendo=avisar) if voz_ia else None)
 
 def sincronizar_chat_dashboard(rol: str, texto: str):
