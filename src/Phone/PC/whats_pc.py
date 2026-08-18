@@ -5,7 +5,8 @@ import unicodedata
 import subprocess
 from dotenv import load_dotenv
 
-load_dotenv()
+_CARPETA_PHONE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(dotenv_path=os.path.join(_CARPETA_PHONE, '.env'))
 
 def quitar_acentos(texto: str) -> str:
     if not texto:
@@ -28,12 +29,10 @@ def obtener_numero_contacto(nombre: str) -> str:
 
 def preparar_envio_pc(destinatario: str, mensaje: str) -> dict:
     try:
-        # Importante: usar quote_plus para asegurar que los espacios se codifiquen correctamente como %20
         mensaje_encoded = urllib.parse.quote(mensaje)
         numero = obtener_numero_contacto(destinatario)
 
         if numero:
-            # Protocolo estricto para chat directo en WhatsApp Windows
             url_app = f"whatsapp://send?phone={numero}&text={mensaje_encoded}"
             print(f"[WhatsApp PC]: Contacto '{destinatario}' resuelto como +{numero}.")
         else:

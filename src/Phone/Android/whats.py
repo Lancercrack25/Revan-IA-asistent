@@ -40,7 +40,6 @@ def preparar_envio_android(destinatario: str, mensaje: str, lista_contactos: dic
         telefono = datos.get("telefono", destinatario)
     elif not any(c.isdigit() for c in destinatario):
         return {"exito": False, "error": f"Sin lista de contactos de Android cargada; no se puede resolver el nombre '{destinatario}' por este canal."}
-
     # Limpiar número de teléfono
     telefono_clean = ''.join(filter(str.isdigit, str(telefono)))
     mensaje_encoded = urllib.parse.quote(mensaje)
@@ -60,6 +59,7 @@ def confirmar_envio_android(datos: dict) -> str:
     try:
         cmd = f'shell am start -a android.intent.action.VIEW -d "{datos["uri"]}"'
         _ejecutar_adb(cmd)
+        
         return (
             f"Señor, el chat de *{datos['contacto_nombre']}* se ha abierto en su teléfono "
             f"con el borrador listo. Por seguridad, presione el botón Enviar en pantalla."
