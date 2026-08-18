@@ -1,6 +1,6 @@
 /config
 /test
+logs/security_audit.log
 src/Database/.env
 src/Phone/.env
-/logs
 src/Entrenamiento
