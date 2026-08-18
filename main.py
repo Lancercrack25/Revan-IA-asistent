@@ -373,7 +373,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
     orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
 
     def _hablar_y_mostrar(texto_respuesta: str):
-        """Sincroniza el chat y bloquea la esfera en rojo durante la voz de ElevenLabs."""
         global ultima_interaccion
         sincronizar_chat_dashboard("usuario", orden_mostrar)
         sincronizar_chat_dashboard("revan", texto_respuesta)
@@ -507,7 +506,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     else:
                         asunto = "Notificación de REVAN Assistant"
                         cuerpo = "Mensaje sin cuerpo especificado."
-
                     respuesta_preparada = preparar_borrador_correo(destinatario, asunto, cuerpo)
                     _hablar_y_mostrar(respuesta_preparada)
                     return
@@ -538,7 +536,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     if len(partes) > 1 and partes[1].strip():
                         titulo_evento = partes[1].strip().capitalize()
                     break
-
             resultado_agendado = agendar_evento(
                 titulo=titulo_evento,
                 fecha_hora_str=fecha_iso,
@@ -604,7 +601,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
                     partes_diga = partes_a[1].split(" que diga ", 1)
                     destinatario = partes_diga[0].strip()
                     mensaje_texto = partes_diga[1].strip() if len(partes_diga) > 1 else "Hola"
-
                     respuesta_prep = preparar_envio_inteligente(destinatario, mensaje_texto)
                     _hablar_y_mostrar(respuesta_prep)
                     return
