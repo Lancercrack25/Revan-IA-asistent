@@ -41,6 +41,18 @@ mediapipe==0.10.14
 
 # --- Reconocimiento de música ---
 shazamio==0.7.0
+# shazamio usa 'pydub' internamente (se instala solo, no hace falta
+# listarlo aparte) para convertir el audio capturado antes de mandarlo a
+# reconocer. pydub A SU VEZ necesita ffmpeg instalado A NIVEL DE SISTEMA
+# OPERATIVO -esto NO lo resuelve pip, es un programa aparte-. Se ve
+# reflejado en la consola cada vez que arranca REVAN:
+#   "Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work"
+# Sin ffmpeg instalado, el reconocimiento de canciones (sección 5 de
+# comandos.txt) puede fallar o comportarse mal. En Windows: descarga un
+# build de https://www.gyan.dev/ffmpeg/builds/ (release full o essentials),
+# descomprime, y agrega la carpeta "bin" a la variable de entorno PATH del
+# sistema. Reinicia la terminal/PC después para que el PATH nuevo surta
+# efecto.
 
 # --- Documentos ---
 python-docx==1.1.2
@@ -60,6 +72,13 @@ psutil==6.0.0
 # --- Ciencia / gráficos (Inspector_asistent) ---
 scipy==1.14.1
 matplotlib==3.9.2
+
+# --- GUI legada (Gui/Dashboard.py) ---
+# Descomenta esta línea SOLO si sigues usando la GUI de escritorio antigua
+# (Gui/Dashboard.py). Ya no está conectada a main.py -ver el hallazgo de
+# código muerto de la revisión anterior-, así que si la vas a borrar, no
+# hace falta instalar esto.
+# customtkinter==5.2.2
 
 # --- Librerías de la librería estándar de Python que NO van aquí ---
 # (no requieren instalación, ya vienen con Python): os, sys, time, json,
