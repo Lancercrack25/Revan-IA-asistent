@@ -138,7 +138,8 @@ REVAN puede ejecutar código, enviar mensajes y mover archivos reales — no es 
 ## Skills (playbooks editables)
 
 `skills/*.md` — reglas de comportamiento específicas por tipo de tarea (generación de código, protocolo de electrónica, tono de redacción de correos), inyectadas al LLM solo cuando el comando las necesita. Edítalos en texto plano; no requieren tocar Python. Detalle técnico de cómo se cargan en [`ARQUITECTURA.md`](./ARQUITECTURA.md#skills).
+pronto estara implementado esto de las skills
 
 ## Estado del proyecto
 
-Honestamente: funcional y usado a diario, construido de forma iterativa. Tiene una capa de seguridad seria (confirmación, sandbox, auditoría, rate limiting) poco común en proyectos de este tipo, pero le falta disciplina de ingeniería que sí tendría un proyecto "production-grade": no hay tests automatizados, el logging es por `print()` en vez del módulo `logging`, y la base de código creció por necesidad turno a turno más que por diseño previo. Es sólido para uso personal; no está listo para salir de tu máquina sin trabajo adicional (credenciales en texto plano, sin cifrado en reposo).
+Honestamenteya es bastante funcional y usado a diario, construido de forma iterativa. Tiene una capa de seguridad seria (confirmación, sandbox, auditoría, rate limiting) poco común en proyectos de este tipo, pero le falta disciplina de ingeniería que sí tendría un proyecto "production-grade": no hay tests automatizados por ahora, el logging es por `print()` en vez del módulo `logging`, y la base de código creció por necesidad turno a turno más que por diseño previo. Es sólido para uso personal; no está listo para salir de tu máquina sin trabajo adicional (credenciales en texto plano, sin cifrado en reposo).

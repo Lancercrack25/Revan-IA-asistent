@@ -115,6 +115,7 @@ nombre: mi_skill
 palabras_clave: [palabra1, palabra2, frase con espacios]
 ---
 Contenido en markdown normal, se manda tal cual como mensaje de sistema.
+esta seccion de skills en un futuro sera implementada
 ```
 
 ## Dashboard web — flujo de datos en vivo
