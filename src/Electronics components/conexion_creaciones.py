@@ -1,17 +1,3 @@
-"""
-Electronics components — comunicación serial en vivo con una placa ya
-programada (Arduino/ESP32).
-
-Complementa a Coder_agent: una vez que la placa YA tiene un sketch
-subido (vía el IDE de Arduino -REVAN no sube firmware, ver
-Coder_agent-), estas funciones permiten leer lo que la placa envía por
-el puerto serie (ej. datos de un sensor) o mandarle un comando de texto.
-
-Enviar comandos SÍ requiere confirmación explícita (puede accionar algo
-físico real, como encender un motor o un relé); leer datos es de solo
-lectura y no la requiere.
-"""
-
 import time
 import serial
 

@@ -5,10 +5,8 @@ import matplotlib.pyplot as plt
 
 # Aplicar estilo oscuro base
 plt.style.use('dark_background')
-
 # Ruta para guardar el historial de análisis en JSON
 HISTORIAL_PATH = os.path.join(os.path.dirname(__file__), "historial_telemetria.json")
-
 
 def _cargar_historial() -> dict:
     """Carga el historial guardado o genera una estructura inicial."""
@@ -125,7 +123,7 @@ def generar_grafica_telemetria_inspector(
     else:
         _renderizar_y_mostrar(*args_render)
 
-    return ruta_salida
+    return ruta_salida 
 
 if __name__ == "__main__":
     print("Prueba directa del módulo gráfico...")
