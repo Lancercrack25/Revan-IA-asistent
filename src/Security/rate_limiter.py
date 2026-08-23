@@ -11,7 +11,6 @@ límite fijo es más fácil de razonar, depurar, y ajustar que un algoritmo
 sofisticado, y para este caso de uso (evitar loops descontrolados, no
 proteger una API pública de miles de usuarios) es más que suficiente.
 """
-
 import time
 import threading
 from collections import defaultdict
@@ -34,7 +33,6 @@ LIMITES_POR_DEFECTO = {
     "investigacion": (10, 60),
     "default": (10, 60),
 }
-
 
 def permitir_accion(categoria: str) -> bool:
     limite, ventana = LIMITES_POR_DEFECTO.get(categoria, LIMITES_POR_DEFECTO["default"])
