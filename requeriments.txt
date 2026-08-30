@@ -1,0 +1,88 @@
+# requirements.txt para Asistente REVAN
+# Generado escaneando los imports reales de todo el proyecto (no es una
+# lista genérica). Instalar con:
+#   pip install -r requirements.txt
+#
+# Nota: varias librerías (opencv, mediapipe, pygame, sounddevice) requieren
+# que el sistema tenga las dependencias nativas correspondientes (drivers de
+# audio/video). Si algo falla al instalar, primero revisa el mensaje de error
+# de pip -suele indicar qué falta a nivel de sistema operativo, no de Python.
+
+# --- Núcleo / LLM ---
+openai==1.51.2                 # cliente usado contra los endpoints de NVIDIA NIM (NimClient y Coder_agent)
+google-genai==0.3.0             # opcional: solo si activas el bloque de respaldo con Gemini real en os_service.py
+
+# --- Coder_agent / Electrónica ---
+pyserial==3.5                  # comunicación con Arduino/ESP32/sensores por puerto serial
+bleak==0.22.3                  # detección opcional de dispositivos Bluetooth (BLE)
+WMI==1.5.1                     # Windows únicamente. Opcional: detección de tarjetas/USB
+                                # conectadas (Electronics components/functionality.py). El
+                                # código ya lo envuelve en try/except ImportError -si no lo
+                                # instalas, esa detección simplemente devuelve una lista
+                                # vacía en silencio en vez de tronar-. Trae pywin32 solo,
+                                # como dependencia propia; no hace falta listarlo aparte.
+
+# --- Servidor web / dashboard ---
+fastapi==0.115.0
+uvicorn==0.31.0
+
+# --- Base de datos ---
+psycopg2-binary==2.9.9         # usar la variante -binary evita tener que compilar contra libpq
+
+# --- Voz ---
+edge_tts==6.1.12
+sounddevice==0.5.0
+SpeechRecognition==3.10.4
+pygame==2.6.0                  # reproducción de audio (ElevenLabs client)
+
+# --- Visión / cámara ---
+opencv-python==4.10.0.84
+mediapipe==0.10.14
+
+# --- Reconocimiento de música ---
+shazamio==0.7.0
+# shazamio usa 'pydub' internamente (se instala solo, no hace falta
+# listarlo aparte) para convertir el audio capturado antes de mandarlo a
+# reconocer. pydub A SU VEZ necesita ffmpeg instalado A NIVEL DE SISTEMA
+# OPERATIVO -esto NO lo resuelve pip, es un programa aparte-. Se ve
+# reflejado en la consola cada vez que arranca REVAN:
+#   "Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work"
+# Sin ffmpeg instalado, el reconocimiento de canciones (sección 5 de
+# comandos.txt) puede fallar o comportarse mal. En Windows: descarga un
+# build de https://www.gyan.dev/ffmpeg/builds/ (release full o essentials),
+# descomprime, y agrega la carpeta "bin" a la variable de entorno PATH del
+# sistema. Reinicia la terminal/PC después para que el PATH nuevo surta
+# efecto.
+
+# --- Documentos ---
+python-docx==1.1.2
+openpyxl==3.1.5
+
+# --- Correo ---
+python-dotenv==1.0.1           # carga de variables de entorno (.env)
+
+# --- Web / scraping ---
+requests==2.32.3
+beautifulsoup4==4.12.3
+
+# --- Red / diagnóstico ---
+speedtest-cli==2.1.3
+psutil==6.0.0
+
+# --- Ciencia / gráficos (Inspector_asistent) ---
+scipy==1.14.1
+matplotlib==3.9.2
+
+# --- GUI legada (Gui/Dashboard.py) ---
+# Descomenta esta línea SOLO si sigues usando la GUI de escritorio antigua
+# (Gui/Dashboard.py). Ya no está conectada a main.py -ver el hallazgo de
+# código muerto de la revisión anterior-, así que si la vas a borrar, no
+# hace falta instalar esto.
+# customtkinter==5.2.2
+
+# --- Librerías de la librería estándar de Python que NO van aquí ---
+# (no requieren instalación, ya vienen con Python): os, sys, time, json,
+# re, threading, subprocess, unicodedata, base64, math, socket, smtplib,
+# imaplib, email, datetime, difflib, shutil, tempfile, uuid, urllib,
+# webbrowser, contextlib, concurrent, ast, abc, asyncio, typing,
+# platform, winsound (Windows), tkinter (viene con Python en Windows).

@@ -3,6 +3,7 @@ import subprocess
 import platform
 import re
 
+
 def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
     sistema = platform.system().lower()
     if "windows" in sistema:
@@ -17,7 +18,8 @@ def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
         print(f"[Latencia]: Error al ejecutar ping: {e}")
         return None
 
-    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms"
+    # Soporta tanto "tiempo=Xms" (Windows en español) como "time=Xms" (Windows
+    # en inglés / Linux / macOS)
     tiempos = [float(m) for m in re.findall(r"(?:tiempo|time)[=<]\s*(\d+(?:\.\d+)?)\s*ms", salida, re.IGNORECASE)]
 
     if not tiempos:
@@ -30,7 +32,6 @@ def medir_latencia(host: str = "8.8.8.8", intentos: int = 4):
         "paquetes_recibidos": len(tiempos),
         "paquetes_enviados": intentos,
     }
-
 
 def reportar_latencia(host: str = "8.8.8.8") -> str:
     """Versión hablable de medir_latencia()."""
@@ -64,6 +65,29 @@ def probar_velocidad_internet() -> str:
     except Exception as e:
         return f"No pude completar la prueba de velocidad, Señor. Detalle: {e}"
 
+def probar_velocidad_con_navegador() -> str:
+    # URL con el parámetro 'run=1' o '/run' que inicia el test al cargar la página
+    url_speedtest = "https://www.speedtest.net/es?run=1"
+    sistema = platform.system().lower()
+    try:
+        if "windows" in sistema:
+            # Abre Brave directamente pasando la URL de inicio automático
+            subprocess.Popen(["cmd", "/c", "start", "brave", url_speedtest], shell=False)
+        elif "darwin" in sistema:  # macOS
+            subprocess.Popen(["open", "-a", "Brave Browser", url_speedtest])
+        else:  # Linux
+            subprocess.Popen(["brave-browser", url_speedtest])
+            
+        return "Abriendo Speedtest en Brave... La medición comenzará automáticamente."
+    except Exception as e:
+        print(f"[VelocidadLatencia]: No se pudo abrir Brave con la URL directa: {e}")
+        # Respaldo: abrir con el navegador predeterminado del sistema
+        try:
+            import webbrowser
+            webbrowser.open(url_speedtest)
+            return "Abriendo prueba de velocidad en el navegador predeterminado..."
+        except Exception as ex:
+            return f"Error al abrir el navegador: {ex}"
 
 if __name__ == "__main__":
     print(reportar_latencia())

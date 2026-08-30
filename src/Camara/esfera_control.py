@@ -3,7 +3,6 @@ import time
 import math
 import threading
 import cv2
-
 try:
     import mediapipe as mp
     HAS_MEDIAPIPE = True
@@ -50,17 +49,14 @@ def _bucle_control_esfera(intervalo_seg: float = 0.05):
 
                 if resultado.multi_hand_landmarks:
                     landmarks = resultado.multi_hand_landmarks[0].landmark
-
                     # Landmark 0 = muñeca (referencia de posición)
                     # Landmark 12 = punta del dedo medio (referencia de "extensión" de la mano)
                     muneca = landmarks[0]
                     medio = landmarks[12]
-
                     # Posición normalizada (0.0 a 1.0 en cada eje) -> convertida
                     # a un rango de rotación en radianes centrado en 0
                     rot_y = (muneca.x - 0.5) * 2 * math.pi   # mano izq/der -> rota la esfera en Y
                     rot_x = (muneca.y - 0.5) * 2 * math.pi   # mano arriba/abajo -> rota la esfera en X
-
                     # Distancia muñeca-dedo medio como aproximación de escala,
                     # limitada (clamp) para que no se deforme de forma exagerada
                     distancia = math.hypot(medio.x - muneca.x, medio.y - muneca.y)

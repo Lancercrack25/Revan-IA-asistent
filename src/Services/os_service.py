@@ -3,17 +3,27 @@ import sys
 import shutil
 import subprocess
 import time
+import base64
 import psutil
 import cv2
 
 sys.dont_write_bytecode = True
 
+# Cliente OpenAI para los endpoints de NVIDIA NIM
 try:
-    import ollama
+    from openai import OpenAI
 except ImportError:
-    print("La librería 'ollama' no está instalada. Ejecuta: pip install ollama")
+    OpenAI = None
+
+# Cliente de Gemini como respaldo opcional
+try:
+    from google import genai
+except ImportError:
+    genai = None
 
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
+from src.Core.Config_loader import cargar_credenciales
+
 
 def obtener_ruta_escritorio() -> str:
     """Detecta de forma inteligente la ruta real del Escritorio, con o sin OneDrive."""
@@ -27,6 +37,24 @@ def obtener_ruta_escritorio() -> str:
         return ruta_onedrive_en
     return ruta_normal
 
+
+def normalizar_si_apunta_a_escritorio(ruta_absoluta: str) -> str:
+    home = os.path.realpath(os.path.expanduser("~"))
+    ruta_resuelta = os.path.realpath(ruta_absoluta)
+
+    if not ruta_resuelta.startswith(home):
+        return ruta_absoluta
+
+    resto = ruta_resuelta[len(home):].lstrip(os.sep)
+    partes = resto.split(os.sep) if resto else []
+
+    if partes and partes[0].lower() in ("desktop", "escritorio"):
+        subcarpetas_extra = partes[1:]
+        if subcarpetas_extra:
+            return os.path.join(obtener_ruta_escritorio(), *subcarpetas_extra)
+        return obtener_ruta_escritorio()
+    return ruta_absoluta
+
 def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bool:
     """Audita y registra las acciones ejecutadas sobre el sistema operativo."""
     if not orden.strip() or not respuesta.strip():
@@ -35,7 +63,6 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
     conn = obtener_conexion_pool()
     if not conn:
         return False
-
     try:
         cur = conn.cursor()
         query = """
@@ -53,9 +80,7 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
     finally:
         liberar_conexion(conn)
 
-
 # --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
-
 def guardar_ruta_actual(ruta_absoluta: str) -> bool:
     """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""
     conn = obtener_conexion_pool()
@@ -105,13 +130,16 @@ def obtener_ruta_actual() -> str:
     finally:
         liberar_conexion(conn)
 
+
 def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
-    """
-    Busca la carpeta en el Escritorio (tolerante a mayúsculas/minúsculas),
-    la abre en Windows Explorer y actualiza la ruta activa en PostgreSQL.
-    """
     escritorio = obtener_ruta_escritorio()
     ruta_objetivo = os.path.join(escritorio, nombre_carpeta)
+
+    if not _es_ruta_base_segura(ruta_objetivo):
+        return (
+            f"Señor, no voy a abrir '{nombre_carpeta}' porque la ruta resultante "
+            f"queda fuera de su carpeta de usuario."
+        )
 
     # 1. Intento directo
     if os.path.exists(ruta_objetivo) and os.path.isdir(ruta_objetivo):
@@ -124,15 +152,13 @@ def abrir_carpeta_sistema(nombre_carpeta: str) -> str:
         for elemento in os.listdir(escritorio):
             if elemento.lower() == nombre_carpeta.lower():
                 ruta_coincidencia = os.path.join(escritorio, elemento)
-                if os.path.isdir(ruta_coincidencia):
+                if os.path.isdir(ruta_coincidencia) and _es_ruta_base_segura(ruta_coincidencia):
                     os.startfile(ruta_coincidencia)
                     guardar_ruta_actual(ruta_coincidencia)
                     return f"Carpeta '{elemento}' localizada y abierta exitosamente."
     except Exception as e:
         print(f"Error en búsqueda secundaria: {e}")
-
     return f"Negativo, Señor. No se localizó la carpeta '{nombre_carpeta}' en el Escritorio."
-
 
 def _sanear_nombre_carpeta(nombre: str) -> str:
     """Quita caracteres inválidos en rutas de Windows para evitar que os.makedirs falle."""
@@ -140,16 +166,14 @@ def _sanear_nombre_carpeta(nombre: str) -> str:
     limpio = "".join(c for c in nombre if c not in invalidos).strip()
     return limpio or "Contenedor_Táctico"
 
+def _es_ruta_base_segura(ruta_absoluta: str) -> bool:
+    """Delegado a src/Security/sanitizador.py -una sola fuente de verdad
+    para 'qué ruta es segura para escribir archivos', reutilizada también
+    por System_commands.py."""
+    from src.Security.sanitizador import es_ruta_segura
+    return es_ruta_segura(ruta_absoluta)
 
 def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") -> str:
-    """
-    Crea una carpeta física.
-    ruta_base admite:
-      - "actual"    -> dentro del foco de trabajo activo (última ruta usada, en PostgreSQL)
-      - algo que contenga "escritorio" / "desktop" -> directo en el Escritorio
-      - algo que contenga "documento" -> directo en Documentos
-      - cualquier otra ruta absoluta -> se usa tal cual
-    """
     nombre_nueva_carpeta = _sanear_nombre_carpeta(nombre_nueva_carpeta)
     base = (ruta_base or "actual").lower().strip()
     if "escritorio" in base or "desktop" in base:
@@ -159,9 +183,22 @@ def crear_carpeta_sistema(nombre_nueva_carpeta: str, ruta_base: str = "actual") 
     elif base in ("", "actual"):
         ruta_padre = obtener_ruta_actual()
     elif os.path.isabs(ruta_base):
+        if not _es_ruta_base_segura(ruta_base):
+            from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+            registrar_evento(
+                modulo="os_service",
+                accion="crear_carpeta_sistema",
+                resultado=f"Ruta rechazada por estar fuera del directorio del usuario: '{ruta_base}'",
+                nivel=NIVEL_ADVERTENCIA,
+            )
+            return (
+                f"Señor, no voy a crear nada en '{ruta_base}' porque está fuera de su "
+                f"carpeta de usuario. Dígame que la cree en Escritorio, Documentos, o en "
+                f"la carpeta actual."
+            )
         ruta_padre = ruta_base
+        ruta_padre = normalizar_si_apunta_a_escritorio(ruta_padre)
     else:
-        # Ruta relativa desconocida: la tratamos como subcarpeta del Escritorio
         ruta_padre = os.path.join(obtener_ruta_escritorio(), ruta_base)
 
     ruta_final = os.path.join(ruta_padre, nombre_nueva_carpeta)
@@ -209,59 +246,92 @@ def obtener_diagnostico_hardware() -> str:
     except Exception as e:
         return f"Error al leer sensores de rendimiento: {e}"
 
-
+# --- MÓDULO DE VISIÓN NATIVE API (NVIDIA NIM / GEMINI FALLBACK) ---
 def _analizar_frame_con_llava(frame) -> str:
-    ruta_foto_temp = "temp_vision.jpg"
-    cv2.imwrite(ruta_foto_temp, frame)
-
     try:
-        print(" [REVAN Vision]: Procesando análisis visual con LLaVA...")
-
-        t0 = time.time()
-        respuesta = ollama.chat(
-            model='llava',
-            messages=[{
-                'role': 'user',
-                'content': 'Describe brevemente en español y en una sola frase qué ves en esta imagen frente a la cámara.',
-                'images': [ruta_foto_temp]
-            }]
+        creds = cargar_credenciales() or {}
+        # Detectar la clave de NVIDIA considerando tu nombre en el config ("NVIDIA_NIM_API_KEY")
+        nvidia_key = (
+            creds.get("NVIDIA_NIM_API_KEY") 
+            or creds.get("NVIDIA_API_KEY") 
+            or os.getenv("NVIDIA_NIM_API_KEY") 
+            or os.getenv("NVIDIA_API_KEY")
         )
-        t_llava = time.time() - t0
+        
+        gemini_key = creds.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-        total_ns = respuesta.get("total_duration")
-        if total_ns is not None:
-            print(f"[LLaVA] Tiempo total (Ollama): {total_ns/1e9:.2f}s | Medido en Python: {t_llava:.2f}s")
+        # 1. Codificar el frame a Base64 JPEG en memoria
+        _, buffer = cv2.imencode('.jpg', frame)
+        base64_image = base64.b64encode(buffer).decode('utf-8')
+        
+        prompt_texto = (
+            "Estás viendo una imagen capturada por la webcam de una PC de escritorio. "
+            "Describe en español, en una sola frase breve, ÚNICAMENTE lo que puedas "
+            "confirmar con certeza que aparece en la imagen. "
+            "Sé literal y conservador: si la imagen está oscura, borrosa, muestra solo una "
+            "pared o un espacio vacío, o no puedes identificar el contenido con certeza, "
+            "dilo explícitamente (por ejemplo: 'La imagen no muestra nada identificable con "
+            "claridad'). No inventes personas, objetos, ni escenas que no estén realmente "
+            "visibles. No asumas contexto externo: esta es la webcam de una computadora, no "
+            "una cámara de seguridad exterior, así que no describas entradas, calles ni "
+            "repartidores a menos que literalmente se vean en la imagen."
+        )
+
+        # INTENTO 1: NVIDIA NIM API (Llama 3.2 11B Vision)
+        if nvidia_key and OpenAI:
+            print(" [REVAN Vision]: Procesando análisis con NVIDIA NIM API (Llama 3.2 Vision)...")
+            client = OpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=nvidia_key
+            )
+
+            response = client.chat.completions.create(
+                model="meta/llama-3.2-11b-vision-instruct",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_texto},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=150,
+                temperature=0.2
+            )
+            analisis = response.choices[0].message.content.strip()
+            print(f" [Análisis NVIDIA]: {analisis}")
+            return f"Según mi sensor óptico: {analisis}"
+
+        # INTENTO 2: GEMINI API (Fallback si falla NVIDIA)
+        elif gemini_key and genai:
+            print(" [REVAN Vision]: Procesando análisis con Gemini API...")
+            client = genai.Client(api_key=gemini_key)
+            imagen_data = {
+                "mime_type": "image/jpeg",
+                "data": buffer.tobytes()
+            }
+            respuesta = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[prompt_texto, imagen_data]
+            )
+            analisis = respuesta.text.strip()
+            print(f" [Análisis Gemini]: {analisis}")
+            return f"Según mi sensor óptico: {analisis}"
+
         else:
-            print(f"[LLaVA] Medido en Python: {t_llava:.2f}s")
-
-        if os.path.exists(ruta_foto_temp):
-            os.remove(ruta_foto_temp)
-
-        analisis = respuesta['message']['content'].strip()
-        print(f" [Análisis]: {analisis}")
-        return f"Según mi sensor óptico: {analisis}"
+            return "No se detectaron claves válidas para NVIDIA_NIM_API_KEY o GEMINI_API_KEY en la configuración."
 
     except Exception as e:
-        if os.path.exists(ruta_foto_temp):
-            os.remove(ruta_foto_temp)
-        print(f" Error en el módulo de visión: {e}")
-        return "Tuve un problema al procesar la visión. Asegúrate de tener instalado el modelo 'llava' en Ollama ejecutando: ollama run llava"
-
+        print(f" Error en el módulo de visión API: {e}")
+        return f"Error al procesar la imagen con el servicio de visión: {e}"
 
 def analizar_entorno_vision() -> str:
-    """Captura un fotograma de la webcam (abre y cierra la cámara) y lo analiza con LLaVA."""
-    print("[REVAN Vision]: Activando sensor óptico...")
+    from src.Camara.open_camera import revan_cam
 
-    # Usar CAP_DSHOW en Windows para apertura instantánea del driver
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) if os.name == 'nt' else cv2.VideoCapture(0)
-
-    if not cap.isOpened():
-        return "No pude acceder a la cámara, Señor. Verifique que no esté siendo usada por otra aplicación."
-
-    ret, frame = cap.read()
-    cap.release()  # Liberar el dispositivo inmediatamente
-
-    if not ret or frame is None:
-        return "Error al capturar la imagen de la cámara."
-
-    return _analizar_frame_con_llava(frame)
+    return revan_cam.capturar_y_analizar(duracion_segundos=3.0)

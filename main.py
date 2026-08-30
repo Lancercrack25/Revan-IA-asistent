@@ -3,46 +3,88 @@ import sys
 import time
 import threading
 import subprocess
-# Prevenir la generación de archivos .pyc
+import unicodedata
+
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
-#importaciones de modulos para ejecucion y funcionamiento.
+
 from src.Core.NimClient import NimClient
 from src.Core.Elevenlabs_client import ElevenLabsClient
 from src.Core.microphone_client import MicrophoneClient
-from src.Core.Config_loader import cargar_ajustes
-from src.Gui.Dashboard import RevanGUI
+from src.Core.Config_loader import cargar_ajustes, cargar_credenciales
+from src.Core.text_utils import limpiar_texto_para_voz
 from src.Automation.System_commands import desplegar_monitores_windows
-from src.Interfaces.servidor import iniciar_servidor_ui, transmitir_desde_hilo_externo
+from src.Automation.work_apps_actions import abrir_teams, abrir_outlook, abrir_vscode, abrir_google_meet, abrir_google_drive
+from src.Interfaces.servidor import (iniciar_servidor_ui,transmitir_desde_hilo_externo,transmitir_chat_desde_hilo_externo,
+    registrar_manejador_comando_texto,registrar_manejador_comando_coder,registrar_manejador_comando_creative,transmitir_respuesta_coder_desde_hilo_externo,transmitir_respuesta_creative_desde_hilo_externo,transmitir_rendimiento_desde_hilo_externo,
+)
+from src.Productividad.rendimiento_general import obtener_snapshot_completo
 from src.Database.init import inicializar_base_datos
 from src.Services.agent_orchestrator import ejecutar_misión_compleja
+from src.Core.Gemini_client import GeminiClient
 from src.Camara.open_camera import iniciar_vigilancia, detener_vigilancia, vigilancia_activa
 from src.Camara.esfera_control import iniciar_control_esfera, detener_control_esfera, control_esfera_activo
-from src.Network.analize_network import analizar_red
-from src.Network.velocidad_latencia import probar_velocidad_internet, reportar_latencia
+from src.Network.analize_network import analizar_red, abrir_terminal_ping, abrir_terminal_scan
+from src.Network.velocidad_latencia import probar_velocidad_con_navegador, reportar_latencia
 from src.Network.busqueda_intrusos import detectar_intrusos, marcar_todos_como_conocidos
-from src.Core.Gemini_client import GeminiClient
+from src.Phone.whatsapp_service import preparar_envio_inteligente, confirmar_envio_inteligente, cancelar_envio_pendiente
+from src.Emails.email_control import (leer_ultimos_correos, contar_correos_sin_leer,preparar_borrador_correo, confirmar_envio_correo, cancelar_borrador_correo)
+from src.Emails.registro_agenda import agendar_evento, consultar_agenda_hoy
+from src.Emails.utils.nlp_date_parser import parsear_fecha_natural
+from src.Sounds.sounds_main import reproducir_sfx
+from src.Sounds.music_detector.detector import identificar_y_abrir_cancion
+from src.Coder_agent.coder_agent import ejecutar_tarea_codigo, procesar_confirmacion_codigo
+from src.Core.NimClient import procesar_confirmacion_serial
+from src.Creative_agent.creative_agent import generar_imagen
 
-# Instancias y Controles Globales
-cerebro_ia = None     # NimClient (Acciones del sistema, vía NVIDIA NIM)
-gemini_ia = None      # Gemini (Conversación)
+cerebro_ia = None
+gemini_ia = None
 voz_ia = None
 oidos_ia = None
-gui = None
 titulo = "Señor"
 sistema_activo = False
-ultima_interaccion = 0  
-TIEMPO_ATENCION = 16   # Ventana de atención activa en segundos (Modo Jarvis)
+esta_hablando = False
+lock_estado_habla = threading.Lock()
+ultima_interaccion = 0
+TIEMPO_ATENCION = 18
 
-# Palabras clave que identifican una ACCIÓN FÍSICA sobre Windows (Para NIM)
 PALABRAS_CLAVE_ACCION = [
-    "word", "excel", "documento", "archivo", "carpeta", "crea", "crear", 
-    "abre", "abrir", "navegador", "brave", "youtube", "video", "busca", 
-    "juego", "jugar", "monitores", "camara","mira"
+    # --- Módulo de Aplicaciones & Archivos ---
+    "word", "excel", "documento", "archivo", "carpeta", "crea", "crear",
+    "abre", "abrir", "navegador", "brave", "youtube", "video", "busca",
+    "juego", "jugar", "monitores", "camara", "mira", "whatsapp", "mensaje",
+    "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar",
+    "corre", "prende", "enciende", "investiga", "recuerda", "guarda", "analiza",
+    "telefono", "celular", "envia", "enviar", "confirma", "confirmar", "cancela", "cancelar",
+    "correo", "correos", "email", "inbox", "buzon", "agenda", "agendar", "evento", "reunion", "cita",
+    "cancion", "musica", "adivina", "reconoce", "identifica", "sonando",
+    "programa", "programar", "codigo", "script",
+    "teams", "outlook", "vscode", "meet", "drive", "trabajo",
+    "imagen", "dibujar", "sensor", "electronica", "hardware", "placa", "microcontrolador",
+    "componente", "pin", "voltaje", "circuito", "gpio","rendimiento", "productividad", "cpu", "ram", "memoria",
+    "reporte", "metricas", "optimiza", "recursos", "sistema"
 ]
 
+def quitar_acentos(texto: str) -> str:
+    if not texto:
+        return ""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+def es_intencion_de_comando(texto: str) -> bool:
+    texto_sin_acentos = quitar_acentos(texto.lower())
+    es_orden = any(palabra in texto_sin_acentos for palabra in PALABRAS_CLAVE_ACCION)
+    
+    if es_orden:
+        print("Clasificado localmente -> ORDEN")
+    else:
+        print("Clasificado localmente -> CONVERSACIÓN")
+        
+    return es_orden
+
 def hilo_servidor_web():
-    """Ejecuta el servidor FastAPI/Uvicorn para la esfera 3D en un hilo dedicado."""
     try:
         servidor = iniciar_servidor_ui()
         servidor.run()
@@ -50,320 +92,698 @@ def hilo_servidor_web():
         print(f" Error en el servidor web de la esfera: {e}")
 
 def sincronizar_estado_esfera(estado, color_hex):
-    """Envía los estados de voz e IA al loop de la esfera 3D vía WebSocket."""
     try:
         transmitir_desde_hilo_externo(estado, color_hex)
     except Exception as e:
         print(f" Error al sincronizar esfera: {e}")
 
+def hablar_sincronizado(accion_de_voz):
+    global esta_hablando
+    with lock_estado_habla:
+        esta_hablando = True
+    sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+    t_inicio_habla = time.time()
+    print(f"[Esfera] -> PROCESANDO (naranja) a las {time.strftime('%H:%M:%S')}")
+
+    def _avisar_reproduciendo():
+        sincronizar_estado_esfera("HABLANDO", "#ff0055")
+        print(f"[Esfera] -> HABLANDO (rojo) a las {time.strftime('%H:%M:%S')}, {time.time() - t_inicio_habla:.2f}s después de decidir hablar (esto ya es cuando el audio suena de verdad)")
+
+    def _tarea():
+        global esta_hablando
+        try:
+            accion_de_voz(_avisar_reproduciendo)
+        except Exception as err_voz:
+            print(f"[Voz Error]: Fallo en la reproducción: {err_voz}")
+        finally:
+            time.sleep(0.3)
+            with lock_estado_habla:
+                esta_hablando = False
+            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            print(f"[Esfera] -> ESPERA (azul) a las {time.strftime('%H:%M:%S')}")
+
+    threading.Thread(target=_tarea, daemon=True).start()
+
+def hablar_filler(texto: str):
+    """
+    Para las frases cortas de relleno ('Un momento, Señor, estoy...') que
+    antes llamaban a hablar_en_hilo_seguro() directo -sin tocar
+    esta_hablando ni la esfera en absoluto-. Usa el mismo voz_ia que el
+    resto del asistente y pasa por hablar_sincronizado() para que la esfera
+    también se ponga roja durante estos mensajes.
+    """
+    hablar_sincronizado(lambda avisar: voz_ia.hablar(texto, avisar_reproduciendo=avisar) if voz_ia else None)
+
+def sincronizar_chat_dashboard(rol: str, texto: str):
+    try:
+        transmitir_chat_desde_hilo_externo(rol, texto)
+    except Exception as e:
+        print(f" Error al sincronizar chat del dashboard: {e}")
+
+def activar_kill_switch() -> str:
+    from src.Security.auditoria import registrar_evento, NIVEL_ADVERTENCIA
+
+    acciones_detenidas = []
+
+    try:
+        resultado_wa = cancelar_envio_pendiente()
+        if "no hay ninguna" not in resultado_wa.lower():
+            acciones_detenidas.append("mensaje de WhatsApp pendiente cancelado")
+    except Exception as e:
+        print(f"[Kill-Switch] Error cancelando WhatsApp: {e}")
+
+    try:
+        resultado_mail = cancelar_borrador_correo()
+        if "no hay ningun" not in resultado_mail.lower():
+            acciones_detenidas.append("borrador de correo cancelado")
+    except Exception as e:
+        print(f"[Kill-Switch] Error cancelando correo: {e}")
+
+    try:
+        if vigilancia_activa():
+            detener_vigilancia()
+            acciones_detenidas.append("vigilancia de cámara detenida")
+    except Exception as e:
+        print(f"[Kill-Switch] Error deteniendo vigilancia: {e}")
+
+    try:
+        if control_esfera_activo():
+            detener_control_esfera()
+            acciones_detenidas.append("control de esfera detenido")
+    except Exception as e:
+        print(f"[Kill-Switch] Error deteniendo control de esfera: {e}")
+
+    registrar_evento(
+        modulo="kill_switch",
+        accion="activar_kill_switch",
+        resultado=f"Acciones detenidas: {acciones_detenidas or 'ninguna (nada estaba pendiente/activo)'}",
+        nivel=NIVEL_ADVERTENCIA,
+    )
+
+    if acciones_detenidas:
+        return "Alto total, Señor. " + "; ".join(acciones_detenidas) + "."
+    return "Alto total, Señor. No había ninguna acción pendiente ni módulo activo que detener."
+
 def apagar_sistema():
-    """Ejecuta el protocolo de desconexión y cierre limpio de REVAN."""
-    global sistema_activo, gui
+    global sistema_activo, esta_hablando
     print("\n[REVAN]: Iniciando secuencia de desconexión...")
     sistema_activo = False
 
-    # Apagar cualquier módulo de cámara que haya quedado activo, para no
-    # dejar el dispositivo "tomado" después de cerrar REVAN.
     if vigilancia_activa():
         detener_vigilancia()
     if control_esfera_activo():
         detener_control_esfera()
-    # Notificar y despedir por voz
+
+    esta_hablando = True
     sincronizar_estado_esfera("HABLANDO", "#ff0055")
+    reproducir_sfx("welcome", "close")
     if voz_ia:
-        voz_ia.hablar(f"Desconectando sistemas. Hasta luego, {titulo}.")
-    
+        voz_ia.hablar(f"Desconectando sistemas, {titulo}.")
+    esta_hablando = False
     sincronizar_estado_esfera("DESCONECTADO", "#444444")
     time.sleep(0.5)
-
-    # Cerrar la interfaz Tkinter de forma segura
-    if gui and hasattr(gui, 'app'):
-        gui.app.after(100, gui.app.destroy)
 
     print("[REVAN]: Sistema totalmente apagado.")
     sys.exit(0)
 
-def encender_sistemas():
-    """Secuencia de despliegue cronológico (Monitores -> CustomTkinter -> Esfera -> Hilo de Voz)."""
-    global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, titulo, sistema_activo
-    sistema_activo = True
+def procesar_comando_coder(prompt: str):
+    if not prompt or not prompt.strip():
+        return
 
+    print(f"[Coder Agent - UI dedicada]: '{prompt.strip()}'")
+
+    def _tarea():
+        sincronizar_estado_esfera("PROCESANDO", "#00f0ff")
+        resultado = ejecutar_tarea_codigo(prompt.strip())
+        transmitir_respuesta_coder_desde_hilo_externo(resultado)
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+
+    threading.Thread(target=_tarea, daemon=True).start()
+
+
+def procesar_comando_creative(prompt: str):
+    if not prompt or not prompt.strip():
+        return
+
+    print(f"[Creative Agent - UI dedicada]: '{prompt.strip()}'")
+
+    def _tarea():
+        sincronizar_estado_esfera("PROCESANDO", "#ff00ff")
+        resultado = generar_imagen(prompt.strip())
+        transmitir_respuesta_creative_desde_hilo_externo(resultado)
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+
+    threading.Thread(target=_tarea, daemon=True).start()
+
+def encender_sistemas():
+    global cerebro_ia, gemini_ia, voz_ia, oidos_ia, titulo, sistema_activo, esta_hablando
+    sistema_activo = True
     print("Inicializando secuencia de despliegue cronológico...")
-    print("[1/3] Desplegando monitores nativos...")
+    print("[1/2] Desplegando monitores nativos...")
     try:
         desplegar_monitores_windows()
     except Exception as e:
         print(f"Aviso al desplegar monitores nativos: {e}")
-
-    time.sleep(0.4) 
-
-    gui.actualizar_estado("CONECTANDO COGNICIÓN...", "#7ef1ff")
+    time.sleep(0.4)
     sincronizar_estado_esfera("CONECTANDO", "#7ef1ff")
-    print("[2/3] Panel CustomTkinter Activo.")
-    
+
     try:
-        ajustes = cargar_ajustes() or {}
-        api_key_nim = ajustes.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
-
-        # Inicialización de motores cognitivos (NIM para acciones + Gemini para conversación)
+        credenciales = cargar_credenciales() or {}
+        api_key_nim = credenciales.get("NVIDIA_NIM_API_KEY", os.getenv("NVIDIA_NIM_API_KEY", ""))
         cerebro_ia = NimClient(api_key=api_key_nim)
-        gemini_ia = GeminiClient()   # ya no recibe api_key, la carga sola con cargar_credenciales()
+        gemini_ia = GeminiClient()
         voz_ia = ElevenLabsClient()
-
-        gui.actualizar_estado("EN LÍNEA", "#7ef1ff")
-        gui.agregar_mensaje("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
-        
-        time.sleep(0.2)
-
+        voz_ia.precalentar_en_hilo()
+        sincronizar_chat_dashboard("revan", f"Sistemas en línea, {titulo}. Listo para recibir instrucciones.")
         try:
             subprocess.Popen(
-                'start brave --app=http://127.0.0.1:8000 --window-size=670,670',
-                shell=True
+                ["cmd", "/c", "start", "brave", "http://127.0.0.1:8000"],
+                shell=False
             )
-            print("[3/3] Núcleo Web Desplegado (Esfera 3D).")
+            print("[2/2] Núcleo Web Desplegado (Esfera 3D + Dashboard).")
         except Exception as e:
             print(f" Error al lanzar la interfaz web: {e}")
+        registrar_manejador_comando_texto(procesar_comando_texto)
+        registrar_manejador_comando_coder(procesar_comando_coder)
+        registrar_manejador_comando_creative(procesar_comando_creative)
+        reproducir_sfx("welcome", "Bienvenida",volumen=1.2)
 
-        # Vocalización de bienvenida
-        sincronizar_estado_esfera("HABLANDO", "#ff0055")
-        voz_ia.hablar(f"Sistemas en línea. Herramientas desplegadas exitosamente, {titulo}.")
-        sincronizar_estado_esfera("ESPERA", "#0077ff")
-        
-        # Escucha asíncrona dedicada en segundo plano
+        def saludo_inicial(avisar):
+            if voz_ia:
+                voz_ia.hablar(f"Bienvenido, {titulo}. Sistemas principales en línea,módulos y agentes han sido sincronizados exitosamente.un honor estar de vuelta listo para ejecutar sus nuevas ideas, ¿Que es lo que tiene en mente hoy {titulo}?", avisar_reproduciendo=avisar)
+
+        hablar_sincronizado(saludo_inicial)
         hilo_voz = threading.Thread(target=bucle_escucha_hilo, daemon=True)
         hilo_voz.start()
-        
+
+        hilo_rendimiento = threading.Thread(target=bucle_rendimiento_hilo, daemon=True)
+        hilo_rendimiento.start()
+
     except Exception as e:
-        gui.actualizar_estado("ERROR EN COGNICIÓN", "#f85149")
         sincronizar_estado_esfera("ERROR", "#f85149")
         print(f" Error crítico al inicializar las APIs locales: {e}")
 
 def bucle_escucha_hilo():
-    """Bucle infinito de escucha fuera del hilo principal de la GUI."""
     global sistema_activo
     while sistema_activo:
         procesar_ciclo_voz()
         time.sleep(0.05)
 
+def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
+    global sistema_activo
+    while sistema_activo:
+        try:
+            snapshot = obtener_snapshot_completo()
+            transmitir_rendimiento_desde_hilo_externo(snapshot)
+        except Exception as e:
+            print(f"[Rendimiento] Error tomando snapshot: {e}")
+        time.sleep(intervalo_segundos)
+
 def procesar_ciclo_voz():
-    """Ciclo táctico de voz con enrutamiento inteligente (NIM para acciones vs Gemini para conversación)."""
-    global cerebro_ia, gemini_ia, voz_ia, oidos_ia, gui, ultima_interaccion
+    global oidos_ia, ultima_interaccion, esta_hablando
     try:
-        # 1. ESTADO: ESCUCHANDO (Cian / Verde agua)
-        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc") 
+        if esta_hablando:
+            time.sleep(0.2)
+            return
+        sincronizar_estado_esfera("ESCUCHANDO", "#00ffcc")
+        print(f"[Esfera] -> ESCUCHANDO (verde) a las {time.strftime('%H:%M:%S')} (esta_hablando={esta_hablando})")
         print("\n[REVAN]: Escuchando...")
-        
         orden_sucia = oidos_ia.escuchar()
-        # Si no capturó audio o fue ruido ambiental vacío
+
+        if esta_hablando:
+            return
+
         if not orden_sucia or not orden_sucia.strip():
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
-
         orden_minusculas = orden_sucia.lower().strip()
+        orden_busqueda = quitar_acentos(orden_minusculas)
         print(f"[Captura]: '{orden_minusculas}'")
-
         tiempo_actual = time.time()
         en_ventana_atencion = (tiempo_actual - ultima_interaccion) < TIEMPO_ATENCION
 
-        # Filtrado inteligente por MODO JARVIS / Invocación
-        if "revan" in orden_minusculas:
+        if "revan" in orden_busqueda:
             partes = orden_minusculas.split("revan", 1)
             orden_limpia = partes[1].strip() if len(partes) > 1 else ""
-            ultima_interaccion = tiempo_actual  
+            ultima_interaccion = tiempo_actual
         elif en_ventana_atencion:
             print("[MODO JARVIS]: Canal abierto. Procesando orden directa...")
             orden_limpia = orden_minusculas
-            ultima_interaccion = tiempo_actual  
+            ultima_interaccion = tiempo_actual
         else:
             print("[REVAN]: Ruido de fondo o conversación ajena ignorada.")
             sincronizar_estado_esfera("ESPERA", "#0077ff")
             return
 
-        # --- INTERCEPTOR DE APAGADO / DESCONEXIÓN ---
-        palabras_desconexion = ["desconectar", "desconéctate", "apagar", "apágate", "cerrar programa", "adiós revan", "desconexión"]
-        if any(cmd in orden_minusculas for cmd in palabras_desconexion):
-            apagar_sistema()
-            return
-
-        # --- INTERCEPTOR DE VIGILANCIA DE CÁMARA (detección de cambios) ---
-        palabras_iniciar_vigilancia = ["vigila la camara", "vigila la cámara", "vigilancia", "mantente al pendiente de la camara"]
-        palabras_detener_vigilancia = ["deja de vigilar", "detén la vigilancia", "detente de vigilar", "para de vigilar"]
-
-        if any(cmd in orden_limpia for cmd in palabras_iniciar_vigilancia):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            if iniciar_vigilancia(voz_ia, sincronizar_estado_esfera):
-                voz_ia.hablar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
-            else:
-                voz_ia.hablar("La vigilancia ya estaba activa, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if any(cmd in orden_limpia for cmd in palabras_detener_vigilancia):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            if detener_vigilancia():
-                voz_ia.hablar("Vigilancia de cámara desactivada.")
-            else:
-                voz_ia.hablar("No había ninguna vigilancia activa, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        # --- INTERCEPTOR DE CONTROL DE ESFERA POR MANO ---
-        # Se usa la RAÍZ de la palabra ("control", "manipul") en vez de
-        # formas verbales específicas ("controla", "controlar"), porque
-        # frases naturales como "dame el control de la esfera" usan el
-        # sustantivo, no el verbo, y "control" nunca hace match contra
-        # "controla" como substring.
-        raices_control = ["control", "manipul", "mueve", "mover"]
-        palabras_detener_intent = ["deja de", "detén", "detente", "para de", "suelta", "quita el control"]
-
-        if "esfera" in orden_limpia and any(p in orden_limpia for p in palabras_detener_intent):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            if detener_control_esfera():
-                voz_ia.hablar("Control de esfera desactivado.")
-            else:
-                voz_ia.hablar("No había ningún control de esfera activo, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if "esfera" in orden_limpia and any(r in orden_limpia for r in raices_control):
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            if vigilancia_activa():
-                # La cámara solo la puede tener un módulo a la vez
-                voz_ia.hablar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
-            elif iniciar_control_esfera():
-                voz_ia.hablar(f"Control de esfera por mano activado, {titulo}.")
-            else:
-                voz_ia.hablar("El control de esfera ya estaba activo, Señor.")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        # --- INTERCEPTOR DE CONSULTAS DE RED ---
-        palabras_lista = orden_limpia.split()
-
-        es_consulta_velocidad = "velocidad" in orden_limpia and any(p in orden_limpia for p in ["red", "internet", "conexion", "conexión"])
-        es_consulta_latencia = "latencia" in orden_limpia or "ping" in palabras_lista
-        es_consulta_intrusos = any(p in orden_limpia for p in ["intruso", "intrusos", "quien esta conectado", "quién está conectado", "dispositivos conectados"])
-        es_marcar_conocidos = "marca" in orden_limpia and ("conocido" in orden_limpia or "conocidos" in orden_limpia)
-        es_consulta_red = (
-            not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos)
-            and ("red" in palabras_lista or "ip" in palabras_lista or
-                 any(p in orden_limpia for p in ["internet", "conexion", "conexión"]))
-        )
-
-        if es_consulta_velocidad:
-            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy probando la velocidad de su conexión...")
-            resultado_red = probar_velocidad_internet()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado_red)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if es_consulta_latencia:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(reportar_latencia())
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if es_marcar_conocidos:
-            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy escaneando su red...")
-            resultado_marcado = marcar_todos_como_conocidos()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado_marcado)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if es_consulta_intrusos:
-            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
-            voz_ia.hablar("Un momento, Señor, estoy escaneando su red en busca de dispositivos desconocidos...")
-            resultado_intrusos = detectar_intrusos()
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(resultado_intrusos)
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        if es_consulta_red:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            voz_ia.hablar(analizar_red())
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
-            return
-
-        # Si sólo dijo "Revan" sin comando adicional
         if not orden_limpia:
-            sincronizar_estado_esfera("HABLANDO", "#ff0055")
-            time.sleep(0.15)
-            voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?")
-            sincronizar_estado_esfera("ESPERA", "#0077ff")
+            def responder_listo(avisar):
+                if voz_ia:
+                    voz_ia.hablar(f"Sistemas listos, {titulo}. ¿Qué comando desea ejecutar?", avisar_reproduciendo=avisar)
+            hablar_sincronizado(responder_listo)
+            ultima_interaccion = time.time()
             return
-
-        # 2. ESTADO: PROCESANDO / PENSANDO (Amarillo / Dorado)
-        sincronizar_estado_esfera("PROCESANDO", "#ffaa00") 
-        print("[REVAN]: Procesando inteligencia...")
-
-        # Intercepción rápida para cámara
-        if any(w in orden_limpia for w in ["camara", "cámara", "que ves", "qué ves"]):
-            orden_limpia = "enciende la camara y dime que ves"
-
-        # PASO A: Intentar ejecutar como misión compleja
-        respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
-        
-        # PASO B: Si no es una misión compleja, ENRUTAR entre NIM (acciones) y Gemini (conversación)
-        if respuesta_final is None:
-            es_comando_accion = any(palabra in orden_limpia for palabra in PALABRAS_CLAVE_ACCION)
-
-            if es_comando_accion:
-                print("[Enrutador]: Orden táctica detectada")
-                respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
-            else:
-                print("[Enrutador]: Conversación/Conocimiento detectado")
-                respuesta_final = gemini_ia.generar_respuesta(orden_limpia) if gemini_ia else None
-
-                # Fallback de seguridad: Si Gemini no está configurado o falla, responde NIM
-                if respuesta_final is None:
-                    print("[Enrutador]: Gemini no disponible. Usando NIM como respaldo...")
-                    respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
-
-        # Validación de seguridad: Asegurar que no enviamos texto nulo o vacío al TTS local
-        if not respuesta_final or not respuesta_final.strip():
-            respuesta_final = f"No he recibido datos válidos del procesador táctico, {titulo}."
-
-        # Actualización segura de Tkinter (Thread-safe)
-        if gui and hasattr(gui, 'app'):
-            gui.app.after(0, lambda u_text=orden_sucia: gui.agregar_mensaje("user", u_text))
-            gui.app.after(0, lambda b_text=respuesta_final: gui.agregar_mensaje("revan", b_text))
-
-        # 3. ESTADO: HABLANDO (Fucsia / Rojo)
-        sincronizar_estado_esfera("HABLANDO", "#ff0055") 
-        time.sleep(0.15)
-        voz_ia.hablar(respuesta_final)
-        time.sleep(0.2)
-        
-        # 4. ESTADO: ESPERA / REPOSO (Azul Estándar)
-        sincronizar_estado_esfera("ESPERA", "#0077ff") 
-
+        ejecutar_orden(orden_limpia, orden_mostrar=orden_sucia)
     except Exception as e:
         print(f"Error en el bucle táctico de voz: {e}")
         sincronizar_estado_esfera("ESPERA", "#0077ff")
 
+def procesar_comando_texto(texto: str):
+    """Procesa mensajes que entran directamente desde el dashboard web."""
+    global ultima_interaccion
+    if not texto or not texto.strip():
+        return
+    print(f"[Modo Texto Recibido]: '{texto.strip()}'")
+    ultima_interaccion = time.time()
+    threading.Thread(
+        target=ejecutar_orden,
+        args=(texto.strip(), texto.strip()),
+        daemon=True
+    ).start()
+
+def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
+    global cerebro_ia, gemini_ia, voz_ia, ultima_interaccion, esta_hablando
+    orden_mostrar = orden_mostrar if orden_mostrar is not None else orden_limpia
+    orden_limpia_sin_acentos = quitar_acentos(orden_limpia)
+
+    def _hablar_y_mostrar(texto_respuesta: str):
+        global ultima_interaccion
+        sincronizar_chat_dashboard("usuario", orden_mostrar)
+        sincronizar_chat_dashboard("revan", texto_respuesta)
+
+        def _hablar(avisar):
+            if voz_ia:
+                texto_voz = limpiar_texto_para_voz(texto_respuesta)
+                voz_ia.hablar(texto_voz, avisar_reproduciendo=avisar)
+
+        hablar_sincronizado(_hablar)
+        ultima_interaccion = time.time()
+
+    try:
+        # --- 1. SALUDOS BÁSICOS ---
+        saludos_basicos = [
+            "hola", "hola revan", "buenos dias", "buenas tardes", "buenas noches",
+            "como estas", "hola como estas", "como estas revan", "que tal", "hola como estas ?", "que rollo", "que onda", "que pedo"
+        ]
+        if orden_limpia_sin_acentos.strip().rstrip("?") in saludos_basicos:
+            print("[Escudo Local]: Saludo común detectado. Respondiendo localmente sin gastar tokens.")
+            _hablar_y_mostrar(f"Sistemas nominales y en línea, {titulo}. ¿En qué puedo ayudarle hoy?")
+            return
+
+        palabras_desconexion = ["desconectar", "desconectate", "apagar", "apagate", "cerrar programa", "adios revan", "desconexion"]
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_desconexion):
+            apagar_sistema()
+            return
+        palabras_kill_switch = ["para todo", "alto total", "detente todo", "cancela todo", "emergencia"]
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_kill_switch):
+            _hablar_y_mostrar(activar_kill_switch())
+            return
+
+        # --- MÓDULO APPS DE TRABAJO: frases fijas, sin pasar por el LLM ---
+        if "hora de la junta" in orden_limpia_sin_acentos:
+            reproducir_sfx("modules", "Automation")
+            _hablar_y_mostrar(abrir_teams())
+            return
+
+        if "hora del checkeo" in orden_limpia_sin_acentos or "hora del checo" in orden_limpia_sin_acentos:
+            reproducir_sfx("modules", "Automation")
+            _hablar_y_mostrar(abrir_outlook())
+            return
+
+        if "hora de trabajar" in orden_limpia_sin_acentos:
+            reproducir_sfx("modules", "Automation")
+            _hablar_y_mostrar(abrir_vscode())
+            return
+        # --- 2. MÓDULO RECONOCIMIENTO DE MÚSICA / CANCIONES ---
+        palabras_reconocer_cancion = [
+            "cual es esta cancion", "puedes adivinar esta cancion", "que cancion es esta",
+            "que cancion esta sonando", "adivina esta cancion", "reconoce esta cancion",
+            "como se llama esta cancion", "identifica esta cancion", "que cancion suena"
+        ]
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_reconocer_cancion):
+            reproducir_sfx("modules", "Sonidos")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            hablar_filler(f"Escuchando el audio interno para identificar la canción, {titulo}. Un momento...")
+            respuesta_musica = identificar_y_abrir_cancion()
+            _hablar_y_mostrar(respuesta_musica)
+            return
+        # --- 3. MÓDULO EMAIL ---
+        es_conteo_correo = any(p in orden_limpia_sin_acentos for p in ["cuantos correos", "correos por ver", "correos pendientes", "correos sin leer"])
+        es_consulta_correo = not es_conteo_correo and any(
+            p in orden_limpia_sin_acentos for p in [
+                "leer correo", "revisar correo", "mis correos", "ver correos", 
+                "buzon", "ultimos correos", "cuales son los correos", "cuales son los ultimos correos",
+                "que correos tengo", "mis ultimos correos"
+            ]
+        )       
+        es_redaccion_asistida = any(p in orden_limpia_sin_acentos for p in ["ayudame a redactar", "redacta un correo", "escribe un correo", "haz un correo"])
+        es_envio_directo = not es_redaccion_asistida and any(p in orden_limpia_sin_acentos for p in ["enviar correo", "manda un correo", "mandar correo", "envia un correo", "manda correo", "envia correo"])
+        es_confirmar_mail = any(p in orden_limpia_sin_acentos for p in ["confirma el correo", "envia el correo", "confirmo correo"])
+        es_cancelar_mail = any(p in orden_limpia_sin_acentos for p in ["cancela el correo", "descarta el correo"])
+
+        if es_confirmar_mail:
+            reproducir_sfx("modules", "emails")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            _hablar_y_mostrar(confirmar_envio_correo())
+            return
+
+        if es_cancelar_mail:
+            reproducir_sfx("modules", "emails")
+            _hablar_y_mostrar(cancelar_borrador_correo())
+            return
+
+        if es_conteo_correo:
+            reproducir_sfx("modules", "emails")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            cantidad = contar_correos_sin_leer()
+            if cantidad >= 0:
+                _hablar_y_mostrar(f"Tiene {cantidad} correos sin leer en su buzón de entrada, {titulo}.")
+            else:
+                _hablar_y_mostrar("No pude verificar la cantidad de correos sin leer. Revise sus credenciales de acceso.")
+            return
+
+        if es_consulta_correo:
+            reproducir_sfx("modules", "emails")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            hablar_filler(f"Revisando su buzón de entrada, {titulo}...")
+            resumenes = leer_ultimos_correos(max_resultados=3)
+            _hablar_y_mostrar("Señor, " + " ".join(resumenes))
+            return
+
+        if es_redaccion_asistida:
+            reproducir_sfx("modules", "emails")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            prompt_redaccion = f"Redacta un correo profesional basado en esta solicitud del usuario: '{orden_limpia}'. Devuelve únicamente el asunto y el cuerpo del mensaje bien formateados."
+            cuerpo_generado = cerebro_ia.generar_respuesta(prompt_redaccion) if cerebro_ia else "No fue posible generar la redacción automáticamente."
+            destinatario = "correo_por_defecto@ejemplo.com"
+            if " a " in orden_limpia:
+                partes = orden_limpia.split(" a ", 1)
+                destinatario = partes[1].split()[0].strip()
+            respuesta_preparada = preparar_borrador_correo(destinatario, "Notificación Generada por REVAN", cuerpo_generado)
+            _hablar_y_mostrar(respuesta_preparada)
+            return
+
+        if es_envio_directo:
+            reproducir_sfx("modules", "emails")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            try:
+                partes_a = orden_limpia.split(" a ", 1)
+                if len(partes_a) > 1:
+                    resto = partes_a[1]
+                    partes_asunto = resto.split(" con asunto ", 1)
+                    destinatario = partes_asunto[0].strip()
+
+                    if len(partes_asunto) > 1:
+                        partes_mensaje = partes_asunto[1].split(" y mensaje ", 1)
+                        asunto = partes_mensaje[0].strip()
+                        cuerpo = partes_mensaje[1].strip() if len(partes_mensaje) > 1 else "Mensaje enviado desde REVAN Assistant."
+                    else:
+                        asunto = "Notificación de REVAN Assistant"
+                        cuerpo = "Mensaje sin cuerpo especificado."
+                    respuesta_preparada = preparar_borrador_correo(destinatario, asunto, cuerpo)
+                    _hablar_y_mostrar(respuesta_preparada)
+                    return
+                else:
+                    _hablar_y_mostrar("Indíqueme el correo con el formato: envía un correo a 'destinatario' con asunto 'tema' y mensaje 'texto'.")
+                    return
+            except Exception as err_mail:
+                print(f"[Email Error]: {err_mail}")
+
+        es_consulta_agenda = any(p in orden_limpia_sin_acentos for p in ["que tengo hoy", "agenda hoy", "eventos de hoy", "mis citas de hoy", "agenda del dia"])
+        es_crear_evento = any(p in orden_limpia_sin_acentos for p in ["agendar", "agenda una", "agenda un", "crea un evento", "crear evento", "recuerdame"])
+
+        if es_consulta_agenda:
+            reproducir_sfx("modules", "Agenda")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            resumen_agenda = consultar_agenda_hoy()
+            _hablar_y_mostrar(resumen_agenda)
+            return
+
+        if es_crear_evento:
+            reproducir_sfx("modules", "Agenda")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            fecha_iso, fecha_reconocida = parsear_fecha_natural(orden_limpia_sin_acentos, devolver_estado=True)
+            titulo_evento = "Compromiso Agendado"
+            for disparador in ["agendar", "agenda", "recuerdame", "crea un evento"]:
+                if disparador in orden_limpia_sin_acentos:
+                    partes = orden_limpia.split(disparador, 1)
+                    if len(partes) > 1 and partes[1].strip():
+                        titulo_evento = partes[1].strip().capitalize()
+                    break
+            resultado_agendado = agendar_evento(
+                titulo=titulo_evento,
+                fecha_hora_str=fecha_iso,
+                duracion_minutos=60
+            )
+            if not fecha_reconocida:
+                resultado_agendado += (
+                    " Aviso, Señor: no reconocí una fecha explícita en su orden, "
+                    "así que agendé el evento para HOY. Si quería otro día, "
+                    "dígamelo de nuevo especificando 'mañana', 'pasado mañana', "
+                    "un día de la semana, o 'en N días'."
+                )
+            _hablar_y_mostrar(resultado_agendado)
+            return
+        # --- 5. MÓDULO WHATSAPP ---
+        palabras_whatsapp = ["manda un whatsapp", "envia un whatsapp", "mandale un whatsapp", "enviale un whatsapp", "envia un mensaje", "manda un mensaje"]
+        es_confirmacion = any(cmd in orden_limpia_sin_acentos for cmd in [
+            "confirma", "confirmar", "confirmalo", "envialo", "mandalo",
+            "si envialo", "si mandala", "procede", "adelante", "ejecuta",
+            "ejecutalo", "hazlo", "dale",
+        ])
+        es_cancelacion = any(cmd in orden_limpia_sin_acentos for cmd in [
+            "cancela", "cancelar", "cancelalo", "aborta", "abortar",
+            "no lo envies", "detente", "mejor no",
+        ])
+      
+        if len(orden_limpia_sin_acentos.split()) > 4:
+            es_confirmacion = False
+            es_cancelacion = False
+
+        if es_confirmacion or es_cancelacion:
+            resultado_codigo = procesar_confirmacion_codigo(orden_limpia)
+            if resultado_codigo is not None:
+                reproducir_sfx("modules", "Agente programador")
+                _hablar_y_mostrar(resultado_codigo)
+                return
+
+            resultado_serial = procesar_confirmacion_serial(orden_limpia)
+            if resultado_serial is not None:
+                reproducir_sfx("modules", "Electro")
+                _hablar_y_mostrar(resultado_serial)
+                return
+
+        if es_confirmacion:
+            reproducir_sfx("modules", "whats")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            resultado = confirmar_envio_inteligente()
+            _hablar_y_mostrar(resultado)
+            return
+
+        if es_cancelacion:
+            reproducir_sfx("modules", "whats")
+            resultado = cancelar_envio_pendiente()
+            _hablar_y_mostrar(resultado)
+            return
+
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_whatsapp):
+            reproducir_sfx("modules", "whats")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            try:
+                partes_a = orden_limpia.split(" a ", 1)
+                if len(partes_a) > 1:
+                    partes_diga = partes_a[1].split(" que diga ", 1)
+                    destinatario = partes_diga[0].strip()
+                    mensaje_texto = partes_diga[1].strip() if len(partes_diga) > 1 else "Hola"
+                    respuesta_prep = preparar_envio_inteligente(destinatario, mensaje_texto)
+                    _hablar_y_mostrar(respuesta_prep)
+                    return
+            except Exception as err_wa:
+                print(f"[Modulo Telefono]: Error analizando comando: {err_wa}")
+        palabras_iniciar_vigilancia = ["vigila la camara", "vigilancia", "mantente al pendiente de la camara"]
+        palabras_detener_vigilancia = ["deja de vigilar", "deten la vigilancia", "detente de vigilar", "para de vigilar"]
+
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_iniciar_vigilancia):
+            reproducir_sfx("modules", "Cam")
+        
+            def _hablar_desde_camara(texto):
+                hablar_sincronizado(lambda avisar: voz_ia.hablar(texto, avisar_reproduciendo=avisar) if voz_ia else None)
+
+            if iniciar_vigilancia(_hablar_desde_camara, sincronizar_estado_esfera):
+                _hablar_y_mostrar(f"Vigilancia de cámara activada, {titulo}. Le avisaré si algo cambia.")
+            else:
+                _hablar_y_mostrar("La vigilancia ya estaba activa, Señor.")
+            return
+
+        if any(cmd in orden_limpia_sin_acentos for cmd in palabras_detener_vigilancia):
+            reproducir_sfx("modules", "Cam")
+            if detener_vigilancia():
+                _hablar_y_mostrar("Vigilancia de cámara desactivada.")
+            else:
+                _hablar_y_mostrar("No había ninguna vigilancia activa, Señor.")
+            return
+        
+        raices_control = ["control", "manipul", "mueve", "mover"]
+        palabras_detener_intent = ["deja de", "deten", "detente", "para de", "suelta", "quita el control"]
+
+        if "esfera" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in palabras_detener_intent):
+            reproducir_sfx("modules", "Cam")
+            if detener_control_esfera():
+                _hablar_y_mostrar("Control de esfera desactivado.")
+            else:
+                _hablar_y_mostrar("No había ningún control de esfera activo, Señor.")
+            return
+
+        if "esfera" in orden_limpia_sin_acentos and any(r in orden_limpia_sin_acentos for r in raices_control):
+            reproducir_sfx("modules", "Cam")
+            if vigilancia_activa():
+                _hablar_y_mostrar("No puedo activar el control por mano mientras la vigilancia esté usando la cámara, Señor. Desactívela primero.")
+            elif iniciar_control_esfera():
+                _hablar_y_mostrar(f"Control de esfera por mano activado, {titulo}.")
+            else:
+                _hablar_y_mostrar("El control de esfera ya estaba activo, Señor.")
+            return
+        palabras_lista = orden_limpia_sin_acentos.split()
+        es_consulta_velocidad = "velocidad" in orden_limpia_sin_acentos and any(p in orden_limpia_sin_acentos for p in ["red", "internet", "conexion"])
+        es_consulta_latencia = "latencia" in orden_limpia_sin_acentos or ("ping" in palabras_lista and "terminal" not in orden_limpia_sin_acentos)
+        es_ping_terminal = "ping" in palabras_lista and any(p in orden_limpia_sin_acentos for p in ["terminal", "cmd", "consola", "haz"])
+        es_escaneo_puertos = any(p in orden_limpia_sin_acentos for p in ["escaneo de puertos", "escanear puertos", "puertos abiertos", "ver conexiones", "netstat"])
+        es_consulta_intrusos = any(p in orden_limpia_sin_acentos for p in [
+            "intruso", "intrusos", "quien esta conectado",
+            "dispositivos conectados", "estoy seguro", "es segura mi red",
+            "seguridad de mi red", "mi red es segura",
+        ])
+        es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
+        es_consulta_red = (
+            not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
+            and ("red" in palabras_lista or "ip" in palabras_lista or
+                 any(p in orden_limpia_sin_acentos for p in ["internet", "conexion"]))
+        )
+
+        if es_consulta_velocidad:
+            reproducir_sfx("modules", "redes")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            hablar_filler("Un momento, Señor, estoy abriendo el navegador y probando la velocidad de su conexión...")
+            resultado_red = probar_velocidad_con_navegador()
+            _hablar_y_mostrar(resultado_red)
+            return
+
+        if es_consulta_latencia:
+            reproducir_sfx("modules", "redes")
+            _hablar_y_mostrar(reportar_latencia())
+            return
+
+        if es_ping_terminal:
+            reproducir_sfx("modules", "redes")
+            partes_ping = orden_limpia.split("ping")
+            target = partes_ping[-1].replace("a", "").strip() if len(partes_ping) > 1 and partes_ping[-1].strip() else "8.8.8.8"
+            _hablar_y_mostrar(abrir_terminal_ping(target))
+            return
+
+        if es_escaneo_puertos:
+            reproducir_sfx("modules", "redes")
+            _hablar_y_mostrar(abrir_terminal_scan())
+            return
+
+        if es_marcar_conocidos:
+            reproducir_sfx("modules", "redes")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            hablar_filler("Un momento, Señor, estoy escaneando su red...")
+            resultado_marcado = marcar_todos_como_conocidos()
+            _hablar_y_mostrar(resultado_marcado)
+            return
+
+        if es_consulta_intrusos:
+            reproducir_sfx("modules", "redes")
+            sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+            hablar_filler("Un momento, Señor, estoy escaneando su red en busca de dispositivos intrusos...")
+            resultado_intrusos = detectar_intrusos(abrir_terminal=True)
+            _hablar_y_mostrar(resultado_intrusos)
+            return
+
+        if es_consulta_red:
+            reproducir_sfx("modules", "redes")
+            _hablar_y_mostrar(analizar_red())
+            return
+        sincronizar_estado_esfera("PROCESANDO", "#ffaa00")
+        palabras_abrir_app = ["abre", "abrir", "inicia", "iniciar", "lanza", "lanzar"]
+        if any(p in orden_limpia_sin_acentos.split() for p in palabras_abrir_app):
+            reproducir_sfx("modules", "Open")
+        palabras_coder_agent = ["programa", "programar", "codigo", "script", "arduino", "esp32"]
+        if any(p in orden_limpia_sin_acentos.split() for p in palabras_coder_agent):
+            reproducir_sfx("modules", "Agente programador")
+        palabras_creative_agent = ["imagen", "dibuja", "dibujar", "ilustracion", "ilustra"]
+        if any(p in orden_limpia_sin_acentos.split() for p in palabras_creative_agent):
+            reproducir_sfx("modules", "Creative_asisstent")
+
+        palabras_electronics = ["sensor", "electronica", "hardware", "placa", "microcontrolador"]
+        frases_electronics = ["puerto serial", "puerto usb"]
+        if (any(p in orden_limpia_sin_acentos.split() for p in palabras_electronics)
+                or any(f in orden_limpia_sin_acentos for f in frases_electronics)):
+            reproducir_sfx("modules", "Electro")
+
+        if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
+            reproducir_sfx("modules", "Cam")
+            orden_limpia = "enciende la camara y dime que ves"
+        es_orden_tecnica = es_intencion_de_comando(orden_limpia)
+        respuesta_final = None
+
+        if es_orden_tecnica:
+            print("[Enrutador]: Procesando comando con Orquestador / NimClient...")
+            try:
+                respuesta_final = ejecutar_misión_compleja(orden_limpia, cerebro_ia)
+            except Exception as err_mision:
+                print(f"[Orquestador Error]: {err_mision}")
+
+            if not respuesta_final or not respuesta_final.strip():
+                try:
+                    respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+                except Exception as err_nim:
+                    print(f"[NimClient Error]: {err_nim}")
+        else:
+            print("[Enrutador]: Intención -> CONVERSACIÓN FLUIDA")
+            if gemini_ia:
+                try:
+                    res_gemini = gemini_ia.generar_respuesta(orden_limpia)
+                    if res_gemini and "percance" not in res_gemini.lower() and "429" not in res_gemini:
+                        respuesta_final = res_gemini
+                except Exception as err_gemini:
+                    print(f"[Gemini Error / Quota Exhausted]: {err_gemini}")
+
+            if not respuesta_final or not respuesta_final.strip():
+                print("[Enrutador]: Gemini no disponible. Derivando a Cerebro NVIDIA NIM...")
+                try:
+                    respuesta_final = cerebro_ia.generar_respuesta(orden_limpia)
+                except Exception as err_nim:
+                    print(f"[NimClient Error]: {err_nim}")
+
+        if not respuesta_final or not respuesta_final.strip():
+            respuesta_final = f"Sistemas de lenguaje momentáneamente saturados, {titulo}. Por favor reintente en unos segundos."
+        _hablar_y_mostrar(respuesta_final)
+    except Exception as e:
+        print(f"Error al ejecutar la orden: {e}")
+        sincronizar_estado_esfera("ESPERA", "#0077ff")
+
 def main():
-    global oidos_ia, gui, sistema_activo, titulo
-    
+    global oidos_ia, sistema_activo, titulo
     print("[REVAN]: Inicializando infraestructura base...")
+
+    try:
+        from src.Security.verificacion_permisos import verificar_archivos_sensibles
+        avisos = verificar_archivos_sensibles()
+        for aviso in avisos:
+            print(f"[Seguridad - Aviso de arranque]: {aviso}")
+    except Exception as e:
+        print(f"Aviso al verificar archivos sensibles: {e}")
+
     try:
         inicializar_base_datos()
     except Exception as e:
         print(f"Alerta al desplegar base de datos: {e}")
-        
     ajustes = cargar_ajustes()
     titulo = ajustes.get("USER_NAME", "Señor") if ajustes else "Señor"
-    
-    # Servidor web en hilo independiente (FastAPI/Uvicorn)
     t_web = threading.Thread(target=hilo_servidor_web, daemon=True)
     t_web.start()
-
     oidos_ia = MicrophoneClient()
-    
     print("REVAN en modo pasivo. Esperando señal acústica...")
     while True:
         try:
@@ -374,19 +794,12 @@ def main():
         except Exception as e:
             print(f"Aviso en escaneo pasivo: {e}")
         time.sleep(0.1)
-
-    print("Desplegando interfaz gráfica...")
-    gui = RevanGUI(titulo_usuario=titulo)
-
+    encender_sistemas()
     try:
-        gui.mostrar_panel()
-    except AttributeError:
-        if hasattr(gui, 'app'):
-            gui.app.deiconify()  
-    # Arrancar secuencia de encendido
-    gui.app.after(250, encender_sistemas)
-    gui.app.mainloop()
-
-# Ejecución de la lógica de REVAN
+        while sistema_activo:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        apagar_sistema()
+        
 if __name__ == "__main__":
     main()

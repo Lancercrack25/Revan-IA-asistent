@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REVAN - Módulo Social Media</title>
+    <link rel="shortcut icon" href="#">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #030712; color: #00f0ff; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 2rem; display: flex; justify-content: center; align-items: flex-start; }
+        .module-container { max-width: 950px; width: 100%; background: rgba(10, 15, 30, 0.85); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 16px; padding: 2.5rem; box-shadow: 0 0 35px rgba(0, 240, 255, 0.15); backdrop-filter: blur(12px); }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 240, 255, 0.2); padding-bottom: 1.2rem; margin-bottom: 1.5rem; }
+        .header-title h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+        .header-title span { font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 2px; }
+        .btn-back { background: rgba(0, 240, 255, 0.05); border: 1px solid #00f0ff; color: #00f0ff; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.3s ease; }
+        .btn-back:hover { background: #00f0ff; color: #030712; box-shadow: 0 0 15px rgba(0, 240, 255, 0.6); }
+        .banner-wrapper { position: relative; width: 100%; height: 260px; border-radius: 12px; overflow: hidden; margin-bottom: 2rem; border: 1px solid rgba(0, 240, 255, 0.3); }
+        .banner-img { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.8) contrast(1.1); }
+        .section-title { font-size: 1.2rem; color: #ffffff; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
+        .description { color: #94a3b8; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem; }
+        .keywords-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+        .keyword-card { background: rgba(0, 240, 255, 0.03); border-left: 4px solid #00f0ff; border-top: 1px solid rgba(0, 240, 255, 0.1); border-right: 1px solid rgba(0, 240, 255, 0.1); border-bottom: 1px solid rgba(0, 240, 255, 0.1); padding: 1rem 1.2rem; border-radius: 6px; }
+        .keyword-card strong { color: #ffffff; display: block; font-size: 0.95rem; margin-bottom: 0.4rem; }
+        .keyword-card code { color: #00f0ff; background: rgba(0, 240, 255, 0.1); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <div class="module-container">
+        <div class="header-bar">
+            <div class="header-title">
+                <span>Módulo de Control</span>
+                <h1>SKILLS </h1>
+            </div>
+            <a href="/" class="btn-back">← Volver al Dashboard</a>
+        </div>
+
+        <div class="banner-wrapper">
+            <img src="https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=1000&auto=format&fit=crop" alt="Social Media" class="banner-img" loading="lazy" 
+         decoding="async">
+        </div>
+
+        <h2 class="section-title">🌐 Capacidades del Módulo</h2>
+        <p class="description">
+            Este modulo se encarga de las habilidades y competencias de los agentes, permitiendo que estos realizen sus tareas de forma decuada y eficiente.
+        </p>
+    </div>
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

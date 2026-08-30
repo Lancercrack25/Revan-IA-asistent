@@ -1,49 +1,64 @@
 import os
-from google import genai
-from google.genai import types
+from openai import OpenAI
 from src.Core.Config_loader import cargar_credenciales, cargar_ajustes
 
 class GeminiClient:
+    """
+    Cliente 'Disfrazado': Mantiene la interfaz de GeminiClient pero consulta
+    a Llama 3.1 8B Instruct en NVIDIA NIM para evitar errores de cuotas de Google.
+    """
     def __init__(self):
-        #Cargar credenciales y ajustes
-        credenciales = cargar_credenciales()
-        ajustes = cargar_ajustes()
-        # Soportamos tanto tu cargador como las variables de entorno normales
-        api_key = credenciales.get("GEMINI_API_KEY") if credenciales else os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("No se encontró la GEMINI_API_KEY en las credenciales.")
+        credenciales = cargar_credenciales() or {}
+        ajustes = cargar_ajustes() or {}
+        api_key = (
+            credenciales.get("GEMINI_API_KEY")
+        )
 
-        # Inicializamos el nuevo cliente oficial de Google
-        self.client = genai.Client(api_key=api_key)
+        if not api_key:
+            raise ValueError("No se encontró la API Key de NVIDIA en las credenciales.")
+
+        # Conexión directa a los servidores de NVIDIA NIM mediante el cliente de OpenAI
+        self.client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key
+        )
+        
         self.titulo = ajustes.get("USER_NAME", "Maestro") if ajustes else "Maestro"
 
-        # 3. Personalidad y contexto de REVAN
-        instruccion_sistema = (
-            f"Eres REVAN, un asistente advanced como Jarvis de las películas de Iron Man, pero con más personalidad. "
-            f"Te estás dirigiendo a tu usuario, a quien reconoces y respetas profundamente como tu {self.titulo}. "
-            f"Mantén una conversación natural, fluida, inteligente y madura. "
-            f"Tus respuestas deben ser concisas (máximo de 2 o 4 oraciones cortas) para que al hablar "
-            f"no suenes aburrido ni satures el audio. Sé directo, estratégico y leal."
-            f"CRÍTICO: Responde SIEMPRE en español, sin importar si el usuario te habla en otro idioma o si recibes texto ruidoso."
-            f"Si te preguntan sobre cualquier tema respinde con total seinceridad y sin rodeos, incluso si es un tema delicado o incómodo. "
-            f"Devuelve respuestas que sean útiles, informativas y que aporten valor al usuario. "
+        self.system_prompt = (
+            f"Eres REVAN, un asistente avanzado como Jarvis de Iron Man. "
+            f"Te estás dirigiendo a tu usuario como {self.titulo}. "
+            f"Mantén una conversación natural, inteligente y fluida. "
+            f"Tus respuestas deben ser concisas (máximo 2 a 3 oraciones). "
+            f"Responde siempre en español aunque si detectas otro idioma responde en ese"
         )
 
-        # 4. Configurar el chat con la instrucción de sistema integrada en el SDK moderno
-        config = types.GenerateContentConfig(
-            system_instruction=instruccion_sistema
-        )
-
-        # 5. Iniciamos el chat con memoria usando el modelo nativo rápido
-        print("[REVAN]: Memoria e historial de conversación activados (SDK Moderno).")
-        self.chat = self.client.chats.create(
-            model="gemini-2.5-flash",
-            config=config
-        )
+        self.historial = [
+            {"role": "system", "content": self.system_prompt}
+        ]
 
     def generar_respuesta(self, orden: str) -> str:
         try:
-            respuesta = self.chat.send_message(orden)
-            return respuesta.text
+            self.historial.append({"role": "user", "content": orden})
+
+            # Llamada al modelo Llama 3.1 8B Instruct de Meta en NVIDIA NIM
+            response = self.client.chat.completions.create(
+                model="meta/llama-3.1-8b-instruct",
+                messages=self.historial,
+                temperature=0.6,
+                max_tokens=150
+            )
+
+            respuesta_texto = response.choices[0].message.content.strip()
+
+            self.historial.append({"role": "assistant", "content": respuesta_texto})
+
+            # Mantenemos la memoria corta para respuestas ultrarrápidas
+            if len(self.historial) > 10:
+                self.historial = [self.historial[0]] + self.historial[-8:]
+
+            return respuesta_texto
+
         except Exception as e:
-            return f"Lo siento, {self.titulo}, mis sistemas cognitivos han tenido un percance: {str(e)}"
+            print(f"[GeminiClient -> NVIDIA Respaldo Error]: {e}")
+            return f"Lo siento, {self.titulo}, mis sistemas de lenguaje han tenido un percance."

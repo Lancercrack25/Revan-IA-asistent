@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REVAN // CODER AGENT OVERWATCH</title>
+
+    <!-- Fuentes Sci-Fi -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- CSS Separado -->
+    <link rel="stylesheet" href="/styles/dashboard.css">
+    <link rel="stylesheet" href="/styles/coder.css">
+</head>
+<body>
+    <div id="particles-js"></div>
+    <div class="cyber-overlay"></div>
+    <div class="scanline"></div>
+
+    <div class="hud-frame">
+        <header class="hud-header coder-header">
+    <div class="brand-core">
+        <div class="reactor-icon cyan-icon">
+            <div class="core-pulse cyan-pulse"></div>
+        </div>
+        <div class="title-group">
+            <h1 class="glitch-text cyan-text" data-text="CODER AGENT">CODER AGENT</h1>
+            <span class="sub-text cyan-sub"><i class="fa-solid fa-code"></i> MATRIX CORE // ARQUITECTURA & COMPILACIÓN</span>
+        </div>
+    </div>
+
+    <div class="hud-waveform cyan-waveform">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+    </div>
+
+    <nav class="hud-switcher">
+        <!-- BOTÓN CORREGIDO PARA EL CODER -->
+        <button class="nav-btn back-btn cyan-btn-back" onclick="playClickAndNavigate('/')">
+            <i class="fa-solid fa-arrow-left"></i> DASHBOARD
+        </button>
+        <button class="nav-btn active cyan-btn" id="btn-toggle-coder" onclick="toggleCoderView()">
+            <i class="fa-solid fa-terminal"></i> MÓDULOS
+        </button>
+    </nav>
+</header>
+        <!-- MAIN BODY -->
+        <main class="hud-main">
+            
+            <!-- VISTA 1: LAS 3 TARJETAS ÉPICAS -->
+            <div id="coder-cards-view" class="coder-view active">
+                <div class="section-title">
+                    <i class="fa-solid fa-network-wired"></i> MATRIZ DE MÓDULOS DE COMPUTACIÓN
+                </div>
+
+                <div class="epic-modules-grid">
+                    
+                    <!-- Tarjeta 1: IDE -->
+                    <div class="epic-card" onclick="openCoderSubView('ide')">
+                        <div class="corner-bracket top-left"></div>
+                        <div class="corner-bracket top-right"></div>
+                        <div class="corner-bracket bottom-left"></div>
+                        <div class="corner-bracket bottom-right"></div>
+                        <div class="card-scan-line"></div>
+
+                        <div class="card-head">
+                            <div class="card-icon"><i class="fa-solid fa-code"></i></div>
+                            <span class="hud-badge pulse-green"><i class="fa-solid fa-circle"></i> ONLINE</span>
+                        </div>
+                        <div class="card-body">
+                            <h3>1. CONSOLA IDE TÁCTICA</h3>
+                            <p>Compilador en vivo, análisis sintáctico de AST y canal de telemetría de consola directo.</p>
+                            <div class="card-metrics">
+                                <span><i class="fa-solid fa-bolt"></i> LATENCY: 0.2ms</span>
+                                <span><i class="fa-solid fa-terminal"></i> BASH/PY</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <span>INICIALIZAR IDE</span> <i class="fa-solid fa-arrow-right-long"></i>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Manual -->
+                    <div class="epic-card" onclick="openCoderSubView('manual')">
+                        <div class="corner-bracket top-left"></div>
+                        <div class="corner-bracket top-right"></div>
+                        <div class="corner-bracket bottom-left"></div>
+                        <div class="corner-bracket bottom-right"></div>
+                        <div class="card-scan-line"></div>
+
+                        <div class="card-head">
+                            <div class="card-icon"><i class="fa-solid fa-book-bookmark"></i></div>
+                            <span class="hud-badge"><i class="fa-solid fa-shield-halved"></i> PROTOCOL</span>
+                        </div>
+                        <div class="card-body">
+                            <h3>2. MANUAL OPERATIVO</h3>
+                            <p>Reglas de compilación automatizada, aislamiento sandbox y protocolos Self-Healing.</p>
+                            <div class="card-metrics">
+                                <span><i class="fa-solid fa-file-shield"></i> ENFORCED V1.0</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <span>DESPLEGAR DOCS</span> <i class="fa-solid fa-arrow-right-long"></i>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 3: Ultron -->
+                    <div class="epic-card" onclick="openCoderSubView('ultron')">
+                        <div class="corner-bracket top-left"></div>
+                        <div class="corner-bracket top-right"></div>
+                        <div class="corner-bracket bottom-left"></div>
+                        <div class="corner-bracket bottom-right"></div>
+                        <div class="card-scan-line"></div>
+
+                        <div class="card-head">
+                            <div class="card-icon"><i class="fa-solid fa-atom"></i></div>
+                            <span class="hud-badge pulse-cyan"><i class="fa-solid fa-rotate"></i> 3D CORE</span>
+                        </div>
+                        <div class="card-body">
+                            <h3>3. NÚCLEO ULTRON 3D</h3>
+                            <p>Esfera de procesamiento de red neuronal, monitoreo espacial de hilos e hilos paralelos.</p>
+                            <div class="card-metrics">
+                                <span><i class="fa-solid fa-cube"></i> WEBGL ACTIVE</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <span>INICIALIZAR CORE</span> <i class="fa-solid fa-arrow-right-long"></i>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- VISTA 2: INTERFAZ COMPLETA DEL IDE -->
+            <div id="view-ide" class="coder-view">
+                <div class="ide-container">
+                    <div class="ide-editor-window">
+                        <div class="window-bar">
+                            <div class="dots-group">
+                                <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                            </div>
+                            <span class="window-title"><i class="fa-solid fa-file-code"></i> core_executor.py</span>
+                        </div>
+                        <textarea id="code-editor" class="code-area" spellcheck="false" placeholder="# Coder Agent Core IDE v1.0&#10;def execute_protocol():&#10;    print('System Operational')"></textarea>
+                    </div>
+                    <div class="ide-terminal-window">
+                        <div class="window-bar">
+                            <span class="window-title"><i class="fa-solid fa-terminal"></i> TELEMETRÍA DE COMPILACIÓN</span>
+                            <button class="clear-btn" onclick="clearTerminal()"><i class="fa-solid fa-trash-can"></i> LIMPIAR</button>
+                        </div>
+                        <div id="terminal-output" class="terminal-box">
+                            <div class="term-line success">> [SYS_INIT]: Motor Coder listo para compilación.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA 3: MANUAL INTERFAZ -->
+            <div id="view-manual" class="coder-view">
+                <div class="glass-panel">
+                    <h2><i class="fa-solid fa-book-open-reader"></i> PROTOCOLOS DE COMPILACIÓN & SEGURIDAD</h2>
+                    <hr class="cyber-hr">
+                    <div class="panel-content">
+                        <h3>1. Sintaxis e Instrucciones Directas</h3>
+                        <p>El Agente Coder analiza peticiones en lenguaje natural para estructurar scripts Python, Node.js y Bash sin intervención manual.</p>
+                        <h3>2. Sistema Self-Healing</h3>
+                        <p>Si la ejecución produce un error `Traceback`, Coder captura la salida de la terminal, aplica el parche sintáctico y reejecuta el script.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA 4: ULTRON 3D INTERFAZ -->
+            <div id="view-ultron" class="coder-view">
+                <div class="ultron-wrapper">
+                    <iframe id="iframe-ultron" src="/esfera" frameborder="0"></iframe>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- FOOTER TÁCTICO -->
+        <footer class="hud-footer">
+            <div class="input-container">
+                <i class="fa-solid fa-terminal prompt-icon"></i>
+                <input type="text" id="coder-cmd" placeholder="Escribe instrucciones de código para el Coder Agent..." autocomplete="off">
+                <button id="btn-compile" onclick="runCoderCommand()">
+                    <i class="fa-solid fa-play"></i> EJECUTAR
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="/static/coder.js"></script>
+</body>
+</html>

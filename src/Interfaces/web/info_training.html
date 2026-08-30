@@ -1,0 +1,456 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REVAN - Telemetría & Rendimiento</title>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@500;600;700&display=swap');
+
+        :root {
+            --bg-dark: #050811;
+            --panel-bg: rgba(10, 16, 30, 0.85);
+            --cyan-glow: #00f0ff;
+            --pink-glow: #ff0055;
+            --green-glow: #00ffaa;
+            --yellow-glow: #ffaa00;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --border-neon: rgba(0, 240, 255, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 70%),
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 25px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .telemetry-container {
+            width: 100%;
+            max-width: 1300px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-neon);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-neon);
+            padding-bottom: 15px;
+        }
+
+        .title-area h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .title-area h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            color: var(--cyan-glow);
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+        }
+
+        .btn-back {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+
+        .btn-back:hover {
+            background: var(--cyan-glow);
+            color: #000;
+            box-shadow: 0 0 20px var(--cyan-glow);
+        }
+
+        /* METRICS CARDS */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .kpi-card {
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 15px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: var(--cyan-glow);
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .kpi-card.ram::before { background: var(--pink-glow); box-shadow: 0 0 10px var(--pink-glow); }
+        .kpi-card.ws::before { background: var(--green-glow); box-shadow: 0 0 10px var(--green-glow); }
+        .kpi-card.agent::before { background: var(--yellow-glow); box-shadow: 0 0 10px var(--yellow-glow); }
+
+        .kpi-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .kpi-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 5px;
+        }
+
+        /* CHARTS SECTION */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-box {
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid var(--border-neon);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .chart-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 260px;
+            display: block;
+        }
+
+        /* KEYWORDS SECTION */
+        .keywords-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .keywords-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .kw-card {
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .kw-title {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .tag {
+            display: inline-block;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="telemetry-container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="title-area">
+                <h2>Módulo de Control</h2>
+                <h1>Productividad & Telemetría</h1>
+            </div>
+            <a href="/" class="btn-back">← Volver al Dashboard</a>
+        </div>
+
+        <!-- TARJETAS DE MÉTRICAS -->
+        <div class="kpi-grid">
+            <div class="kpi-card cpu">
+                <div class="kpi-label">CPU Uso</div>
+                <div class="kpi-value" id="kpi-cpu">0%</div>
+            </div>
+            <div class="kpi-card ram">
+                <div class="kpi-label">RAM Uso</div>
+                <div class="kpi-value" id="kpi-ram">0%</div>
+            </div>
+            <div class="kpi-card ws">
+                <div class="kpi-label">Canal WS</div>
+                <div class="kpi-value" id="kpi-ws" style="color: var(--yellow-glow);">CONECTANDO...</div>
+            </div>
+            <div class="kpi-card agent">
+                <div class="kpi-label">Tareas de Agentes</div>
+                <div class="kpi-value" id="kpi-agentes">0</div>
+            </div>
+        </div>
+
+        <!-- GRÁFICAS PRINCIPALES -->
+        <div class="charts-grid">
+            <div class="chart-box">
+                <div class="chart-title">💻 Consumo de Hardware (CPU & RAM)</div>
+                <div class="chart-wrapper">
+                    <canvas id="hardwareChart" height="260"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-box">
+                <div class="chart-title">🤖 Actividad y Tareas por Agente</div>
+                <div class="chart-wrapper">
+                    <canvas id="agentsChart" height="260"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-box">
+                <div class="chart-title">🧩 Uso por Módulo</div>
+                <div class="chart-wrapper">
+                    <canvas id="modulesChart" height="260"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMANDOS ACTIVOS -->
+        <div class="keywords-section">
+            <div class="chart-title">💬 Palabras Clave y Comandos Activos</div>
+            <div class="keywords-grid">
+                <div class="kw-card">
+                    <div class="kw-title">Estado de Rendimiento</div>
+                    <span class="tag">"reporte de productividad"</span>
+                </div>
+                <div class="kw-card">
+                    <div class="kw-title">Uso de Hardware</div>
+                    <span class="tag">"estado del sistema"</span>
+                </div>
+                <div class="kw-card">
+                    <div class="kw-title">Métricas de Agentes</div>
+                    <span class="tag">"rendimiento de agentes"</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Deshabilitar animaciones para cero parpadeos
+        Chart.defaults.animation = false;
+        const maxPoints = 12;
+        const initialLabels = Array(maxPoints).fill('--:--:--');
+        // 1. Inicializar Gráfica Hardware
+        const hwCtx = document.getElementById('hardwareChart').getContext('2d');
+        const hardwareChart = new Chart(hwCtx, {
+            type: 'line',
+            data: {
+                labels: [...initialLabels],
+                datasets: [
+                    {
+                        label: 'CPU (%)',
+                        data: Array(maxPoints).fill(0),
+                        borderColor: '#00f0ff',
+                        backgroundColor: 'rgba(0, 240, 255, 0.15)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'RAM (%)',
+                        data: Array(maxPoints).fill(0),
+                        borderColor: '#ff0055',
+                        backgroundColor: 'rgba(255, 0, 85, 0.15)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } },
+                    x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b' } }
+                },
+                plugins: { legend: { labels: { color: '#e2e8f0' } } }
+            }
+        });
+
+        const agCtx = document.getElementById('agentsChart').getContext('2d');
+        const agentsChart = new Chart(agCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Coder Agent', 'Creative Agent', 'Actions_agent', 'Revan'],
+                datasets: [{
+                    label: 'Eventos registrados',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#00f0ff', '#ff0055', '#00ffaa', '#ffaa00'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', precision: 0 } },
+                    x: { grid: { display: false }, ticks: { color: '#e2e8f0' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        const modCtx = document.getElementById('modulesChart').getContext('2d');
+        const modulesChart = new Chart(modCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Usos recientes',
+                    data: [],
+                    backgroundColor: '#00ffaa',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', precision: 0 } },
+                    y: { grid: { display: false }, ticks: { color: '#e2e8f0' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // CONEXIÓN WEBSOCKET 100% REAL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+        socket.onopen = function() {
+            document.getElementById('kpi-ws').innerText = 'CONECTADO';
+            document.getElementById('kpi-ws').style.color = '#00ffaa';
+        };
+
+        socket.onclose = function() {
+            document.getElementById('kpi-ws').innerText = 'DESCONECTADO';
+            document.getElementById('kpi-ws').style.color = '#ff0055';
+        };
+
+        // AL RECIBIR DATOS REALES DE PYTHON
+        socket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.tipo !== 'rendimiento_update' || !data.datos) return;
+                const d = data.datos;
+                const hora = new Date().toLocaleTimeString().split(' ')[0];
+                const hardware = d.hardware || {};
+                let cpuVal = hardware.cpu_percent;
+                let ramVal = hardware.ram_percent;
+
+                if (cpuVal !== undefined && ramVal !== undefined) {
+                    cpuVal = Math.round(Number(cpuVal));
+                    ramVal = Math.round(Number(ramVal));
+
+                    document.getElementById('kpi-cpu').innerText = `${cpuVal}%`;
+                    document.getElementById('kpi-ram').innerText = `${ramVal}%`;
+
+                    hardwareChart.data.labels.shift();
+                    hardwareChart.data.labels.push(hora);
+                    hardwareChart.data.datasets[0].data.shift();
+                    hardwareChart.data.datasets[0].data.push(cpuVal);
+                    hardwareChart.data.datasets[1].data.shift();
+                    hardwareChart.data.datasets[1].data.push(ramVal);
+                    hardwareChart.update('none');
+                }
+
+                if (d.agentes) {
+                    const claves = ['Coder Agent', 'Creative Agent', 'Actions Agent', 'Revan'];
+                    const valores = claves.map(clave => Number(d.agentes[clave]?.eventos || 0));
+
+                    agentsChart.data.datasets[0].data = valores;
+                    agentsChart.update('none');
+
+                    document.getElementById('kpi-agentes').innerText = valores.reduce((a, b) => a + b, 0);
+                }
+
+                // --- C) ACTUALIZAR MÓDULOS REALES ---
+                if (d.modulos) {
+                    const entradas = Object.entries(d.modulos).slice(0, 8);
+                    modulesChart.data.labels = entradas.map(([nombre]) => nombre);
+                    modulesChart.data.datasets[0].data = entradas.map(([, info]) => Number(info.usos || 0));
+                    modulesChart.update('none');
+                }
+
+            } catch (e) {
+                console.error("Error leyendo datos del WebSocket:", e);
+            }
+        };
+    </script>
+</body>
+</html>

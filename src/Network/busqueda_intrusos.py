@@ -1,4 +1,3 @@
-#este archivo se encarga de escanear la red local y detectar dispositivos desconocidos conectados
 import os
 import re
 import json
@@ -6,6 +5,19 @@ import socket
 import subprocess
 import platform
 from concurrent.futures import ThreadPoolExecutor
+
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
+
+def abrir_terminal_intrusos():
+    """Lanza la ventana táctil de comandos net_search_intrusos.bat"""
+    bat_path = os.path.join(SCRIPTS_DIR, "net_search_intrusos.bat")
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "REVAN - Intrusos", "cmd", "/k", bat_path],
+            shell=False,
+        )
+    except Exception as e:
+        print(f"[BusquedaIntrusos]: No se pudo abrir la terminal externa: {e}")
 
 def _obtener_ip_local():
     try:
@@ -16,9 +28,9 @@ def _obtener_ip_local():
         return ip
     except Exception:
         return None
-#esta funcion se encarga de pinguear la ip del host paara asi despues empezar con la busqueda de intrusos 
+
 def _ping_host(ip: str, timeout_ms: int = 300) -> bool:
-    """Ping silencioso de un solo intento, solo para saber si el host responde."""
+    """Ping silencioso de un solo intento."""
     sistema = platform.system().lower()
     if "windows" in sistema:
         cmd = ["ping", "-n", "1", "-w", str(timeout_ms), ip]
@@ -35,8 +47,7 @@ def _ping_host(ip: str, timeout_ms: int = 300) -> bool:
         return False
 
 def _leer_tabla_arp():
-    """Lee la tabla ARP del sistema (IP <-> MAC de dispositivos con los que
-    esta PC ya intercambió tráfico), usando el comando nativo 'arp -a'."""
+    """Lee la tabla ARP del sistema usando el comando nativo 'arp -a'."""
     dispositivos = []
     try:
         salida = subprocess.run(
@@ -44,8 +55,6 @@ def _leer_tabla_arp():
         ).stdout
 
         for linea in salida.splitlines():
-            # Formato típico de Windows: "  192.168.1.1     00-11-22-33-44-55     dinámico"
-            # Formato típico de Linux/macOS: "? (192.168.1.1) at 00:11:22:33:44:55 ..."
             match_win = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F]{2}[-:][0-9a-fA-F-:]{14,16})", linea)
             if match_win:
                 ip = match_win.group(1)
@@ -57,8 +66,8 @@ def _leer_tabla_arp():
 
     return dispositivos
 
-
 def escanear_red_local(timeout_ms: int = 300, max_hilos: int = 60):
+    """Hace un barrido de ping sobre el rango /24 y retorna la tabla ARP."""
     ip_local = _obtener_ip_local()
     if not ip_local:
         print("[BusquedaIntrusos]: No se pudo determinar la IP local, no se puede escanear.")
@@ -72,16 +81,11 @@ def escanear_red_local(timeout_ms: int = 300, max_hilos: int = 60):
 
     return _leer_tabla_arp()
 
-
 def _ruta_dispositivos_conocidos() -> str:
-    """Ruta al archivo config/dispositivos_conocidos.json, junto a tus
-    otros archivos de configuración (credentials.json, settings.json)."""
     raiz_proyecto = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return os.path.join(raiz_proyecto, "config", "dispositivos_conocidos.json")
 
-
 def cargar_dispositivos_conocidos() -> dict:
-    """Devuelve {mac: nombre_asignado} de los dispositivos ya marcados como conocidos."""
     ruta = _ruta_dispositivos_conocidos()
     if not os.path.exists(ruta):
         return {}
@@ -92,15 +96,14 @@ def cargar_dispositivos_conocidos() -> dict:
         print(f"[BusquedaIntrusos]: Error al leer dispositivos conocidos: {e}")
         return {}
 
-
 def guardar_dispositivos_conocidos(dispositivos: dict):
     ruta = _ruta_dispositivos_conocidos()
     try:
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(dispositivos, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"[BusquedaIntrusos]: Error al guardar dispositivos conocidos: {e}")
-
 
 def marcar_todos_como_conocidos() -> str:
     encontrados = escanear_red_local()
@@ -114,8 +117,57 @@ def marcar_todos_como_conocidos() -> str:
 
     return f"Se guardaron {len(encontrados)} dispositivos como conocidos, Señor."
 
+def _ruta_carpeta_reportes() -> str:
+    carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reportes")
+    os.makedirs(carpeta, exist_ok=True)
+    return carpeta
 
-def detectar_intrusos() -> str:
+def generar_reporte_seguridad(encontrados: list, desconocidos: list) -> str:
+    from datetime import datetime
+
+    carpeta = _ruta_carpeta_reportes()
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    ruta_archivo = os.path.join(carpeta, f"reporte_red_{timestamp}.txt")
+
+    macs_desconocidas = {d["mac"] for d in desconocidos}
+
+    lineas = [
+        "REPORTE DE SEGURIDAD DE RED - REVAN",
+        f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+        "=" * 50,
+        "",
+        f"Total de dispositivos conectados: {len(encontrados)}",
+        f"Dispositivos desconocidos: {len(desconocidos)}",
+        "",
+        "--- DETALLE DE TODOS LOS DISPOSITIVOS ---",
+    ]
+
+    for d in encontrados:
+        estado = "DESCONOCIDO" if d["mac"] in macs_desconocidas else "conocido"
+        lineas.append(f"  IP: {d['ip']:<16} MAC: {d['mac']:<20} Estado: {estado}")
+
+    lineas.append("")
+    if desconocidos:
+        lineas.append("--- ATENCIÓN: DISPOSITIVOS DESCONOCIDOS DETECTADOS ---")
+        for d in desconocidos:
+            lineas.append(f"  IP: {d['ip']}   MAC: {d['mac']}")
+        lineas.append("")
+        lineas.append("VEREDICTO: Su red podría estar comprometida. Revise estos dispositivos.")
+    else:
+        lineas.append("VEREDICTO: Su red está segura. Todos los dispositivos son reconocidos.")
+
+    try:
+        with open(ruta_archivo, "w", encoding="utf-8") as f:
+            f.write("\n".join(lineas))
+        return ruta_archivo
+    except Exception as e:
+        print(f"[BusquedaIntrusos]: Error al generar el reporte: {e}")
+        return ""
+
+def detectar_intrusos(abrir_terminal: bool = True) -> str:
+    if abrir_terminal:
+        abrir_terminal_intrusos()
+
     conocidos = cargar_dispositivos_conocidos()
 
     if not conocidos:
@@ -129,12 +181,22 @@ def detectar_intrusos() -> str:
 
     desconocidos = [d for d in encontrados if d["mac"] not in conocidos]
 
-    if not desconocidos:
-        return f"Todo en orden, Señor. Los {len(encontrados)} dispositivos conectados son reconocidos."
+    ruta_reporte = generar_reporte_seguridad(encontrados, desconocidos)
+    nombre_reporte = os.path.basename(ruta_reporte) if ruta_reporte else None
 
-    ips_desconocidos = ", ".join(d["ip"] for d in desconocidos)
-    return (f"Atención, Señor. Detecté {len(desconocidos)} dispositivo(s) desconocido(s) "
-            f"de un total de {len(encontrados)} conectados. Direcciones: {ips_desconocidos}.")
+    if not desconocidos:
+        texto = (f"Su red está segura, Señor. Los {len(encontrados)} dispositivos conectados "
+                  f"son reconocidos.")
+    else:
+        ips_desconocidos = ", ".join(d["ip"] for d in desconocidos)
+        texto = (f"Atención, Señor. Su red podría estar comprometida. Detecté "
+                  f"{len(desconocidos)} dispositivo(s) desconocido(s) de {len(encontrados)} "
+                  f"conectados, en las direcciones: {ips_desconocidos}.")
+
+    if nombre_reporte:
+        texto += f" Generé un reporte detallado: {nombre_reporte}."
+
+    return texto
 
 if __name__ == "__main__":
     print("Escaneando red local...")

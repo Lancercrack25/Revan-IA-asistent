@@ -1,7 +1,6 @@
 import os
 import json
 import math
-
 try:
     from openai import OpenAI
 except ImportError:
@@ -10,9 +9,7 @@ except ImportError:
 from src.Database.conexion import obtener_conexion_pool, liberar_conexion
 from src.Core.Config_loader import cargar_ajustes
 
-# Límite de caracteres antes de generar el embedding. El modelo tiene un
 # máximo de 512 tokens de contexto (~4 caracteres por token en promedio),
-# así que se deja margen para no pasarse y que la API corte o falle.
 MAX_CARACTERES_EMBEDDING = 1800
 
 _cliente_nim = None
@@ -32,14 +29,12 @@ def _obtener_cliente_nim():
     _cliente_nim = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
     return _cliente_nim
 
-
 def _generar_embedding(texto: str, input_type: str = "passage"):
     texto = (texto or "").strip()
     if not texto:
         return None
 
     texto = texto[:MAX_CARACTERES_EMBEDDING]
-
     try:
         cliente = _obtener_cliente_nim()
         respuesta = cliente.embeddings.create(
@@ -53,12 +48,7 @@ def _generar_embedding(texto: str, input_type: str = "passage"):
         print(f"[MemoriaSemantica]: Error al generar embedding: {e}")
         return None
 
-
 def _similitud_coseno(vec_a: list, vec_b: list) -> float:
-    """
-    Similitud coseno pura en Python (sin numpy, para no agregar otra
-    dependencia): 1.0 = idénticos, 0.0 = sin relación, -1.0 = opuestos.
-    """
     producto_punto = sum(a * b for a, b in zip(vec_a, vec_b))
     norma_a = math.sqrt(sum(a * a for a in vec_a))
     norma_b = math.sqrt(sum(b * b for b in vec_b))

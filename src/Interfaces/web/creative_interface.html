@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REVAN // CREATIVE AGENT</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="styles/dashboard.css">
+    <link rel="stylesheet" href="styles/creative.css">
+</head>
+<body>
+    <!-- CONTENEDOR DE PARTÍCULAS -->
+    <div id="particles-js"></div>
+    <div class="scanline-revan"></div>
+
+    <div class="hud-frame">
+        <!-- HEADER REVAN -->
+        <header class="hud-header revan-header">
+            <div class="brand-core">
+                <div class="reactor-icon sith-icon">
+                    <div class="core-pulse sith-pulse"></div>
+                </div>
+                <div class="title-group">
+                    <h1 class="glitch-text sith-text" data-text="CREATIVE AGENT">CREATIVE AGENT</h1>
+                    <span class="sub-text sith-sub"><i class="fa-solid fa-wand-magic-sparkles"></i> REVAN OVERWATCH // ALQUIMIA DIGITAL</span>
+                </div>
+            </div>
+
+            <div class="hud-waveform sith-waveform">
+                <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+                <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            </div>
+
+            <nav class="hud-switcher">
+                <button class="nav-btn back-btn sith-btn-back" onclick="playClickAndNavigate('/')">
+                    <i class="fa-solid fa-arrow-left"></i> DASHBOARD
+                </button>
+                <button class="nav-btn active sith-btn" id="btn-toggle-creative" onclick="toggleCreativeView()">
+                    <i class="fa-solid fa-cubes"></i> MÓDULOS
+                </button>
+            </nav>
+        </header>
+
+        <!-- MAIN CONTAINER -->
+        <main class="hud-main">
+            <!-- VISTA 1: MÓDULOS -->
+            <div id="creative-cards-view" class="creative-view active">
+                <div class="section-title sith-text">
+                    <i class="fa-solid fa-shield-halved"></i> FORJA MULTIMEDIA Y ALQUIMIA CREATIVA
+                </div>
+
+                <div class="epic-modules-grid">
+                    <!-- Modulo 1 -->
+                    <div class="epic-card revan-card" onclick="openCreativeSubView('canvas')">
+                        <div class="corner-bracket top-left"></div>
+                        <div class="corner-bracket top-right"></div>
+                        <div class="corner-bracket bottom-left"></div>
+                        <div class="corner-bracket bottom-right"></div>
+                        <div class="card-scan-line"></div>
+
+                        <div class="card-head">
+                            <div class="card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                            <span class="hud-badge sith-badge">VISUAL FORGE</span>
+                        </div>
+                        <div class="card-body">
+                            <h3>1. FORJA VISUAL NEURAL</h3>
+                            <p>Generación de arte conceptual, renderizado gráfico y síntesis de imágenes por difusión.</p>
+                            <div class="card-metrics">
+                                <span><i class="fa-solid fa-microchip"></i> REVAN ENGINE V4</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <span>DESPLEGAR CANVAS</span> <i class="fa-solid fa-arrow-right-long"></i>
+                        </div>
+                    </div>
+
+                    <!-- Modulo 2 -->
+                    <div class="epic-card revan-card" onclick="openCreativeSubView('gallery')">
+                        <div class="corner-bracket top-left"></div>
+                        <div class="corner-bracket top-right"></div>
+                        <div class="corner-bracket bottom-left"></div>
+                        <div class="corner-bracket bottom-right"></div>
+                        <div class="card-scan-line"></div>
+
+                        <div class="card-head">
+                            <div class="card-icon"><i class="fa-solid fa-waveform-lines"></i></div>
+                            <span class="hud-badge sith-badge">AUDIO VAULT</span>
+                        </div>
+                        <div class="card-body">
+                            <h3>2. SINTETIZADOR AUDIO/VOZ</h3>
+                            <p>Clonación de voces, ambientes sonoros sci-fi y efectos musicales en tiempo real.</p>
+                            <div class="card-metrics">
+                                <span><i class="fa-solid fa-volume-high"></i> TTS / ELEVEN LABS</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <span>ENTRAR A BANCO</span> <i class="fa-solid fa-arrow-right-long"></i>
+                        </div>
+                    </div>
+
+                    <!-- Modulo 3 -->
+                    <div class="epic-card revan-card" onclick="openCreativeSubView('settings')">
+                        <div class="corner-bracket top-left"></div>
+                        <div class="corner-bracket top-right"></div>
+                        <div class="corner-bracket bottom-left"></div>
+                        <div class="corner-bracket bottom-right"></div>
+                        <div class="card-scan-line"></div>
+
+                        <div class="card-head">
+                            <div class="card-icon"><i class="fa-solid fa-sliders"></i></div>
+                            <span class="hud-badge sith-badge">MATRIX CORE</span>
+                        </div>
+                        <div class="card-body">
+                            <h3>3. PARÁMETROS DEL NÚCLEO</h3>
+                            <p>Configuración de Samplers, CFG Scale, LORAs y modificadores estéticos del agente.</p>
+                            <div class="card-metrics">
+                                <span><i class="fa-solid fa-gear"></i> FINE-TUNING ACTIVE</span>
+                            </div>
+                        </div>
+                        <div class="card-footer-action">
+                            <span>CONFIGURAR</span> <i class="fa-solid fa-arrow-right-long"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTAS INTERNAS -->
+            <div id="view-canvas" class="creative-view">
+                <div class="revan-panel">
+                    <h2><i class="fa-solid fa-palette"></i> CANVAS DE LA FORJA VISUAL</h2>
+                    <hr class="sith-hr">
+                    <div class="canvas-workspace">
+                        <i class="fa-solid fa-wand-magic-sparkles big-icon"></i>
+                        <p>> Ingresa un prompt en la terminal inferior para iniciar la generación...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-gallery" class="creative-view">
+                <div class="revan-panel">
+                    <h2><i class="fa-solid fa-waveform-lines"></i> BANCO DE AUDIOS Y ASSETS</h2>
+                    <hr class="sith-hr">
+                    <p>> No hay elementos sintetizados en el buffer activo.</p>
+                </div>
+            </div>
+
+            <div id="view-settings" class="creative-view">
+                <div class="revan-panel">
+                    <h2><i class="fa-solid fa-sliders"></i> AJUSTES DE MOTOR</h2>
+                    <hr class="sith-hr">
+                    <p>> Modelo cargado: Revan-Creative-Core-v4.safetensors</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="hud-footer revan-footer">
+            <div class="input-container">
+                <i class="fa-solid fa-wand-magic-sparkles sith-text"></i>
+                <input type="text" id="creative-cmd" placeholder="Escribe el prompt o instrucción para el agente..." autocomplete="off">
+                <button class="btn-sith" onclick="runCreativeCommand()">
+                    <i class="fa-solid fa-bolt"></i> SINTETIZAR
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="/static/creative.js"></script>
+</body>
+</html>

@@ -1,7 +1,13 @@
-#este archivo se encargara de realizar un analisis de la red y obtener informacion relevante sobre la misma
 import socket
 import psutil
 import requests
+import os
+import subprocess
+
+from src.Security.sanitizador import sanitizar_o_rechazar, EntradaNoSeguraError
+
+# Ruta absoluta a la carpeta de scripts .bat
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
 
 def hay_conexion_internet(timeout: float = 3.0) -> bool:
     try:
@@ -17,7 +23,6 @@ def hay_conexion_internet(timeout: float = 3.0) -> bool:
     except Exception:
         return False
 
-
 def obtener_ip_local():
     """IP dentro de tu red local (la que te asigna tu router)."""
     try:
@@ -29,7 +34,6 @@ def obtener_ip_local():
     except Exception:
         return None
 
-
 def obtener_ip_publica():
     """IP con la que te ve el resto de internet. Requiere conexión real a internet."""
     try:
@@ -40,10 +44,8 @@ def obtener_ip_publica():
     except Exception:
         return None
 
-
 def obtener_estadisticas_trafico():
-    """Bytes enviados/recibidos por todas las interfaces desde que arrancó el sistema
-    (no desde que arrancó REVAN, es un contador acumulado del propio sistema operativo)."""
+    """Bytes enviados/recibidos por todas las interfaces desde que arrancó el sistema."""
     try:
         io = psutil.net_io_counters()
         return {
@@ -53,10 +55,8 @@ def obtener_estadisticas_trafico():
     except Exception:
         return None
 
-
 def listar_interfaces_red():
-    """Lista las interfaces de red disponibles (Wi-Fi, Ethernet, etc.) y si están activas.
-    Pensado para depuración en consola, no para hablarse en voz alta (puede ser largo)."""
+    """Lista las interfaces de red disponibles (Wi-Fi, Ethernet, etc.) y si están activas."""
     try:
         interfaces = {}
         direcciones = psutil.net_if_addrs()
@@ -70,6 +70,41 @@ def listar_interfaces_red():
         print(f"[Red]: Error al listar interfaces: {e}")
         return {}
 
+def abrir_terminal_ping(target: str = "8.8.8.8") -> str:
+    """Ejecuta el script net_ping.bat en una terminal externa.
+
+    'target' llega desde lo que dice el usuario/LLM. Antes se interpolaba
+    directo en un string con shell=True: un target como
+    '8.8.8.8 & del /f /q C:\\algo' se habría ejecutado tal cual. Ahora se
+    valida contra caracteres de shell y se pasa como argv separado (nunca
+    shell=True), así que aunque contuviera esos caracteres no tendrían
+    efecto especial.
+    """
+    bat_path = os.path.join(SCRIPTS_DIR, "net_ping.bat")
+    try:
+        target_seguro = sanitizar_o_rechazar(target, contexto="target de ping")
+    except EntradaNoSeguraError:
+        return "Señor, ese destino contiene caracteres no permitidos. Indíqueme una IP o dominio válido."
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "REVAN - Ping", "cmd", "/k", bat_path, target_seguro],
+            shell=False,
+        )
+        return f"Desplegando diagnóstico de Ping hacia {target_seguro}."
+    except Exception as e:
+        return f"Error al abrir la terminal de Ping: {e}"
+
+def abrir_terminal_scan() -> str:
+    """Ejecuta el script net_scan.bat en una terminal externa."""
+    bat_path = os.path.join(SCRIPTS_DIR, "net_scan.bat")
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "REVAN - Scan", "cmd", "/k", bat_path],
+            shell=False,
+        )
+        return "Desplegando escaneo de sockets y puertos en terminal externa."
+    except Exception as e:
+        return f"Error al abrir la terminal de escaneo: {e}"
 
 def analizar_red() -> str:
     if not hay_conexion_internet():
@@ -94,7 +129,6 @@ def analizar_red() -> str:
         )
 
     return " ".join(partes)
-
 
 if __name__ == "__main__":
     print(analizar_red())
