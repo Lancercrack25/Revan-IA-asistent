@@ -17,7 +17,6 @@ def buscar_y_resumir_tema(termino_busqueda: str):
         
         if respuesta.status_code != 200:
             return f"No logré encontrar un artículo directo para '{termino_busqueda}' en la red principal."
-        # Parseamos el HTML de forma ultra veloz
         soup = BeautifulSoup(respuesta.text, 'html.parser')
         párrafos = soup.find_all('p')
         texto_limpio = "\n".join([p.text for p in párrafos[:3] if p.text.strip()])

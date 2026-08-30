@@ -13,7 +13,6 @@ ARCHIVOS_SENSIBLES: tuple[str, ...] = (
     "src/Phone/.env",
 )
 
-
 def _permisos_demasiado_abiertos(ruta: Path) -> bool:
     if os.name == "nt":
         return False
