@@ -79,7 +79,6 @@ def registrar_accion_sistema(orden: str, respuesta: str, accion_tipo: str) -> bo
         return False
     finally:
         liberar_conexion(conn)
-
 # --- GESTIÓN DE ESTADO DE CARPETAS (CONTEXTO ACTIVO) ---
 def guardar_ruta_actual(ruta_absoluta: str) -> bool:
     """Registra en PostgreSQL la última carpeta sobre la cual operó el usuario."""

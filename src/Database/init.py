@@ -5,12 +5,10 @@ import sys
 
 # Prevenir generación de archivos .pyc
 sys.dont_write_bytecode = True
-
 from src.Database.conexion import obtener_conexion, DB_CONFIG
 from src.Database.tablas import crear_tablas_si_no_existen
 
 # ================= CREAR BD =================
-
 def crear_bd_si_no_existe():
     conn = None
     try:

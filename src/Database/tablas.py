@@ -16,7 +16,6 @@ def crear_tablas_si_no_existen(conn):
         return
     try:
         cur = conn.cursor()
-
         # TABLA 1: HISTORIAL DE INTERACCIONES Y COMANDOS
         query_historial = """
         CREATE TABLE IF NOT EXISTS historial_interacciones (
@@ -27,7 +26,6 @@ def crear_tablas_si_no_existen(conn):
             accion_ejecutada VARCHAR(100) DEFAULT 'CONVERSACION'
         );
         """
-
         # TABLA 2: MEMORIA DE LARGO PLAZO (SISTEMA DE RECUERDOS)
         query_memoria = """
         CREATE TABLE IF NOT EXISTS memoria_largo_plazo (
@@ -37,9 +35,6 @@ def crear_tablas_si_no_existen(conn):
             fecha_guardado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
-
-        # TABLA 3: ESTADO DEL SISTEMA (FOCO Y RUTA ACTIVA EN TIEMPO REAL)
-        # Permite saber en qué carpeta está trabajando el usuario para crear subcarpetas o archivos ahí.
         query_estado = """
         CREATE TABLE IF NOT EXISTS estado_sistema (
             clave VARCHAR(50) PRIMARY KEY,
@@ -47,7 +42,6 @@ def crear_tablas_si_no_existen(conn):
             actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
-        
         query_memoria_semantica = """
         CREATE TABLE IF NOT EXISTS memoria_semantica (
             id SERIAL PRIMARY KEY,
@@ -57,13 +51,11 @@ def crear_tablas_si_no_existen(conn):
             fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
-
         # Ejecutamos las 4 tablas
         cur.execute(query_historial)
         cur.execute(query_memoria)
         cur.execute(query_estado)
         cur.execute(query_memoria_semantica)
-
         # INSERTAR ESTADO INICIAL (RUTA DEL ESCRITORIO POR DEFECTO)
         ruta_escritorio = os.path.join(os.path.expanduser("~"), "Desktop")
         query_inicial_ruta = """
@@ -72,11 +64,9 @@ def crear_tablas_si_no_existen(conn):
         ON CONFLICT (clave) DO NOTHING;
         """
         cur.execute(query_inicial_ruta, (ruta_escritorio,))
-
         # Todo en una sola transacción, un solo commit al final
         conn.commit()
         print("[REVAN DB]: Tablas e infraestructura de estado inicializadas correctamente.")
-
         cur.close()
     except psycopg2.Error as e:
         print("Error de PostgreSQL al crear las tablas:", e)

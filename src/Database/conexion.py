@@ -4,9 +4,6 @@ from psycopg2 import pool as pg_pool
 import os
 import sys
 from dotenv import load_dotenv
-
-# BUG ANTERIOR: buscaba en src/.env (dirname(__file__) + '..'), pero el archivo
-# real vive en src/Database/.env, junto a este mismo módulo. Se corrige la ruta.
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 sys.dont_write_bytecode = True  # Evita la creación de archivos
 
