@@ -290,13 +290,6 @@ def bucle_escucha_hilo():
         time.sleep(0.05)
 
 def bucle_rendimiento_hilo(intervalo_segundos: float = 4.0):
-    """
-    Cada 'intervalo_segundos' toma un snapshot de hardware/agentes/módulos
-    y lo transmite por WebSocket -alimenta las gráficas en tiempo real de
-    la página de Rendimiento en el dashboard-. Corre mientras el sistema
-    esté activo; si algo falla en una vuelta, no tumba el hilo, solo lo
-    reporta y sigue en la siguiente.
-    """
     global sistema_activo
     while sistema_activo:
         try:
@@ -660,7 +653,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
             "seguridad de mi red", "mi red es segura",
         ])
         es_marcar_conocidos = "marca" in orden_limpia_sin_acentos and ("conocido" in orden_limpia_sin_acentos or "conocidos" in orden_limpia_sin_acentos)
-        
         es_consulta_red = (
             not (es_consulta_velocidad or es_consulta_latencia or es_consulta_intrusos or es_marcar_conocidos or es_escaneo_puertos or es_ping_terminal)
             and ("red" in palabras_lista or "ip" in palabras_lista or
@@ -732,7 +724,6 @@ def ejecutar_orden(orden_limpia: str, orden_mostrar: str = None):
         if any(w in orden_limpia_sin_acentos for w in ["camara", "que ves"]):
             reproducir_sfx("modules", "Cam")
             orden_limpia = "enciende la camara y dime que ves"
-
         es_orden_tecnica = es_intencion_de_comando(orden_limpia)
         respuesta_final = None
 
